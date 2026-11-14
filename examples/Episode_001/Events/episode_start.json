@@ -1,0 +1,13 @@
+{
+  "schema_version": "0.1",
+  "event_id": "event.episode_start",
+  "trigger": {
+    "type": "episode_started"
+  },
+  "actions": [
+    {
+      "type": "open_conversation",
+      "conversation_id": "anisha.day01"
+    }
+  ]
+}
