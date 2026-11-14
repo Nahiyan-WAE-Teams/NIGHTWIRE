@@ -296,6 +296,12 @@ namespace Nightwire.Runtime.Saves
                 x.DeliveredMessageIds == null || x.ReadMessageIds == null || x.SelectedOptions == null ||
                 double.IsNaN(x.ElapsedDelaySeconds) || double.IsInfinity(x.ElapsedDelaySeconds) || x.ElapsedDelaySeconds < 0))
                 throw new SaveStoreException("save_payload_invalid", "Conversation save data is incomplete or invalid.");
+            if (payload.Calls.Any(x => x == null || string.IsNullOrWhiteSpace(x.CallId) || x.ElapsedMilliseconds < 0 ||
+                x.FiredCueIds == null || x.FiredSubtitleIds == null) ||
+                payload.Minigames.Any(x => x == null || string.IsNullOrWhiteSpace(x.MinigameId) || x.AttemptsUsed < 0 ||
+                double.IsNaN(x.ElapsedSeconds) || double.IsInfinity(x.ElapsedSeconds) || x.ElapsedSeconds < 0 ||
+                x.SequenceInput == null || x.MatchedItemIds == null || x.SequenceInput.Count > 32))
+                throw new SaveStoreException("save_payload_invalid", "Call or minigame save data is incomplete or invalid.");
             if (payload.CompletedEventIds.Any(string.IsNullOrWhiteSpace) || payload.UnlockedAssetIds.Any(string.IsNullOrWhiteSpace) ||
                 payload.StoryFlags.Any(x => x == null || string.IsNullOrWhiteSpace(x.Name) ||
                     (x.Kind == StoryFlagValueKind.Number && (double.IsNaN(x.NumberValue) || double.IsInfinity(x.NumberValue)))) ||
