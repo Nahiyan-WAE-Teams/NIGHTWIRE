@@ -128,8 +128,8 @@ namespace Nightwire.Unity
         {
             if (paused && sessionHost?.ActiveSession != null)
             {
-                var result = sessionHost.ActiveSession.SaveNow();
-                if (!result.Success)
+                var result = sessionHost.SaveCheckpoint();
+                if (result != null && !result.Success)
                     Debug.LogError("NIGHTWIRE pause save failed: " + result.Error, this);
             }
         }
