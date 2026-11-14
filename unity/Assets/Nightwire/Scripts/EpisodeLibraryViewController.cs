@@ -24,6 +24,13 @@ namespace Nightwire.Unity.UI
         /// <summary>The game host handles opening/resuming a verified installed episode.</summary>
         public event Action<string> PlayEpisodeRequested;
 
+        public void SetVisible(bool visible)
+        {
+            if (document == null) document = GetComponent<UIDocument>();
+            if (document != null && document.rootVisualElement != null)
+                document.rootVisualElement.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
         public void Bind(EpisodeLibraryPresentation model)
         {
             if (model == null) throw new ArgumentNullException(nameof(model));
