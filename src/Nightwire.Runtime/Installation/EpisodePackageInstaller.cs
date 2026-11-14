@@ -95,6 +95,16 @@ namespace Nightwire.Runtime.Installation
                 var backups = pair.Value.OrderByDescending(Directory.GetLastWriteTimeUtc).ToList();
                 try
                 {
+                    if (File.Exists(destination))
+                    {
+                        warnings.Add("Episode destination is a file; backup retained for '" + pair.Key + "'.");
+                        continue;
+                    }
+                    if (Directory.Exists(destination) && (File.GetAttributes(destination) & FileAttributes.ReparsePoint) != 0)
+                    {
+                        warnings.Add("Episode destination is a symbolic link or reparse point; backup retained for '" + pair.Key + "'.");
+                        continue;
+                    }
                     if (!Directory.Exists(destination))
                     {
                         Directory.Move(backups[0], destination);
