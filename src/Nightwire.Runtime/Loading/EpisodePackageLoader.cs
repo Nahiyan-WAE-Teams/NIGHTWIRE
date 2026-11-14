@@ -491,7 +491,7 @@ namespace Nightwire.Runtime.Loading
 
         private EpisodePackageDescriptor ParseDescriptor(JsonElement root)
         {
-            return new EpisodePackageDescriptor
+            var descriptor = new EpisodePackageDescriptor
             {
                 SchemaVersion = RequiredString(root, "schema_version", "episode.json"),
                 EpisodeId = RequiredString(root, "episode_id", "episode.json"),
@@ -502,7 +502,9 @@ namespace Nightwire.Runtime.Loading
                 EntryEventId = RequiredString(root, "entry_event", "episode.json"),
                 DefaultLocale = RequiredString(root, "default_locale", "episode.json"),
                 Manifest = RequiredString(root, "manifest", "episode.json")
-            }.Also(d => d.SupportedLocales.AddRange(StringArray(root, "supported_locales")));
+            };
+            descriptor.SupportedLocales.AddRange(StringArray(root, "supported_locales"));
+            return descriptor;
         }
 
         private static EpisodeManifest ParseManifest(JsonElement root)
@@ -547,6 +549,8 @@ namespace Nightwire.Runtime.Loading
         private JsonDocument ReadJson(string path, int maxBytes)
         {
             if (!File.Exists(path)) throw Fail("required_json_missing", $"Required JSON file is missing: '{path}'.");
+            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                throw Fail("unsafe_json_link", $"Symbolic links and reparse points are not allowed: '{path}'.");
             var info = new FileInfo(path);
             if (info.Length > maxBytes) throw Fail("json_too_large", $"JSON file exceeds {maxBytes} bytes: '{path}'.");
             try
@@ -580,7 +584,13 @@ namespace Nightwire.Runtime.Loading
         private static bool TryVersion(string value, out Version version)
         {
             string core = value.Split('-', '+')[0];
-            return Version.TryParse(core, out version!);
+            if (Version.TryParse(core, out var parsed))
+            {
+                version = parsed;
+                return true;
+            }
+            version = new Version(0, 0, 0);
+            return false;
         }
 
         private static string ResolveSafePath(string root, string relative)
@@ -647,9 +657,5 @@ namespace Nightwire.Runtime.Loading
 
         private static EpisodePackageLoadException Fail(string code, string message) => new EpisodePackageLoadException(code, message);
 
-        private static class Fluent
-        {
-            public static T Also<T>(this T value, Action<T> action) { action(value); return value; }
-        }
     }
 }
