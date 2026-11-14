@@ -186,7 +186,7 @@ The host must implement `IEpisodeInstallLeaseProvider` so lease acquisition is a
 
 `Installation/EpisodeLibraryPresentation.cs` exposes immutable UI snapshots, catalogue state, per-episode status, download byte progress, cancellation, and install/update operations without depending on Unity. Construct it on the Unity main thread so its `Progress<T>` and `Changed` callbacks return to that synchronization context. A UI host should subscribe while enabled and unsubscribe while disabled; it owns the presentation model lifecycle.
 
-`Installation/EpisodeAccessCoordinator.cs` implements the manager's install lease provider and also exposes session leases. The host must acquire a session lease before starting/resuming `RuntimeSessionCoordinator`, hold it until after `CloseSession`, then dispose it. Pass the same coordinator instance to `EpisodeReleaseManager`. This serializes session-open and install-open operations atomically within one process.
+`Installation/EpisodeLibraryPresentation.cs` implements the manager's install lease provider and also exposes session leases. The host must acquire a session lease before starting/resuming `RuntimeSessionCoordinator`, hold it until after `CloseSession`, then dispose it. Pass the same coordinator instance to `EpisodeReleaseManager`. This serializes session-open and install-open operations atomically within one process.
 
 Unity UI Toolkit integration source and setup notes are under `unity/Assets/Nightwire` and `docs/architecture/UNITY_EPISODE_LIBRARY_UI.md`. The view raises `PlayEpisodeRequested`; the host remains responsible for starting/resuming gameplay. Unity Editor import, runtime assembly dependency integration, play-mode validation, and Android IL2CPP verification have not been completed.
 
