@@ -148,8 +148,9 @@ namespace Nightwire.Runtime.Installation
             _leaseProvider = leaseProvider ?? throw new ArgumentNullException(nameof(leaseProvider));
             _ownsDownloader = downloader == null;
             _downloader = downloader ?? new EpisodePackageDownloader();
-            _installer = installer ?? new EpisodePackageInstaller();
-            _loader = loader ?? new EpisodePackageLoader();
+            _loader = loader ?? new EpisodePackageLoader(
+                new Nightwire.Runtime.Domain.EpisodePackageLoaderOptions { RuntimeVersion = runtimeVersion });
+            _installer = installer ?? new EpisodePackageInstaller(loader: _loader);
         }
 
         /// <summary>Must run before sessions or installs are opened.</summary>
