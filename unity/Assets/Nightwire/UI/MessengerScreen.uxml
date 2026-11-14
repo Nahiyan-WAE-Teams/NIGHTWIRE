@@ -5,7 +5,7 @@
             <ui:Button name="back-button" text="‹ ARCHIVE" class="back-button" />
             <ui:VisualElement class="contact-block">
                 <ui:Label name="contact-name" text="NIGHTWIRE CONTACT" class="contact-name" />
-                <ui:Label name="contact-status" text="SECURE CHANNEL · LOCAL EPISODE" class="contact-status" />
+                <ui:Label name="contact-status" text="LOCAL STORY CHANNEL · EPISODE CONTENT" class="contact-status" />
             </ui:VisualElement>
             <ui:Label name="contact-mark" text="NW" class="contact-mark" />
         </ui:VisualElement>
