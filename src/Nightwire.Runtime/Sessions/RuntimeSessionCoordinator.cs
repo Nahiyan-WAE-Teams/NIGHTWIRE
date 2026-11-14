@@ -328,6 +328,10 @@ namespace Nightwire.Runtime.Sessions
                 return "Save points to a call that is absent from this episode version.";
             if (state.PendingMinigameId != null && !package.Minigames.ContainsKey(state.PendingMinigameId))
                 return "Save points to a minigame that is absent from this episode version.";
+            foreach (var pair in state.CallProgress)
+                if (!package.Calls.ContainsKey(pair.Key)) return "Saved call progress is not present in this episode version.";
+            foreach (var pair in state.MinigameProgress)
+                if (!package.Minigames.ContainsKey(pair.Key)) return "Saved minigame progress is not present in this episode version.";
             foreach (var pair in state.ConversationProgress)
             {
                 if (!package.Conversations.TryGetValue(pair.Key, out var conversation))
