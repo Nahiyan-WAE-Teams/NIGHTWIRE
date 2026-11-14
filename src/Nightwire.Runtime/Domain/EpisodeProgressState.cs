@@ -48,6 +48,7 @@ namespace Nightwire.Runtime.Domain
         public long ElapsedMilliseconds { get; set; }
         public bool IsComplete { get; set; }
         public HashSet<string> FiredCueIds { get; } = new HashSet<string>(StringComparer.Ordinal);
+        public HashSet<string> FiredSubtitleIds { get; } = new HashSet<string>(StringComparer.Ordinal);
     }
 
     public sealed class MinigameProgressState
