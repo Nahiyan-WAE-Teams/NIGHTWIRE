@@ -1162,6 +1162,13 @@ internal static class Program
         public void SaveHighestAcceptedSequence(long sequence) { Sequence = sequence; }
     }
 
+    private sealed class FailingReleaseSequenceStore : IReleaseCatalogueSequenceStore
+    {
+        public long LoadHighestAcceptedSequence() => 0;
+        public void SaveHighestAcceptedSequence(long sequence) =>
+            throw new InvalidOperationException("StrongBox persistence is unavailable.");
+    }
+
     private sealed class DeferredCatalogueTransport : IReleaseCatalogueTransport
     {
         private readonly TaskCompletionSource<byte[]> _completion =
@@ -1244,6 +1251,12 @@ internal static class Program
         var acceptance = new ReleaseCatalogueAcceptanceService(verifier, sequenceStore);
         var accepted = acceptance.Accept(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow);
         Assert(accepted.Success && sequenceStore.Sequence == 7, accepted.Error ?? "Accepted catalogue sequence was not persisted.");
+
+        var failingAcceptance = new ReleaseCatalogueAcceptanceService(verifier, new FailingReleaseSequenceStore());
+        var storageFailure = failingAcceptance.Accept(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow);
+        Assert(!storageFailure.Success && storageFailure.ErrorCode == "sequence_store_failed",
+            "A StrongBox persistence exception did not fail catalogue acceptance closed.");
+
         var rollback = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow, 8);
         Assert(!rollback.Success && rollback.ErrorCode == "catalogue_rollback", "Old catalogue sequence was accepted.");
 
