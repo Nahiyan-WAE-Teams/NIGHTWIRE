@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using Nightwire.Runtime.Loading;
 using Nightwire.Runtime.Domain;
 using Nightwire.Runtime.Progression;
@@ -21,6 +22,7 @@ internal static class Program
         Run("episode loader rejects an older runtime", EpisodeLoaderRejectsOldRuntime, ref failures);
         Run("conversation runtime advances by authored delay and persists read state", ConversationRuntimePersistsProgress, ref failures);
         Run("conversation choices select the authored branch", ConversationRuntimeBranchesOnChoice, ref failures);
+        Run("choice effects update story flags and relationship scores", ConversationChoiceEffectsPersist, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -250,6 +252,41 @@ internal static class Program
             "Runtime did not follow the selected choice branch.");
         Assert(!progress.DeliveredMessageIds.Contains("anisha.day01.003"),
             "Runtime delivered a message from the unselected branch.");
+    }
+
+
+    private static void ConversationChoiceEffectsPersist()
+    {
+        string root = FindRepositoryRoot();
+        var package = new EpisodePackageLoader().Load(Path.Combine(root, "examples", "Episode_001"));
+        using var document = JsonDocument.Parse(@"{
+            ""conversation_id"": ""choice.effects"",
+            ""messages"": [{
+                ""message_id"": ""choice.effects.prompt"",
+                ""type"": ""choice"",
+                ""sender_id"": ""anisha"",
+                ""prompt_key"": ""choice.effects.prompt"",
+                ""options"": [{
+                    ""option_id"": ""trust"",
+                    ""text_key"": ""choice.effects.trust"",
+                    ""next_message_id"": null,
+                    ""set_flags"": [""anisha_trusted""],
+                    ""relationship_delta"": 5
+                }]
+            }]
+        }");
+        package.Conversations["choice.effects"] = document.RootElement.Clone();
+
+        var state = CreateState();
+        var runtime = new ConversationRuntime();
+        Assert(runtime.BeginConversation(package, state, "choice.effects").Success, "Choice conversation did not begin.");
+        Assert(runtime.Advance(package, state, 0).Success, "Choice prompt did not deliver.");
+        var selected = runtime.SelectChoice(package, state, "trust");
+        Assert(selected.Success, selected.Error ?? "Choice selection failed.");
+        Assert(state.StoryFlags.TryGetValue("anisha_trusted", out var flag) &&
+            flag.Kind == StoryFlagValueKind.Boolean && flag.BooleanValue, "Choice flag was not applied.");
+        Assert(state.RelationshipScores.TryGetValue("anisha", out var score) && score == 5,
+            "Relationship delta was not applied to the choice sender.");
     }
 
     private static string FindRepositoryRoot()
