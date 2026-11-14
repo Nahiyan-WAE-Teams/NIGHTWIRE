@@ -72,10 +72,11 @@ The loader does not authenticate who published a package. A future installer mus
 `Conversations/ConversationRuntime` interprets the verified conversation documents in a loaded package. The host advances time explicitly through `Advance`; there are no background timers or Unity dependencies in the core.
 
 - Authored `delay_seconds` values gate message delivery and can be advanced deterministically by the host.
-- A delivered choice pauses progression until a valid option is selected.
+- A delivered choice pauses progression until a valid option is selected; authored choice flags and relationship deltas update player-owned story state.
 - `next_message_id` selects an explicit branch; an omitted property continues in authored order, while an explicit JSON null ends the conversation.
 - Delivery, read state, selected options, the current/next message, and partially elapsed delay are stored in `EpisodeProgressState.ConversationProgress`, not in episode files.
 - Marking a delivered message read emits the `message_completed` story trigger; selecting an option emits `choice_selected`.
+- A bounded advancement pass yields safely on long branch cycles and preserves elapsed time for the next host tick.
 - The runtime does not implement free-form player replies, live networking, or presentation/typing animations. UI code can render typing indicators using the same authored delay information without changing story state.
 
 The host should serialize the player progress object using a versioned save format. Save serialization and migration are not yet implemented in this library.
