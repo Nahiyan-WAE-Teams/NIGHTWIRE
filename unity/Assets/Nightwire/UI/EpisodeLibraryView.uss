@@ -1,0 +1,52 @@
+.library-root {
+    flex-grow: 1;
+    min-height: 100%;
+    padding-left: 28px;
+    padding-right: 28px;
+    padding-top: 34px;
+    padding-bottom: 20px;
+    background-color: rgb(7, 10, 20);
+    color: rgb(235, 239, 250);
+}
+.top-glow {
+    position: absolute;
+    top: -150px;
+    right: -120px;
+    width: 360px;
+    height: 300px;
+    background-color: rgba(105, 64, 190, 0.12);
+    border-radius: 100%;
+}
+.header { margin-bottom: 24px; }
+.brand-row { flex-direction: row; align-items: center; margin-bottom: 28px; }
+.wordmark { color: rgb(240, 242, 255); font-size: 18px; -unity-font-style: bold; letter-spacing: 3px; }
+.eyebrow { color: rgb(166, 121, 255); font-size: 9px; letter-spacing: 2px; margin-left: 12px; }
+.page-title { font-size: 31px; -unity-font-style: bold; color: rgb(245, 246, 255); margin-bottom: 8px; }
+.status-copy { font-size: 12px; color: rgb(143, 153, 177); white-space: normal; }
+.toolbar { flex-direction: row; margin-bottom: 20px; }
+.button { height: 42px; border-radius: 5px; font-size: 10px; -unity-font-style: bold; letter-spacing: 1px; }
+.button-primary { flex-grow: 1; background-color: rgb(112, 75, 194); color: white; border-top-width: 0; border-bottom-width: 0; border-left-width: 0; border-right-width: 0; }
+.button-primary:hover { background-color: rgb(133, 91, 220); }
+.button-quiet { width: 142px; margin-left: 9px; background-color: rgb(22, 28, 44); color: rgb(180, 188, 209); border-top-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-right-width: 1px; border-top-color: rgb(47, 56, 79); border-bottom-color: rgb(47, 56, 79); border-left-color: rgb(47, 56, 79); border-right-color: rgb(47, 56, 79); }
+.episode-list { flex-grow: 1; }
+.episode-card { padding: 17px; margin-bottom: 12px; background-color: rgb(15, 21, 36); border-top-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-right-width: 1px; border-top-color: rgb(37, 46, 68); border-bottom-color: rgb(37, 46, 68); border-left-color: rgb(37, 46, 68); border-right-color: rgb(37, 46, 68); border-radius: 7px; }
+.episode-card-top { flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.episode-name { font-size: 15px; color: rgb(238, 241, 252); -unity-font-style: bold; }
+.episode-status { font-size: 9px; color: rgb(174, 133, 255); letter-spacing: 1px; }
+.episode-meta { font-size: 11px; color: rgb(139, 150, 176); margin-bottom: 12px; }
+.episode-actions { flex-direction: row; align-items: center; }
+.episode-action { min-width: 104px; height: 34px; background-color: rgb(35, 42, 64); color: rgb(231, 233, 246); border-radius: 4px; font-size: 10px; -unity-font-style: bold; }
+.episode-progress { flex-grow: 1; height: 7px; margin-left: 12px; }
+.empty-state { align-items: center; justify-content: center; padding: 34px; }
+.empty-title { color: rgb(160, 170, 194); font-size: 11px; letter-spacing: 2px; -unity-font-style: bold; }
+.empty-copy { color: rgb(112, 124, 151); font-size: 11px; margin-top: 8px; }
+.footer { flex-direction: row; align-items: center; justify-content: space-between; padding-top: 15px; border-top-width: 1px; border-top-color: rgb(35, 42, 61); margin-top: 12px; }
+.footer-copy { color: rgb(101, 114, 142); font-size: 8px; letter-spacing: 1px; }
+.footer-indicator { width: 6px; height: 6px; border-radius: 50%; background-color: rgb(143, 93, 233); }
+.button, .episode-action {
+    transition-property: background-color, scale, opacity;
+    transition-duration: 140ms;
+    transition-timing-function: ease-out;
+}
+.episode-action:hover { background-color: rgb(52, 58, 86); scale: 1.015 1.015; }
+.button-quiet:hover { background-color: rgb(34, 41, 62); }
