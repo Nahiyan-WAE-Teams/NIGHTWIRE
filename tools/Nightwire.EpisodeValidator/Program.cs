@@ -564,7 +564,9 @@ internal static class Program
             }
 
             var completionEvent = GetString(call, "completion_event_id");
-            if (completionEvent is not null &&
+            if (completionEvent is null)
+                Errors.Add($"Call '{callId}': missing completion_event_id.");
+            else if (
                 (!events.TryGetValue(completionEvent, out var completion) ||
                  !completion.TryGetProperty("trigger", out var trigger) ||
                  GetString(trigger, "type") != "call_ended" ||
@@ -593,7 +595,7 @@ internal static class Program
                 var target = GetNumber(config, "target_frequency");
                 var tolerance = GetNumber(config, "tolerance");
                 if (min is null || max is null || target is null || tolerance is null ||
-                    min >= max || target < min || target > max || tolerance <= 0)
+                    min.Value >= max.Value || target.Value < min.Value || target.Value > max.Value || tolerance.Value <= 0)
                     Errors.Add($"Minigame '{minigameId}': frequency range, target, and tolerance are inconsistent.");
             }
             else if (type == "sequence_reconstruction")
