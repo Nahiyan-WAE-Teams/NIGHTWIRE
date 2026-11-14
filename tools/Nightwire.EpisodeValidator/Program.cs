@@ -236,7 +236,11 @@ internal static class Program
             }
 
             if (!paths.Add(path)) Errors.Add($"manifest.json: duplicate or case-colliding path '{path}'.");
+            if (string.Equals(path, "manifest.json", StringComparison.OrdinalIgnoreCase))
+                Errors.Add("manifest.json: the manifest must not list or hash itself.");
             if (!IsSafeRelativePath(path)) Errors.Add($"manifest.json: unsafe relative path '{path}'.");
+            if (kind is not ("episode_descriptor" or "character_profile" or "conversation" or "event" or "call" or "minigame" or "localization" or "media" or "other"))
+                Errors.Add($"manifest.json: unsupported file kind '{kind}' for '{path}'.");
             if (sizeBytes < 0) Errors.Add($"manifest.json: negative size_bytes for '{path}'.");
             if (hash.Length != 64 || hash.Any(c => !Uri.IsHexDigit(c)))
                 Errors.Add($"manifest.json: invalid SHA-256 value for '{path}'.");
@@ -344,6 +348,9 @@ internal static class Program
             var participants = GetStringArray(conversation, "participants", conversationId);
             if (!participants.Contains("player", StringComparer.Ordinal))
                 Errors.Add($"{conversationId}: participants must include 'player'.");
+            foreach (var participant in participants)
+                if (participant != "player" && !characters.Contains(participant))
+                    Errors.Add($"{conversationId}: participant '{participant}' has no character profile.");
 
             if (!conversation.TryGetProperty("messages", out var messages) || messages.ValueKind != JsonValueKind.Array)
             {
