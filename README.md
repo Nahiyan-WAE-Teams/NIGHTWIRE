@@ -17,7 +17,7 @@ NIGHTWIRE is designed around a reusable game runtime and independently downloada
 
 The repository is being established. The first milestone is the episode package contract and its validation rules. Runtime implementation follows after that contract is reviewed.
 
-See [the episode package specification](docs/architecture/EPISODE_PACKAGE_SPEC.md), the [JSON Schema guide](docs/architecture/JSON_SCHEMA_GUIDE.md), and the [sample Episode 001](examples/Episode_001/episode.json).
+See [the episode package specification](docs/architecture/EPISODE_PACKAGE_SPEC.md), the [JSON Schema guide](docs/architecture/JSON_SCHEMA_GUIDE.md), and the [sample Episode 001](examples/Episode_001/episode.json). The v0.1 contracts include character posts, prerecorded calls, and declarative minigames.
 
 ## Planned technology
 
@@ -42,3 +42,14 @@ dotnet run --project tools/Nightwire.EpisodeValidator -- examples/Episode_001
 ```
 
 The validator checks package integrity and cross-file references. See its [README](tools/Nightwire.EpisodeValidator/README.md) for the exact validation boundary.
+
+
+## Validator tests
+
+The standard-library Python integration tests build and exercise the validator:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+See [tests/README.md](tests/README.md). GitHub Actions remains intentionally deferred.
