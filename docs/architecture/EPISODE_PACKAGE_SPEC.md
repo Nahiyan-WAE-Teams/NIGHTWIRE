@@ -365,7 +365,7 @@ Missing localization keys must be detected during package validation. The runtim
 
 ## 10. Player save data
 
-Save data is separate from the episode package and is scoped by episode ID.
+Save data is separate from the episode package and is scoped by episode ID. The initial portable implementation stores a versioned `save.json` envelope under the host-provided save root, with a sibling `save.json.bak` recovery copy.
 
 Proposed logical layout:
 
@@ -389,7 +389,7 @@ Save data may contain:
 - Current event and episode progress.
 - Save schema version and last-updated timestamp.
 
-Authored episode files must never be modified to record player progress. Save migrations must be explicit and versioned.
+Authored episode files must never be modified to record player progress. Save migrations must be explicit and versioned. The runtime rejects unknown save-format versions and episode-content version mismatches unless a complete registered migration chain exists. A local SHA-256 checksum detects accidental corruption but is not a publisher signature or tamper-proof security boundary.
 
 ## 11. Validation before runtime loading
 
@@ -501,3 +501,14 @@ The initial implementation supports:
 - Emitting `message_completed` when a delivered message is marked read and `choice_selected` after a valid choice.
 
 The interpreter does not provide free-form player replies, a Unity typing indicator, wall-clock scheduling, save-file serialization/migration, or UI rendering. Relationship values are accumulated without a global cap because the v0.1 format does not define one. Those remain host/runtime integration work. The C# runtime tests have been authored but have not yet been executed in this environment.
+
+
+## 19. Save persistence implementation boundary
+
+The initial implementation is `src/Nightwire.Runtime/Saves/SaveStore.cs`. Save format version 1 persists the complete current `EpisodeProgressState` through a dedicated DTO rather than serializing domain objects directly. It includes conversation progress, completed events, unlocked assets, typed story flags, relationship scores, notifications, active conversation, and pending call/minigame IDs.
+
+The store writes a flushed temporary file, retains the previous committed save as a backup, and replaces the primary file with a same-directory move. Loading verifies the payload checksum and can recover from the backup if the primary file is invalid. The store enforces configurable file/collection limits and restricts episode IDs used as path components.
+
+Episode-content migrations are explicit implementations of `IEpisodeProgressMigration`, registered by episode ID and source version. The store follows a complete chain to the installed episode version and rejects missing chains. Save-format versions other than the current version are rejected; no historical format migration is claimed yet.
+
+This is local persistence only. It does not provide encryption, anti-tamper guarantees, cloud synchronization, multi-device conflict resolution, concurrent-writer coordination, or Unity lifecycle integration. The runtime tests are authored but have not been executed in the current environment.
