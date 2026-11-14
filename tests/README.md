@@ -29,7 +29,7 @@ The tests use only Python's standard library. They do not run GitHub Actions; CI
 
 ## C# runtime tests
 
-The portable runtime test harness covers story-event execution, package loading, conversation progression, and versioned save persistence:
+The portable runtime test harness covers story-event execution, package loading, conversation progression, versioned save persistence, signed catalogue signature/rollback checks, duplicate JSON property rejection, and malformed minimum-runtime version rejection:
 
 ```bash
 dotnet run --project tests/Nightwire.Runtime.Tests
