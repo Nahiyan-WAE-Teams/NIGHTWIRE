@@ -58,6 +58,7 @@ internal static class Program
         Run("episode downloader verifies a trusted archive hash", EpisodeDownloaderChecksTrustedHash, ref failures);
         Run("signed release catalogue verifies trusted key and rejects rollback", ReleaseCatalogueVerifiesSignatureAndSequence, ref failures);
         Run("installer startup recovery restores interrupted update backup", InstallerRecoveryRestoresPreviousInstall, ref failures);
+        Run("installer rejects signed release identity mismatch before replacing existing content", InstallerRejectsReleaseIdentityMismatch, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -866,6 +867,30 @@ internal static class Program
         envelopeText = envelopeText.Replace(Convert.ToBase64String(signature), Convert.ToBase64String(new byte[64]));
         var tampered = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow);
         Assert(!tampered.Success && tampered.ErrorCode == "signature_invalid", "Invalid catalogue signature was accepted.");
+    }
+
+    private static void InstallerRejectsReleaseIdentityMismatch()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-release-identity-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string archive = Path.Combine(root, "episode.zip");
+            CreateSampleArchive(archive);
+            string installRoot = Path.Combine(root, "installed");
+            var installer = new EpisodePackageInstaller();
+            var first = installer.InstallArchive(archive, installRoot);
+            Assert(first.Success, first.Error ?? "Initial package install failed.");
+            string marker = Path.Combine(first.InstallDirectory!, "preserve.marker");
+            File.WriteAllText(marker, "keep-old-install");
+
+            var mismatch = installer.InstallArchive(archive, installRoot, "nightwire.ep001", "9.9.9");
+            Assert(!mismatch.Success && mismatch.ErrorCode == "release_episode_version_mismatch",
+                "Installer accepted a package version that did not match the signed release.");
+            Assert(File.Exists(marker) && File.ReadAllText(marker) == "keep-old-install",
+                "Rejected release replaced the previously installed episode.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
 
     private static void InstallerRecoveryRestoresPreviousInstall()
