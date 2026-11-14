@@ -89,7 +89,7 @@ class EpisodeValidatorTests(unittest.TestCase):
             "sender_id": "anisha",
             "call_id": "missing.call",
         })
-        conversation_path.write_text(json.dumps(conversation, indent=2) + "\\n", encoding="utf-8")
+        conversation_path.write_text(json.dumps(conversation, indent=2) + "\n", encoding="utf-8")
         self.refresh_manifest_entry(relative)
         result = self.run_validator()
         self.assertEqual(result.returncode, 1)
@@ -100,7 +100,7 @@ class EpisodeValidatorTests(unittest.TestCase):
         minigame_path = self.package / relative
         minigame = json.loads(minigame_path.read_text(encoding="utf-8"))
         minigame["configuration"]["sequence"][1] = "undeclared"
-        minigame_path.write_text(json.dumps(minigame, indent=2) + "\\n", encoding="utf-8")
+        minigame_path.write_text(json.dumps(minigame, indent=2) + "\n", encoding="utf-8")
         self.refresh_manifest_entry(relative)
         result = self.run_validator()
         self.assertEqual(result.returncode, 1)
@@ -111,7 +111,7 @@ class EpisodeValidatorTests(unittest.TestCase):
         post_path = self.package / relative
         post = json.loads(post_path.read_text(encoding="utf-8"))
         post["author_id"] = "missing_character"
-        post_path.write_text(json.dumps(post, indent=2) + "\\n", encoding="utf-8")
+        post_path.write_text(json.dumps(post, indent=2) + "\n", encoding="utf-8")
         self.refresh_manifest_entry(relative)
         result = self.run_validator()
         self.assertEqual(result.returncode, 1)
