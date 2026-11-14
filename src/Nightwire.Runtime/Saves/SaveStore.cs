@@ -418,15 +418,18 @@ namespace Nightwire.Runtime.Saves
             public long ElapsedMilliseconds { get; set; }
             public bool IsComplete { get; set; }
             public List<string> FiredCueIds { get; set; } = new List<string>();
+            public List<string> FiredSubtitleIds { get; set; } = new List<string>();
             public static CallPayload From(string id, CallProgressState state) => new CallPayload
             {
                 CallId = id, ElapsedMilliseconds = state.ElapsedMilliseconds, IsComplete = state.IsComplete,
-                FiredCueIds = state.FiredCueIds.OrderBy(x => x, StringComparer.Ordinal).ToList()
+                FiredCueIds = state.FiredCueIds.OrderBy(x => x, StringComparer.Ordinal).ToList(),
+                FiredSubtitleIds = state.FiredSubtitleIds.OrderBy(x => x, StringComparer.Ordinal).ToList()
             };
             public CallProgressState ToState()
             {
                 var state = new CallProgressState { ElapsedMilliseconds = ElapsedMilliseconds, IsComplete = IsComplete };
                 foreach (string id in FiredCueIds) state.FiredCueIds.Add(id);
+                foreach (string id in FiredSubtitleIds) state.FiredSubtitleIds.Add(id);
                 return state;
             }
         }
