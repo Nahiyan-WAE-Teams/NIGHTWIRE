@@ -73,7 +73,9 @@ namespace Nightwire.Runtime.Installation
                 string destination = Path.GetFullPath(destinationPath);
                 string? directory = Path.GetDirectoryName(destination);
                 if (string.IsNullOrEmpty(directory)) return Error("destination_invalid", "Download destination directory is invalid.");
+                EnsureNoLinkedAncestors(destination);
                 Directory.CreateDirectory(directory);
+                EnsureNoLinkedAncestors(destination);
                 temporary = Path.Combine(directory, ".download-" + Guid.NewGuid().ToString("N") + ".part");
 
                 using var request = new HttpRequestMessage(HttpMethod.Get, source);
@@ -148,6 +150,26 @@ namespace Nightwire.Runtime.Installation
             if (release == null) throw new ArgumentNullException(nameof(release));
             return DownloadAsync(release.ArchiveUrl, destinationPath, release.ArchiveSha256,
                 progress, cancellationToken, release.ArchiveSizeBytes);
+        }
+
+        private static void EnsureNoLinkedAncestors(string path)
+        {
+            string current = Path.GetFullPath(path);
+            while (!string.IsNullOrEmpty(current))
+            {
+                try
+                {
+                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                        throw new IOException("Download destination or one of its parent directories is a symbolic link or reparse point.");
+                }
+                catch (FileNotFoundException) { }
+                catch (DirectoryNotFoundException) { }
+
+                string? parent = Path.GetDirectoryName(current);
+                if (string.IsNullOrEmpty(parent) || string.Equals(parent, current, StringComparison.Ordinal))
+                    break;
+                current = parent;
+            }
         }
 
         private static bool IsSha256(string value)
