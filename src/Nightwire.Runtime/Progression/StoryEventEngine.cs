@@ -48,6 +48,7 @@ namespace Nightwire.Runtime.Progression
                 return result;
             }
 
+            var matchedEvents = new List<StoryEventDefinition>();
             foreach (var storyEvent in episode.Events)
             {
                 if (!Matches(storyEvent, trigger)) continue;
@@ -60,6 +61,12 @@ namespace Nightwire.Runtime.Progression
                     return result;
                 }
 
+                matchedEvents.Add(storyEvent);
+            }
+
+            // Validate the entire trigger batch before applying any side effects.
+            foreach (var storyEvent in matchedEvents)
+            {
                 ApplyActions(storyEvent, state, result);
                 state.CompletedEventIds.Add(storyEvent.EventId);
                 result.ExecutedEventIds.Add(storyEvent.EventId);
