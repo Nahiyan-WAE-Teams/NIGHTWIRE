@@ -1,0 +1,13 @@
+plugins {
+    id 'com.android.library' version '8.13.2'
+}
+
+android {
+    namespace 'com.nightwire.securestore'
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 28
+        consumerProguardFiles 'consumer-rules.pro'
+    }
+}
