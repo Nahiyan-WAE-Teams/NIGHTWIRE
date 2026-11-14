@@ -568,7 +568,7 @@ Payload schema version 1 contains:
 - `issued_utc` and `expires_utc`: UTC validity window
 - `releases[]`: `episode_id`, `episode_version`, `archive_url`, `archive_size_bytes`, `archive_sha256`, and `minimum_runtime_version`
 
-The verifier rejects unknown keys/algorithms, invalid signatures, expired/future-issued catalogues, stale sequence numbers, duplicate release identities, unsafe IDs, non-HTTPS URLs, invalid archive sizes, and malformed digests. The host persists the highest accepted sequence and supplies it as the verifier's `minimumSequence` to prevent rollback across app restarts. The downloader's `DownloadReleaseAsync` method consumes only a verified release entry and enforces its signed archive size and SHA-256 before publishing the archive.
+The verifier rejects unknown keys/algorithms, invalid signatures, expired/future-issued catalogues, stale sequence numbers, duplicate release identities, unsafe IDs, non-HTTPS URLs, invalid archive sizes, and malformed digests. `ReleaseCatalogueAcceptanceService` verifies the envelope and advances an `IReleaseCatalogueSequenceStore` only after successful validation. The host persists the highest accepted sequence in durable platform-backed protected storage and serializes refreshes across processes to prevent rollback across app restarts. The downloader's `DownloadReleaseAsync` method consumes only a verified release entry and enforces its signed archive size and SHA-256 before publishing the archive.
 
 The signing private key is release-infrastructure-only. The app ships trusted public keys. Key rotation is performed by an app update or a future root-signed keyset protocol; a catalogue must never be allowed to introduce a new trust root by itself.
 
