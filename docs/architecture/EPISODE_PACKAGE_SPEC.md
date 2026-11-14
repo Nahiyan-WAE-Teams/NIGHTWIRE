@@ -43,7 +43,7 @@ Episode_001/
 ├── Calls/
 │   └── call01.json
 ├── Minigames/
-│   └── frequency01.json
+│   └── signal_sequence.json
 ├── Media/
 │   ├── Images/
 │   ├── Audio/
@@ -280,6 +280,70 @@ Minigames are declarative definitions. The first proposed supported types are:
 Each minigame has localized title/instructions, validated configuration, optional attempt/time limits, and a completion event. Evidence item media references must resolve through manifest asset IDs. The runtime implements each minigame type; packages cannot provide executable game logic or native plugins.
 
 Character social posts are individual `character_post` documents under each character's `Posts/` folder. A post contains an author, publication timestamp, localized body, optional media assets, and authored comments. Character profile `post_ids` must resolve to these documents.
+
+Example prerecorded video call definition:
+
+```json
+{
+  "schema_version": "0.1",
+  "call_id": "call.anisha.railway",
+  "mode": "video",
+  "presentation": "prerecorded",
+  "participants": ["anisha"],
+  "duration_ms": 42000,
+  "media": {
+    "video_asset_id": "call.anisha.railway.video",
+    "poster_asset_id": "call.anisha.railway.poster"
+  },
+  "subtitle_tracks": [
+    {
+      "locale": "en",
+      "entries": [
+        {
+          "start_ms": 1200,
+          "end_ms": 3900,
+          "text_key": "call.anisha.railway.line01",
+          "speaker_id": "anisha"
+        }
+      ]
+    }
+  ],
+  "cues": [
+    {
+      "cue_id": "signal_interference",
+      "at_ms": 18000,
+      "type": "visual_effect",
+      "effect": "signal_glitch"
+    }
+  ],
+  "completion_event_id": "event.call_anisha_ended"
+}
+```
+
+The referenced video/poster assets must be listed in the manifest. The matching event must use the `call_ended` trigger with this call ID.
+
+Example sequence-reconstruction minigame:
+
+```json
+{
+  "schema_version": "0.1",
+  "minigame_id": "minigame.signal_sequence",
+  "type": "sequence_reconstruction",
+  "title_key": "minigame.signal_sequence.title",
+  "instructions_key": "minigame.signal_sequence.instructions",
+  "completion_event_id": "event.signal_sequence_complete",
+  "attempt_limit": 3,
+  "time_limit_seconds": 90,
+  "configuration": {
+    "sequence": ["low", "high", "low"],
+    "symbols": ["low", "high"],
+    "hint_key": "minigame.signal_sequence.hint"
+  }
+}
+```
+
+The runtime implements the interaction for each supported minigame type. The episode package only supplies the puzzle configuration and localization.
+
 
 ## 9. Localization
 
