@@ -67,6 +67,7 @@ internal static class Program
         Run("installer rejects a symlinked ancestor of its install root", InstallerRejectsSymlinkedRootAncestor, ref failures);
         Run("installer rejects signed release identity mismatch before replacing existing content", InstallerRejectsReleaseIdentityMismatch, ref failures);
         Run("release manager refreshes signed catalogue and installs offline episode", ReleaseManagerInstallsOfflineEpisode, ref failures);
+        Run("release manager cancels active catalogue refresh safely on disposal", ReleaseManagerDisposalCancelsRefresh, ref failures);
         Run("episode access gate excludes session and installer ownership", EpisodeAccessGateExcludesSessionAndInstall, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
@@ -985,6 +986,16 @@ internal static class Program
         public void SaveHighestAcceptedSequence(long sequence) { Sequence = sequence; }
     }
 
+    private sealed class BlockingCatalogueTransport : IReleaseCatalogueTransport
+    {
+        public async Task<byte[]> FetchAsync(Uri catalogueUri, CancellationToken cancellationToken)
+        {
+            var completion = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using (cancellationToken.Register(() => completion.TrySetCanceled()))
+                return await completion.Task.ConfigureAwait(false);
+        }
+    }
+
     private sealed class StubCatalogueTransport : IReleaseCatalogueTransport
     {
         private readonly byte[] _envelope;
@@ -1114,6 +1125,25 @@ internal static class Program
         Assert(access.TryAcquireSessionLease("nightwire.ep001", out var reopenedSession) && reopenedSession != null,
             "Gameplay session could not open after installation released its lease.");
         reopenedSession!.Dispose();
+    }
+
+    private static void ReleaseManagerDisposalCancelsRefresh()
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var verifier = new ReleaseCatalogueVerifier(new[]
+        {
+            new TrustedReleaseKey { KeyId = "dispose-test", SubjectPublicKeyInfo = key.ExportSubjectPublicKeyInfo() }
+        });
+        var acceptance = new ReleaseCatalogueAcceptanceService(verifier, new MemoryReleaseSequenceStore());
+        var manager = new EpisodeReleaseManager(new Uri("https://catalogue.example.test/releases.json"),
+            Path.Combine(Path.GetTempPath(), "nightwire-dispose-install"),
+            Path.Combine(Path.GetTempPath(), "nightwire-dispose-download"),
+            new BlockingCatalogueTransport(), acceptance, new StubInstallLeaseProvider(), "1.0.0");
+        Task<ReleaseCatalogueResult> refresh = manager.RefreshCatalogueAsync(DateTime.UtcNow);
+        manager.Dispose();
+        var result = refresh.GetAwaiter().GetResult();
+        Assert(!result.Success && result.ErrorCode == "catalogue_fetch_cancelled",
+            "Disposing the manager did not cancel an active catalogue refresh cleanly.");
     }
 
     private static void ReleaseManagerInstallsOfflineEpisode()
