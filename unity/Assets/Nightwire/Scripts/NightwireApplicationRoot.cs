@@ -15,6 +15,7 @@ namespace Nightwire.Unity
     public sealed class NightwireApplicationRoot : MonoBehaviour
     {
         [SerializeField] private EpisodeLibraryViewController libraryView;
+        [SerializeField] private Nightwire.Unity.UI.MessengerScreenController messengerView;
         [SerializeField] private NightwirePlatformServicesBehaviour platformServices;
         [SerializeField] private string runtimeVersion = "0.1.0";
 
@@ -79,6 +80,11 @@ namespace Nightwire.Unity
                 libraryPresentation = new EpisodeLibraryPresentation(releaseManager);
                 libraryView.Bind(libraryPresentation);
                 libraryView.PlayEpisodeRequested += PlayEpisodeRequested;
+                if (messengerView != null)
+                {
+                    messengerView.SetVisible(false);
+                    messengerView.CloseRequested += MessengerCloseRequested;
+                }
                 initialized = true;
                 return true;
             }
@@ -119,9 +125,29 @@ namespace Nightwire.Unity
 
             var result = sessionHost.OpenEpisode(episodeId, entry.InstallDirectory);
             if (!result.Success)
+            {
                 Debug.LogWarning("NIGHTWIRE could not open episode: " + result.Error, this);
-            else
-                Debug.Log("NIGHTWIRE episode session opened: " + episodeId, this);
+                return;
+            }
+
+            if (messengerView == null)
+            {
+                Debug.LogWarning("NIGHTWIRE episode opened, but no MessengerScreenController is assigned.", this);
+                return;
+            }
+
+            try
+            {
+                messengerView.Bind(sessionHost);
+                messengerView.SetVisible(true);
+                libraryView.SetVisible(false);
+                Debug.Log("NIGHTWIRE messenger opened: " + episodeId, this);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+                CloseActiveSession();
+            }
         }
 
         private void OnApplicationPause(bool paused)
@@ -142,16 +168,31 @@ namespace Nightwire.Unity
         private void OnDestroy()
         {
             if (libraryView != null) libraryView.PlayEpisodeRequested -= PlayEpisodeRequested;
+            if (messengerView != null) messengerView.CloseRequested -= MessengerCloseRequested;
             CloseActiveSession();
             DisposeServices();
         }
 
+        private void MessengerCloseRequested()
+        {
+            CloseActiveSession();
+        }
+
         public void CloseActiveSession()
         {
-            if (sessionHost?.ActiveSession == null) return;
-            var result = sessionHost.SaveAndClose();
-            if (!result.Success)
-                Debug.LogError("NIGHTWIRE session close save failed: " + result.Error, this);
+            if (sessionHost?.ActiveSession != null)
+            {
+                var result = sessionHost.SaveAndClose();
+                if (!result.Success)
+                    Debug.LogError("NIGHTWIRE session close save failed: " + result.Error, this);
+            }
+
+            if (messengerView != null)
+            {
+                messengerView.SetVisible(false);
+                messengerView.UnbindForSessionClose();
+            }
+            if (libraryView != null) libraryView.SetVisible(true);
         }
 
         private void DisposeServices()
