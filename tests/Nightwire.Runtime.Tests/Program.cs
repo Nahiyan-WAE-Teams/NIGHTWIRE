@@ -42,6 +42,7 @@ internal static class Program
         Run("save store rejects a symlinked episode directory", SaveStoreRejectsSymlinkedEpisodeDirectory, ref failures);
         Run("save store rejects a symlinked ancestor of its root", SaveStoreRejectsSymlinkedRootAncestor, ref failures);
         Run("save store recovers from a corrupt primary using backup", SaveStoreRecoversBackup, ref failures);
+        Run("save store rejects a linked backup-restore temporary file", SaveStoreRejectsLinkedRestoreTemporaryFile, ref failures);
         Run("save store rejects a different episode identity", SaveStoreRejectsEpisodeMismatch, ref failures);
         Run("save store detects episode-version metadata tampering", SaveStoreRejectsMetadataTampering, ref failures);
         Run("save store applies an explicit episode migration", SaveStoreMigratesEpisodeVersion, ref failures);
@@ -496,6 +497,42 @@ internal static class Program
             Assert(!secondLoad.RecoveredFromBackup, "Restored primary save was still treated as corrupt.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void SaveStoreRejectsLinkedRestoreTemporaryFile()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-save-restore-link-" + Guid.NewGuid().ToString("N"));
+        string outside = Path.Combine(Path.GetTempPath(), "nightwire-save-restore-outside-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new SaveStore(root);
+            var state = CreateState();
+            state.RelationshipScores["anisha"] = 1;
+            store.Save(state);
+            state.RelationshipScores["anisha"] = 2;
+            store.Save(state);
+
+            string primary = store.GetSavePath("nightwire.ep001");
+            string restoreTemporary = primary + ".restore.tmp";
+            File.WriteAllText(primary, "{corrupt");
+            File.WriteAllText(outside, "do-not-overwrite");
+            File.CreateSymbolicLink(restoreTemporary, outside);
+
+            bool rejected = false;
+            try { store.Load("nightwire.ep001", "1.0.0"); }
+            catch (SaveStoreException exception) { rejected = exception.ErrorCode == "save_path_unsafe"; }
+
+            Assert(rejected, "Save recovery accepted a linked temporary restore path.");
+            Assert(File.ReadAllText(outside) == "do-not-overwrite",
+                "Save recovery wrote through the linked temporary restore path.");
+        }
+        finally
+        {
+            string restoreTemporary = Path.Combine(root, "nightwire.ep001", "save.json.restore.tmp");
+            if (File.Exists(restoreTemporary)) File.Delete(restoreTemporary);
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+            if (File.Exists(outside)) File.Delete(outside);
+        }
     }
 
     private static void SaveStoreRejectsEpisodeMismatch()
