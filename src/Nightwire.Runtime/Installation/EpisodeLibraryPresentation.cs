@@ -190,11 +190,15 @@ namespace Nightwire.Runtime.Installation
             if (string.IsNullOrWhiteSpace(episodeId))
                 throw new ArgumentException("Episode ID is required.", nameof(episodeId));
 
+            CancellationTokenSource operationSource;
+            CancellationToken operationToken;
             lock (_gate)
             {
                 if (_operationCancellation != null)
                     return FailedOperation("library_operation_in_progress", "Another library operation is already running.", episodeId);
-                _operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                operationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                _operationCancellation = operationSource;
+                operationToken = operationSource.Token;
                 if (!_rows.TryGetValue(episodeId, out var row))
                 {
                     row = new EpisodeLibraryRow { EpisodeId = episodeId, Status = EpisodeLibraryStatus.AvailableToDownload };
@@ -208,7 +212,6 @@ namespace Nightwire.Runtime.Installation
             }
             Publish();
 
-            var operationToken = _operationCancellation.Token;
             var progress = new Progress<EpisodeDownloadProgress>(value =>
             {
                 lock (_gate)
@@ -243,10 +246,11 @@ namespace Nightwire.Runtime.Installation
             {
                 lock (_gate)
                 {
-                    _operationCancellation?.Dispose();
-                    _operationCancellation = null;
+                    if (ReferenceEquals(_operationCancellation, operationSource))
+                        _operationCancellation = null;
                     if (_rows.TryGetValue(episodeId, out var row)) row.IsBusy = false;
                 }
+                operationSource.Dispose();
                 Publish();
             }
         }
@@ -335,8 +339,6 @@ namespace Nightwire.Runtime.Installation
                 if (_disposed) return;
                 _disposed = true;
                 _operationCancellation?.Cancel();
-                _operationCancellation?.Dispose();
-                _operationCancellation = null;
             }
         }
     }
