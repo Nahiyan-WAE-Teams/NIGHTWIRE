@@ -27,6 +27,7 @@ internal static class Program
         Run("save store round-trips player progress", SaveStoreRoundTripsProgress, ref failures);
         Run("save store recovers from a corrupt primary using backup", SaveStoreRecoversBackup, ref failures);
         Run("save store rejects a different episode identity", SaveStoreRejectsEpisodeMismatch, ref failures);
+        Run("save store detects episode-version metadata tampering", SaveStoreRejectsMetadataTampering, ref failures);
         Run("save store applies an explicit episode migration", SaveStoreMigratesEpisodeVersion, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
@@ -369,6 +370,26 @@ internal static class Program
             try { store.Load("nightwire.ep002", "1.0.0"); }
             catch (SaveStoreException exception) { rejected = exception.ErrorCode == "episode_id_mismatch"; }
             Assert(rejected, "A save copied under another episode directory was accepted.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+
+    private static void SaveStoreRejectsMetadataTampering()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-save-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new SaveStore(root);
+            store.Save(CreateState());
+            string path = store.GetSavePath("nightwire.ep001");
+            string json = File.ReadAllText(path);
+            json = json.Replace("\\"episodeVersion\\":\\"1.0.0\\"", "\\"episodeVersion\\":\\"1.1.0\\"");
+            File.WriteAllText(path, json);
+            bool rejected = false;
+            try { store.Load("nightwire.ep001", "1.1.0"); }
+            catch (SaveStoreException exception) { rejected = exception.ErrorCode == "save_invalid"; }
+            Assert(rejected, "Edited episode-version metadata bypassed the save checksum.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
