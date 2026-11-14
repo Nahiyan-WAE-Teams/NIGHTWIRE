@@ -17,6 +17,9 @@ UI Toolkit is selected for this archive screen because it is a multi-resolution,
 - `unity/Assets/Nightwire/UI/EpisodeLibraryView.uxml` — screen hierarchy and named controls.
 - `unity/Assets/Nightwire/UI/EpisodeLibraryView.uss` — dark archive styling and responsive flex layout.
 - `unity/Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` — UI Toolkit view controller.
+- `unity/Assets/Nightwire/Scripts/NightwireApplicationRoot.cs` — application composition root for release, save, library, and session services.
+- `unity/Assets/Nightwire/Scripts/EpisodeSessionHost.cs` — resume/new-session selection and lease lifetime.
+- `unity/Assets/Nightwire/Scripts/INightwirePlatformServices.cs` — platform boundary for trusted keys and rollback-resistant sequence storage.
 - `unity/Assets/Nightwire/Scripts/Nightwire.Unity.asmdef` — presentation assembly boundary referencing `Nightwire.Runtime`.
 - `src/Nightwire.Runtime/Installation/EpisodeLibraryPresentation.cs` — UI-neutral snapshot/progress adapter.
 - `src/Nightwire.Runtime/Installation/EpisodeLibraryPresentation.cs` — atomic per-episode session/install lease gate.
@@ -33,7 +36,22 @@ The visual direction uses near-black navy surfaces, restrained violet accents, c
 6. Subscribe to `PlayEpisodeRequested`. The host should load the installed directory using `RuntimeSessionCoordinator`, resume the player's save when one exists, or start a new session only when no save exists. The UI deliberately does not overwrite or reset player progress.
 7. Call `EpisodeReleaseManager.RecoverAtStartup()` before opening any episode session or beginning any install.
 
-The repository does not yet contain a complete Unity project, scene, Panel Settings asset, Android Player Settings, or a verified Unity import of the runtime assembly. These files are integration source/assets, not a claim that an Editor scene has already been run.
+The repository contains bootstrap/session-host integration source but does not yet contain a complete Unity project, scene, Panel Settings asset, Android Player Settings, a concrete Android secure-storage provider, or a verified Unity import of the runtime assembly. These files are integration source/assets, not a claim that an Editor scene has already been run.
+
+## Application composition and platform boundary
+
+`NightwireApplicationRoot` is the Unity bootstrap component. Assign its episode-library view and a concrete `NightwirePlatformServicesBehaviour` provider, then set the runtime version. On startup it:
+
+1. Obtains the HTTPS catalogue URI, trusted ECDSA P-256 public keys, and protected catalogue sequence store from the platform provider.
+2. Creates persistent episode, download, and save directories under `Application.persistentDataPath`.
+3. Creates one `EpisodeAccessCoordinator` and shares it with the release manager and `EpisodeSessionHost`.
+4. Runs interrupted-install recovery before refreshing the catalogue.
+5. Binds the library presentation to the UI and connects the Play action to session opening.
+6. Saves active progress on application pause and saves/closes the session on application quit or root destruction.
+
+The platform contract intentionally has no default implementation. A production provider must provision public verification keys independently of downloaded catalogue data and store the highest accepted catalogue sequence in rollback-resistant platform storage. A normal editable preferences/file implementation is not sufficient. No catalogue URL, production key, or storage implementation is fabricated in this repository.
+
+`EpisodeSessionHost` acquires the session lease before loading the package. It resumes when either the primary save or its recovery backup exists; otherwise it starts a new session. A failed open releases the lease. On close it saves, closes the coordinator, and only then releases the lease. The host is single-session and must be called on the Unity main thread.
 
 ## Session/install exclusion contract
 
