@@ -6,6 +6,8 @@ using Nightwire.Runtime.Domain;
 using Nightwire.Runtime.Loading;
 using Nightwire.Runtime.Progression;
 using Nightwire.Runtime.Saves;
+using Nightwire.Runtime.Calls;
+using Nightwire.Runtime.Minigames;
 
 namespace Nightwire.Runtime.Sessions
 {
@@ -18,6 +20,8 @@ namespace Nightwire.Runtime.Sessions
         public bool Migrated { get; internal set; }
         public List<string> NewlyDeliveredMessageIds { get; } = new List<string>();
         public List<RuntimeCommand> Commands { get; } = new List<RuntimeCommand>();
+        public CallRuntimeResult? CallTimeline { get; internal set; }
+        public MinigameRuntimeResult? Minigame { get; internal set; }
     }
 
     /// <summary>
@@ -30,6 +34,8 @@ namespace Nightwire.Runtime.Sessions
         private readonly SaveStore _saveStore;
         private readonly StoryEventEngine _storyEngine;
         private readonly ConversationRuntime _conversationRuntime;
+        private readonly CallRuntime _callRuntime = new CallRuntime();
+        private readonly MinigameRuntime _minigameRuntime = new MinigameRuntime();
 
         public LoadedEpisodePackage? Package { get; private set; }
         public EpisodeProgressState? Progress { get; private set; }
@@ -145,6 +151,84 @@ namespace Nightwire.Runtime.Sessions
             if (!operation.Success) return Fail("choice_failed", operation.Error ?? "Could not select choice.");
             var result = Success();
             foreach (var story in operation.StoryResults) AddStory(result, story);
+            return Persist(result);
+        }
+
+        public RuntimeSessionResult StartCallPlayback(string callId)
+        {
+            if (!TryContext(out var package, out var state, out var failure)) return failure!;
+            var playback = _callRuntime.Start(package, state, callId);
+            if (!playback.Success) return Fail("call_start_failed", playback.Error ?? "Could not start call.");
+            var result = Success(); result.CallTimeline = playback;
+            return Persist(result);
+        }
+
+        public RuntimeSessionResult AdvanceCallPlayback(string callId, long elapsedMilliseconds, string locale)
+        {
+            if (!TryContext(out var package, out var state, out var failure)) return failure!;
+            var playback = _callRuntime.Advance(package, state, callId, elapsedMilliseconds, locale);
+            if (!playback.Success) return Fail("call_advance_failed", playback.Error ?? "Could not advance call.");
+            var result = Success(); result.CallTimeline = playback;
+            if (playback.Completed)
+            {
+                var story = _storyEngine.ProcessTrigger(package.RuntimeDefinition, state,
+                    new StoryTrigger { Type = StoryTriggerType.CallEnded, ReferenceId = callId });
+                if (!story.Success) return Fail("call_completion_event_failed", story.Error ?? "Call completion event failed.");
+                state.PendingCallId = null; AddStory(result, story);
+            }
+            return Persist(result);
+        }
+
+        public RuntimeSessionResult StartMinigame(string minigameId)
+        {
+            if (!TryContext(out var package, out var state, out var failure)) return failure!;
+            var game = _minigameRuntime.Start(package, state, minigameId);
+            if (!game.Success) return Fail("minigame_start_failed", game.Error ?? "Could not start minigame.");
+            var result = Success(); result.Minigame = game;
+            return Persist(result);
+        }
+
+        public RuntimeSessionResult SubmitSequence(string minigameId, IReadOnlyList<string> sequence)
+        {
+            if (!TryContext(out var package, out var state, out var failure)) return failure!;
+            return HandleMinigameResult(package, state, minigameId, _minigameRuntime.SubmitSequence(package, state, minigameId, sequence));
+        }
+
+        public RuntimeSessionResult SubmitFrequency(string minigameId, double frequency)
+        {
+            if (!TryContext(out var package, out var state, out var failure)) return failure!;
+            return HandleMinigameResult(package, state, minigameId, _minigameRuntime.SubmitFrequency(package, state, minigameId, frequency));
+        }
+
+        public RuntimeSessionResult MatchEvidence(string minigameId, string leftItemId, string rightItemId)
+        {
+            if (!TryContext(out var package, out var state, out var failure)) return failure!;
+            return HandleMinigameResult(package, state, minigameId, _minigameRuntime.MatchEvidence(package, state, minigameId, leftItemId, rightItemId));
+        }
+
+        public RuntimeSessionResult AdvanceMinigameTime(string minigameId, double elapsedSeconds)
+        {
+            if (!TryContext(out var package, out var state, out var failure)) return failure!;
+            var game = _minigameRuntime.AddElapsedTime(package, state, minigameId, elapsedSeconds);
+            if (!game.Success) return Fail("minigame_time_failed", game.Error ?? "Could not advance minigame.");
+            var result = Success(); result.Minigame = game;
+            if (game.AttemptsExhausted) state.PendingMinigameId = null;
+            return Persist(result);
+        }
+
+        private RuntimeSessionResult HandleMinigameResult(LoadedEpisodePackage package, EpisodeProgressState state,
+            string minigameId, MinigameRuntimeResult game)
+        {
+            if (!game.Success) return Fail("minigame_input_failed", game.Error ?? "Minigame input failed.");
+            var result = Success(); result.Minigame = game;
+            if (game.Solved)
+            {
+                var story = _storyEngine.ProcessTrigger(package.RuntimeDefinition, state,
+                    new StoryTrigger { Type = StoryTriggerType.MinigameCompleted, ReferenceId = minigameId });
+                if (!story.Success) return Fail("minigame_completion_event_failed", story.Error ?? "Minigame completion event failed.");
+                state.PendingMinigameId = null; AddStory(result, story);
+            }
+            else if (game.AttemptsExhausted) state.PendingMinigameId = null;
             return Persist(result);
         }
 
