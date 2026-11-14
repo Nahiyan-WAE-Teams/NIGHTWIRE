@@ -1,4 +1,4 @@
-# NIGHTWIRE validator integration tests
+# NIGHTWIRE automated tests
 
 These tests exercise the .NET episode validator against a copied sample package and intentionally corrupted variants.
 
@@ -15,10 +15,20 @@ From the repository root:
 python -m unittest discover -s tests -v
 ```
 
-The test suite builds the validator in Release configuration once, then checks:
+The Python integration suite builds the validator in Release configuration once, then checks:
 - the sample package passes;
 - a modified file fails SHA-256 integrity validation;
 - a choice pointing to a missing message fails semantic validation;
 - a path-traversal manifest entry is rejected.
 
 The tests use only Python's standard library. They do not run GitHub Actions; CI remains deferred until the implementation and review milestone is reached.
+
+## C# runtime tests
+
+The portable runtime test harness covers story-event execution and episode loading:
+
+```bash
+dotnet run --project tests/Nightwire.Runtime.Tests
+```
+
+It verifies that the sample Episode 001 loads, modified files fail integrity checks, and unlisted files are rejected. These tests require the .NET 10 SDK and have not yet been executed in this development environment.
