@@ -10,6 +10,9 @@
 | `episode.schema.json` | Episode identity, version compatibility, locale declarations, entry event |
 | `manifest.schema.json` | Package file inventory, hashes, and asset records |
 | `character-profile.schema.json` | Character identity and profile references |
+| `character-post.schema.json` | Authored character social posts and comments |
+| `call.schema.json` | Prerecorded audio/video call media, subtitles, and timed presentation cues |
+| `minigame.schema.json` | Declarative configuration for supported puzzle types |
 | `conversation.schema.json` | Participants, message variants, choices, and asset references |
 | `event.schema.json` | Supported event trigger and action shapes |
 | `localization.schema.json` | Locale key/value dictionaries |
@@ -30,7 +33,10 @@ JSON Schema checks document shape and field constraints. It cannot, by itself, e
 - Every package file required by the format is represented in the manifest.
 - File sizes and SHA-256 digests match actual bytes.
 - Every asset ID is unique and its path maps to a manifest file.
-- Every character, conversation, event, call, minigame, and message reference resolves.
+- Every character, post, conversation, event, call, minigame, and message reference resolves.
+- Call media, subtitle timing, participants, and completion events are consistent.
+- Minigame configurations match their declared type and completion event.
+- Post authors, comment authors, and media assets resolve.
 - Message IDs and option IDs are unique in their defined scopes.
 - All localization keys referenced by episode content exist in the declared locales.
 - The entry event exists and event/message progression references are valid.
@@ -49,4 +55,4 @@ Run it from the repository root:
 dotnet run --project tools/Nightwire.EpisodeValidator -- examples/Episode_001
 ```
 
-It verifies file inventory, byte sizes, SHA-256 digests, asset references, character/conversation/event references, message flow, and localization coverage. It does not yet run the full JSON Schema Draft 2020-12 evaluator; structural schema validation remains a separate step until a schema-validation library and its compatibility are selected.
+It verifies file inventory, byte sizes, SHA-256 digests, asset references, character/post/conversation/event/call/minigame references, message flow, and localization coverage. It does not yet run the full JSON Schema Draft 2020-12 evaluator; structural schema validation remains a separate step until a schema-validation library and its compatibility are selected.
