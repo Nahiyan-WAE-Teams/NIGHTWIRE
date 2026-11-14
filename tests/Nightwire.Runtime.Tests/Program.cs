@@ -358,10 +358,13 @@ internal static class Program
         {
             var store = new SaveStore(root);
             store.Save(CreateState());
+            string mismatchedPath = store.GetSavePath("nightwire.ep002");
+            Directory.CreateDirectory(Path.GetDirectoryName(mismatchedPath)!);
+            File.Copy(store.GetSavePath("nightwire.ep001"), mismatchedPath);
             bool rejected = false;
             try { store.Load("nightwire.ep002", "1.0.0"); }
-            catch (SaveStoreException exception) { rejected = exception.ErrorCode == "save_not_found"; }
-            Assert(rejected, "A different episode unexpectedly loaded this save.");
+            catch (SaveStoreException exception) { rejected = exception.ErrorCode == "episode_id_mismatch"; }
+            Assert(rejected, "A save copied under another episode directory was accepted.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
