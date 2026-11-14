@@ -16,7 +16,7 @@ namespace Nightwire.Runtime.Domain
 
         public HashSet<string> CompletedEventIds { get; } = new HashSet<string>(StringComparer.Ordinal);
         public HashSet<string> UnlockedAssetIds { get; } = new HashSet<string>(StringComparer.Ordinal);
-        public Dictionary<string, bool> StoryFlags { get; } = new Dictionary<string, bool>(StringComparer.Ordinal);
+        public Dictionary<string, StoryFlagValue> StoryFlags { get; } = new Dictionary<string, StoryFlagValue>(StringComparer.Ordinal);
         public List<RuntimeNotification> Notifications { get; } = new List<RuntimeNotification>();
 
         public void ResetTransientActions()
@@ -29,7 +29,8 @@ namespace Nightwire.Runtime.Domain
     public sealed class RuntimeNotification
     {
         public string NotificationId { get; set; } = string.Empty;
-        public string TextKey { get; set; } = string.Empty;
+        public string TitleKey { get; set; } = string.Empty;
+        public string BodyKey { get; set; } = string.Empty;
         public string? DestinationId { get; set; }
         public bool IsRead { get; set; }
     }
