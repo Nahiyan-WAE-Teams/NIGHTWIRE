@@ -61,46 +61,46 @@ namespace Nightwire.Unity
             if (!_access.TryAcquireSessionLease(episodeId, out lease) || lease == null)
                 return Failure("episode_install_active", "This episode is currently being installed or updated.");
 
-            var coordinator = new RuntimeSessionCoordinator(_saveStore, _loader);
-            RuntimeSessionResult result;
+            Nightwire.Runtime.Loading.LoadedEpisodePackage package;
             try
             {
-                string savePath = _saveStore.GetSavePath(episodeId);
-                bool hasSave = File.Exists(savePath) || File.Exists(savePath + ".bak");
-                result = hasSave
-                    ? coordinator.ResumeSession(installDirectory)
-                    : coordinator.StartNewSession(installDirectory);
-
-                if (!result.Success)
-                {
-                    coordinator.CloseSession();
-                    lease.Dispose();
-                    return new EpisodeSessionOpenResult
-                    {
-                        Success = false,
-                        ErrorCode = result.ErrorCode,
-                        Error = result.Error,
-                        SessionResult = result
-                    };
-                }
-
-                if (!string.Equals(coordinator.Package?.Descriptor.EpisodeId, episodeId, StringComparison.Ordinal))
-                {
-                    coordinator.CloseSession();
-                    lease.Dispose();
-                    return Failure("episode_identity_mismatch", "Installed package identity does not match the requested episode.");
-                }
-
-                _session = coordinator;
-                _sessionLease = lease;
-                return new EpisodeSessionOpenResult { Success = true, SessionResult = result };
+                package = _loader.Load(installDirectory);
             }
-            catch
+            catch (Exception exception)
+            {
+                lease.Dispose();
+                return Failure("package_load_failed", exception.Message);
+            }
+
+            if (!string.Equals(package.Descriptor.EpisodeId, episodeId, StringComparison.Ordinal))
+            {
+                lease.Dispose();
+                return Failure("episode_identity_mismatch", "Installed package identity does not match the requested episode.");
+            }
+
+            var coordinator = new RuntimeSessionCoordinator(_saveStore, _loader);
+            string savePath = _saveStore.GetSavePath(episodeId);
+            bool hasSave = File.Exists(savePath) || File.Exists(savePath + ".bak");
+            RuntimeSessionResult result = hasSave
+                ? coordinator.ResumeSession(package)
+                : coordinator.StartNewSession(package);
+
+            if (!result.Success)
             {
                 coordinator.CloseSession();
                 lease.Dispose();
-                throw;
+                return new EpisodeSessionOpenResult
+                {
+                    Success = false,
+                    ErrorCode = result.ErrorCode,
+                    Error = result.Error,
+                    SessionResult = result
+                };
             }
+
+            _session = coordinator;
+            _sessionLease = lease;
+            return new EpisodeSessionOpenResult { Success = true, SessionResult = result };
         }
 
         public EpisodeSessionCloseResult SaveAndClose()
