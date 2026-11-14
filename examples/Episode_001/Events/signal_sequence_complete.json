@@ -1,0 +1,15 @@
+{
+  "schema_version": "0.1",
+  "event_id": "event.signal_sequence_complete",
+  "trigger": {
+    "type": "minigame_completed",
+    "minigame_id": "minigame.signal_sequence"
+  },
+  "actions": [
+    {
+      "type": "set_story_flag",
+      "flag": "signal_sequence_solved",
+      "value": true
+    }
+  ]
+}
