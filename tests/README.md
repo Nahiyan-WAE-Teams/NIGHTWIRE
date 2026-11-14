@@ -25,10 +25,10 @@ The tests use only Python's standard library. They do not run GitHub Actions; CI
 
 ## C# runtime tests
 
-The portable runtime test harness covers story-event execution and episode loading:
+The portable runtime test harness covers story-event execution, package loading, and conversation progression:
 
 ```bash
 dotnet run --project tests/Nightwire.Runtime.Tests
 ```
 
-It verifies that the sample Episode 001 loads, modified files fail integrity checks, and unlisted files are rejected. These tests require the .NET 10 SDK and have not yet been executed in this development environment.
+It verifies that the sample Episode 001 loads, modified files fail integrity checks, unlisted files are rejected, older runtimes are rejected, authored message delays are respected, read state is persisted separately, and selected choices follow the correct branch. These tests require the .NET 10 SDK and have not yet been executed in this development environment.
