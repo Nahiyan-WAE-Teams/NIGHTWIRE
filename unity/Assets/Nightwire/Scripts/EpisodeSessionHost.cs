@@ -7,6 +7,14 @@ using Nightwire.Runtime.Sessions;
 
 namespace Nightwire.Unity
 {
+    public sealed class EpisodeSessionOpenResult
+    {
+        public bool Success { get; internal set; }
+        public string ErrorCode { get; internal set; }
+        public string Error { get; internal set; }
+        public RuntimeSessionResult SessionResult { get; internal set; }
+    }
+
     /// <summary>
     /// Owns one gameplay session and its exclusive per-episode access lease.
     /// The lease remains held until progress has been saved and the coordinator closed.
@@ -20,7 +28,6 @@ namespace Nightwire.Unity
         private RuntimeSessionCoordinator? _session;
         private IDisposable? _sessionLease;
 
-        public EpisodeSessionCoordinatorPlaceholder Placeholder => null;
         public RuntimeSessionCoordinator? ActiveSession => _session;
         public string? ActiveEpisodeId => _session?.Package?.Descriptor.EpisodeId;
 
@@ -36,7 +43,7 @@ namespace Nightwire.Unity
             });
         }
 
-        public RuntimeSessionResult OpenEpisode(string episodeId, string installDirectory)
+        public EpisodeSessionOpenResult OpenEpisode(string episodeId, string installDirectory)
         {
             if (_session != null)
                 return Failure("session_already_active", "Close the active episode before opening another.");
@@ -61,7 +68,7 @@ namespace Nightwire.Unity
                 {
                     coordinator.CloseSession();
                     lease.Dispose();
-                    return result;
+                    return new EpisodeSessionOpenResult { Success = true, SessionResult = result };
                 }
 
                 if (!string.Equals(coordinator.Package?.Descriptor.EpisodeId, episodeId, StringComparison.Ordinal))
@@ -73,7 +80,7 @@ namespace Nightwire.Unity
 
                 _session = coordinator;
                 _sessionLease = lease;
-                return result;
+                return new EpisodeSessionOpenResult { Success = true, SessionResult = result };
             }
             catch
             {
@@ -112,7 +119,7 @@ namespace Nightwire.Unity
             _sessionLease = null;
         }
 
-        private static RuntimeSessionResult Failure(string code, string message) =>
-            new RuntimeSessionResult { Success = false, ErrorCode = code, Error = message };
+        private static EpisodeSessionOpenResult Failure(string code, string message) =>
+            new EpisodeSessionOpenResult { Success = false, ErrorCode = code, Error = message };
     }
 }
