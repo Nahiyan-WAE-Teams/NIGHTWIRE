@@ -278,7 +278,7 @@ internal static class Program
             if (string.Equals(path, "manifest.json", StringComparison.OrdinalIgnoreCase))
                 Errors.Add("manifest.json: the manifest must not list or hash itself.");
             if (!IsSafeRelativePath(path)) Errors.Add($"manifest.json: unsafe relative path '{path}'.");
-            if (kind is not ("episode_descriptor" or "character_profile" or "conversation" or "event" or "call" or "minigame" or "localization" or "media" or "other"))
+            if (kind is not ("episode_descriptor" or "character_profile" or "character_post" or "conversation" or "event" or "call" or "minigame" or "localization" or "media" or "other"))
                 Errors.Add($"manifest.json: unsupported file kind '{kind}' for '{path}'.");
             if (sizeBytes < 0) Errors.Add($"manifest.json: negative size_bytes for '{path}'.");
             if (hash.Length != 64 || hash.Any(c => !Uri.IsHexDigit(c)))
@@ -566,7 +566,6 @@ internal static class Program
             var completionEvent = GetString(call, "completion_event_id");
             if (completionEvent is not null &&
                 (!events.TryGetValue(completionEvent, out var completion) ||
-                 GetString(completion, "trigger") is not null ||
                  !completion.TryGetProperty("trigger", out var trigger) ||
                  GetString(trigger, "type") != "call_ended" ||
                  GetString(trigger, "call_id") != callId))
