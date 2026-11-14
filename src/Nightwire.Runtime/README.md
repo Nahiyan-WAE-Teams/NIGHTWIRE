@@ -27,3 +27,13 @@ Unity 6 documents .NET Standard 2.1 as its cross-platform API compatibility prof
 This is a pure C# runtime core. It does not load JSON, access files, render Unity UI, play media, download packages, or implement cloud saves yet. Those responsibilities will be added in separate adapters/modules.
 
 The episode loader must map validated package JSON into these domain models. The Unity presentation layer must consume typed runtime commands and must never execute arbitrary episode-provided code.
+
+## Runtime tests
+
+A dependency-free console test harness is available:
+
+```bash
+dotnet run --project tests/Nightwire.Runtime.Tests
+```
+
+It covers episode-start execution, one-shot idempotency, atomic rejection of invalid action batches, and typed asset/call commands. It has not been executed in this environment.
