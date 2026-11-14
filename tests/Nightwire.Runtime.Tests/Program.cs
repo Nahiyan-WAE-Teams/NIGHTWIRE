@@ -224,9 +224,8 @@ internal static class Program
         Assert(state.ConversationProgress["anisha.day01"].ReadMessageIds.Contains("anisha.day01.001"),
             "Read state was not persisted in player progress.");
 
-        var choice = runtime.Advance(package, state, 0);
-        Assert(choice.Success && choice.NewlyDeliveredMessageIds.Contains("anisha.day01.002"),
-            "Choice prompt was not delivered after the first message.");
+        Assert(delivered.NewlyDeliveredMessageIds.Contains("anisha.day01.002"),
+            "Zero-delay choice prompt was not delivered after the first message.");
         Assert(state.ConversationProgress["anisha.day01"].WaitingChoiceMessageId == "anisha.day01.002",
             "Conversation did not pause for the player's choice.");
     }
