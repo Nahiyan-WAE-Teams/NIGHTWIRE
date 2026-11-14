@@ -29,6 +29,7 @@ namespace Nightwire.Runtime.Loading
                 throw new ArgumentException("Package directory is required.", nameof(packageDirectory));
 
             string root = Path.GetFullPath(packageDirectory);
+            EnsureNoLinkedAncestors(root);
             if (!Directory.Exists(root))
                 throw Fail("package_not_found", $"Episode directory does not exist: {root}");
             if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
@@ -134,6 +135,26 @@ namespace Nightwire.Runtime.Loading
             if (!listed.TryGetValue("episode.json", out var descriptorEntry) ||
                 !string.Equals(descriptorEntry.Kind, "episode_descriptor", StringComparison.Ordinal))
                 throw Fail("descriptor_not_manifested", "episode.json must be listed as episode_descriptor.");
+        }
+
+        private static void EnsureNoLinkedAncestors(string path)
+        {
+            string current = Path.GetFullPath(path);
+            while (!string.IsNullOrEmpty(current))
+            {
+                try
+                {
+                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                        throw Fail("unsafe_root", "Episode root or one of its parent directories is a symbolic link or reparse point.");
+                }
+                catch (FileNotFoundException) { }
+                catch (DirectoryNotFoundException) { }
+
+                string? parent = Path.GetDirectoryName(current);
+                if (string.IsNullOrEmpty(parent) || string.Equals(parent, current, StringComparison.Ordinal))
+                    break;
+                current = parent;
+            }
         }
 
         private static void EnsureNoLinkComponents(string root, string relativePath)
