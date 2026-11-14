@@ -101,7 +101,7 @@ namespace Nightwire.Runtime.Installation
                     ecdsa.ImportSubjectPublicKeyInfo(publicKey, out int bytesRead);
                     if (bytesRead != publicKey.Length || ecdsa.KeySize != 256)
                         return Error("trusted_key_invalid", "Trusted key must be a complete ECDSA P-256 SubjectPublicKeyInfo key.");
-                    if (!ecdsa.VerifyData(payload, signature, HashAlgorithmName.SHA256))
+                    if (!ecdsa.VerifyData(payload, signature, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation))
                         return Error("signature_invalid", "Release catalogue signature verification failed.");
                 }
 
