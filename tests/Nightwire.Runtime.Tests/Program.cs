@@ -59,6 +59,7 @@ internal static class Program
         Run("signed release catalogue verifies trusted key and rejects rollback", ReleaseCatalogueVerifiesSignatureAndSequence, ref failures);
         Run("installer startup recovery restores interrupted update backup", InstallerRecoveryRestoresPreviousInstall, ref failures);
         Run("installer rejects signed release identity mismatch before replacing existing content", InstallerRejectsReleaseIdentityMismatch, ref failures);
+        Run("release manager refreshes signed catalogue and installs offline episode", ReleaseManagerInstallsOfflineEpisode, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -822,6 +823,24 @@ internal static class Program
         public void SaveHighestAcceptedSequence(long sequence) { Sequence = sequence; }
     }
 
+    private sealed class StubCatalogueTransport : IReleaseCatalogueTransport
+    {
+        private readonly byte[] _envelope;
+        public StubCatalogueTransport(byte[] envelope) { _envelope = envelope; }
+        public Task<byte[]> FetchAsync(Uri catalogueUri, CancellationToken cancellationToken) =>
+            Task.FromResult((byte[])_envelope.Clone());
+    }
+
+    private sealed class StubInstallLeaseProvider : IEpisodeInstallLeaseProvider
+    {
+        public bool TryAcquireInstallLease(string episodeId, out IDisposable? lease)
+        {
+            lease = new TestLease();
+            return true;
+        }
+        private sealed class TestLease : IDisposable { public void Dispose() { } }
+    }
+
     private sealed class StubHttpHandler : HttpMessageHandler
     {
         private readonly byte[] _payload;
@@ -867,6 +886,50 @@ internal static class Program
         envelopeText = envelopeText.Replace(Convert.ToBase64String(signature), Convert.ToBase64String(new byte[64]));
         var tampered = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow);
         Assert(!tampered.Success && tampered.ErrorCode == "signature_invalid", "Invalid catalogue signature was accepted.");
+    }
+
+    private static void ReleaseManagerInstallsOfflineEpisode()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-release-manager-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string archivePath = Path.Combine(root, "episode.zip");
+            CreateSampleArchive(archivePath);
+            byte[] archiveBytes = File.ReadAllBytes(archivePath);
+            using var sha = SHA256.Create();
+            string archiveHash = BitConverter.ToString(sha.ComputeHash(archiveBytes)).Replace("-", string.Empty).ToLowerInvariant();
+            using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            byte[] publicKey = key.ExportSubjectPublicKeyInfo();
+            string issued = DateTime.UtcNow.AddMinutes(-1).ToString("o", CultureInfo.InvariantCulture);
+            string expires = DateTime.UtcNow.AddHours(1).ToString("o", CultureInfo.InvariantCulture);
+            string payloadText = "{\"schema_version\":1,\"sequence\":1,\"issued_utc\":\"" + issued +
+                "\",\"expires_utc\":\"" + expires + "\",\"releases\":[{\"episode_id\":\"nightwire.ep001\",\"episode_version\":\"1.0.0\",\"archive_url\":\"https://cdn.example.test/episode.zip\",\"archive_size_bytes\":" +
+                archiveBytes.Length + ",\"archive_sha256\":\"" + archiveHash + "\",\"minimum_runtime_version\":\"0.1.0\"}]}";
+            byte[] payload = System.Text.Encoding.UTF8.GetBytes(payloadText);
+            byte[] signature = key.SignData(payload, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+            string envelope = "{\"key_id\":\"test-key\",\"algorithm\":\"ECDSA-P256-SHA256\",\"payload\":\"" +
+                Convert.ToBase64String(payload) + "\",\"signature\":\"" + Convert.ToBase64String(signature) + "\"}";
+            var verifier = new ReleaseCatalogueVerifier(new[]
+            {
+                new TrustedReleaseKey { KeyId = "test-key", SubjectPublicKeyInfo = publicKey }
+            });
+            var acceptance = new ReleaseCatalogueAcceptanceService(verifier, new MemoryReleaseSequenceStore());
+            using var httpClient = new HttpClient(new StubHttpHandler(archiveBytes));
+            using var downloader = new EpisodePackageDownloader(client: httpClient);
+            var manager = new EpisodeReleaseManager(new Uri("https://catalogue.example.test/releases.json"),
+                Path.Combine(root, "installed"), Path.Combine(root, "downloads"),
+                new StubCatalogueTransport(System.Text.Encoding.UTF8.GetBytes(envelope)),
+                acceptance, new StubInstallLeaseProvider(), "1.0.0", downloader);
+            var refreshed = manager.RefreshCatalogueAsync(DateTime.UtcNow).GetAwaiter().GetResult();
+            Assert(refreshed.Success, refreshed.Error ?? "Signed catalogue refresh failed.");
+            var result = manager.InstallOrUpdateAsync("nightwire.ep001").GetAwaiter().GetResult();
+            Assert(result.Success, result.Error ?? "Episode release manager failed to install the episode.");
+            var library = manager.GetLibrary();
+            Assert(library.Count == 1 && library[0].Status == EpisodeLibraryStatus.InstalledOffline &&
+                library[0].InstalledVersion == "1.0.0", "Installed episode was not recognized as available offline.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
 
     private static void InstallerRejectsReleaseIdentityMismatch()
