@@ -512,3 +512,14 @@ The store writes a flushed temporary file, retains the previous committed save a
 Episode-content migrations are explicit implementations of `IEpisodeProgressMigration`, registered by episode ID and source version. The store follows a complete chain to the installed episode version and rejects missing chains. Save-format versions other than the current version are rejected; no historical format migration is claimed yet.
 
 This is local persistence only. It does not provide encryption, anti-tamper guarantees, cloud synchronization, multi-device conflict resolution, concurrent-writer coordination, or Unity lifecycle integration. The runtime tests are authored but have not been executed in the current environment.
+
+
+## Runtime session boundary
+
+The portable runtime session coordinator is the host-facing orchestration boundary for one active episode. It composes the package loader, player-owned progress state, story event engine, conversation interpreter, and local save store without depending on Unity APIs.
+
+- A new session must load and verify the installed package, refuse to overwrite an existing save or backup, initialize progress for the exact episode identity/version, process the package's episode-start trigger, and persist the initial state.
+- Resume must load against the installed episode version, use only explicitly registered episode migrations, report backup recovery, and reject saved references that no longer resolve in the installed episode.
+- Successful conversation operations and host-reported call/minigame completion are persisted. The host receives stable message IDs and allowlisted typed commands for presentation.
+- The coordinator supports one active episode per instance. The host serializes calls and invokes explicit lifecycle saves; Unity UI, media playback, downloads, archive extraction, background timers, and cloud synchronization remain adapter/service responsibilities.
+- A save-write failure closes the in-memory session so gameplay cannot continue from state that may not have been committed. The player can resume from the last committed save or its backup.
