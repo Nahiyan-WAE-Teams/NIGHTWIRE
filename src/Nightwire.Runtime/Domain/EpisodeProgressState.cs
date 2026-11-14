@@ -19,6 +19,7 @@ namespace Nightwire.Runtime.Domain
         public HashSet<string> CompletedEventIds { get; } = new HashSet<string>(StringComparer.Ordinal);
         public HashSet<string> UnlockedAssetIds { get; } = new HashSet<string>(StringComparer.Ordinal);
         public Dictionary<string, StoryFlagValue> StoryFlags { get; } = new Dictionary<string, StoryFlagValue>(StringComparer.Ordinal);
+        public Dictionary<string, long> RelationshipScores { get; } = new Dictionary<string, long>(StringComparer.Ordinal);
         public List<RuntimeNotification> Notifications { get; } = new List<RuntimeNotification>();
 
         public void ResetTransientActions()
