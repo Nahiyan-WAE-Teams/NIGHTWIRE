@@ -79,28 +79,37 @@ namespace Nightwire.Unity
             }
 
             var coordinator = new RuntimeSessionCoordinator(_saveStore, _loader);
-            string savePath = _saveStore.GetSavePath(episodeId);
-            bool hasSave = File.Exists(savePath) || File.Exists(savePath + ".bak");
-            RuntimeSessionResult result = hasSave
-                ? coordinator.ResumeSession(package)
-                : coordinator.StartNewSession(package);
+            try
+            {
+                string savePath = _saveStore.GetSavePath(episodeId);
+                bool hasSave = File.Exists(savePath) || File.Exists(savePath + ".bak");
+                RuntimeSessionResult result = hasSave
+                    ? coordinator.ResumeSession(package)
+                    : coordinator.StartNewSession(package);
 
-            if (!result.Success)
+                if (!result.Success)
+                {
+                    coordinator.CloseSession();
+                    lease.Dispose();
+                    return new EpisodeSessionOpenResult
+                    {
+                        Success = false,
+                        ErrorCode = result.ErrorCode,
+                        Error = result.Error,
+                        SessionResult = result
+                    };
+                }
+
+                _session = coordinator;
+                _sessionLease = lease;
+                return new EpisodeSessionOpenResult { Success = true, SessionResult = result };
+            }
+            catch
             {
                 coordinator.CloseSession();
                 lease.Dispose();
-                return new EpisodeSessionOpenResult
-                {
-                    Success = false,
-                    ErrorCode = result.ErrorCode,
-                    Error = result.Error,
-                    SessionResult = result
-                };
+                throw;
             }
-
-            _session = coordinator;
-            _sessionLease = lease;
-            return new EpisodeSessionOpenResult { Success = true, SessionResult = result };
         }
 
         public RuntimeSessionResult? SaveCheckpoint()
