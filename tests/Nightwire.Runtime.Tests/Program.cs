@@ -12,6 +12,7 @@ using Nightwire.Runtime.Calls;
 using Nightwire.Runtime.Minigames;
 using Nightwire.Runtime.Assets;
 using Nightwire.Runtime.Installation;
+using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
@@ -55,6 +56,8 @@ internal static class Program
         Run("episode installer installs and updates a verified package", EpisodeInstallerInstallsAndUpdates, ref failures);
         Run("episode installer rejects ZIP path traversal", EpisodeInstallerRejectsTraversal, ref failures);
         Run("episode downloader verifies a trusted archive hash", EpisodeDownloaderChecksTrustedHash, ref failures);
+        Run("signed release catalogue verifies trusted key and rejects rollback", ReleaseCatalogueVerifiesSignatureAndSequence, ref failures);
+        Run("installer startup recovery restores interrupted update backup", InstallerRecoveryRestoresPreviousInstall, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -823,6 +826,57 @@ internal static class Program
                 RequestMessage = request
             });
         }
+    }
+
+
+    private static void ReleaseCatalogueVerifiesSignatureAndSequence()
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        byte[] publicKey = key.ExportSubjectPublicKeyInfo();
+        string issued = DateTime.UtcNow.AddMinutes(-1).ToString("o", CultureInfo.InvariantCulture);
+        string expires = DateTime.UtcNow.AddHours(2).ToString("o", CultureInfo.InvariantCulture);
+        string payloadText = "{\"schema_version\":1,\"sequence\":7,\"issued_utc\":\"" + issued +
+            "\",\"expires_utc\":\"" + expires + "\",\"releases\":[{\"episode_id\":\"nightwire.ep001\",\"episode_version\":\"1.0.0\",\"archive_url\":\"https://cdn.example.test/ep001.zip\",\"archive_size_bytes\":1234,\"archive_sha256\":\"" + new string('a', 64) +
+            "\",\"minimum_runtime_version\":\"1.0.0\"}]}";
+        byte[] payload = System.Text.Encoding.UTF8.GetBytes(payloadText);
+        byte[] signature = key.SignData(payload, HashAlgorithmName.SHA256);
+        string envelopeText = "{\"key_id\":\"release-2026\",\"algorithm\":\"ECDSA-P256-SHA256\",\"payload\":\"" +
+            Convert.ToBase64String(payload) + "\",\"signature\":\"" + Convert.ToBase64String(signature) + "\"}";
+        var verifier = new ReleaseCatalogueVerifier(new[]
+        {
+            new TrustedReleaseKey { KeyId = "release-2026", SubjectPublicKeyInfo = publicKey }
+        });
+        var verified = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow, 7);
+        Assert(verified.Success && verified.Catalogue!.Releases.Count == 1 &&
+            verified.Catalogue.Releases[0].EpisodeId == "nightwire.ep001", verified.Error ?? "Valid signed catalogue rejected.");
+        var rollback = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow, 8);
+        Assert(!rollback.Success && rollback.ErrorCode == "catalogue_rollback", "Old catalogue sequence was accepted.");
+
+        envelopeText = envelopeText.Replace(Convert.ToBase64String(signature), Convert.ToBase64String(new byte[64]));
+        var tampered = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow);
+        Assert(!tampered.Success && tampered.ErrorCode == "signature_invalid", "Invalid catalogue signature was accepted.");
+    }
+
+    private static void InstallerRecoveryRestoresPreviousInstall()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-recovery-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string backup = Path.Combine(root, ".backup-nightwire.ep001-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(backup);
+            File.WriteAllText(Path.Combine(backup, "previous-install.marker"), "preserve");
+            string staging = Path.Combine(root, ".install-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(staging);
+            File.WriteAllText(Path.Combine(staging, "partial.marker"), "discard");
+            var result = new EpisodePackageInstaller().RecoverInterruptedInstalls(root);
+            string restored = Path.Combine(root, "nightwire.ep001");
+            Assert(result.RestoredEpisodeIds.Contains("nightwire.ep001"), "Interrupted episode backup was not restored.");
+            Assert(File.Exists(Path.Combine(restored, "previous-install.marker")), "Restored installation content is missing.");
+            Assert(!Directory.Exists(staging) && result.RemovedStagingDirectories == 1,
+                "Incomplete staging directory was not cleaned.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
 
     private sealed class TestEpisodeMigration : IEpisodeProgressMigration
