@@ -186,15 +186,14 @@ Do not build all screens as disconnected mockups. Each UI surface must be backed
 
 ## 14. First Unity presentation integration
 
-The first Unity-facing implementation is `unity/Assets/Nightwire/Scripts/UI/EpisodeLibraryScreen.cs`, a UI Toolkit component backed by the portable `EpisodeReleaseManager`.
+The first Unity-facing implementation is the UI Toolkit archive screen:
+- `unity/Assets/Nightwire/UI/EpisodeLibraryView.uxml` defines the named screen hierarchy.
+- `unity/Assets/Nightwire/UI/EpisodeLibraryView.uss` defines the dark archive visual system and restrained 140 ms interactions.
+- `unity/Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` binds the view to the presentation model.
+- `src/Nightwire.Runtime/Installation/EpisodeLibraryPresentation.cs` provides UI-neutral snapshots, progress, cancellation, and the atomic `EpisodeAccessCoordinator` session/install gate.
 
-The screen:
-- Renders installed, downloadable, update-available, unlisted, and invalid episode states.
-- Refreshes the signed catalogue through the manager.
-- Starts verified downloads and displays byte progress.
-- Exposes `OpenEpisodeRequested` so the application shell can resume or start a session without coupling the view to save policy.
-- Cancels in-flight UI operations when its GameObject is destroyed.
+The screen renders installed, downloadable, update-available, unlisted, and invalid episode states. It refreshes the signed catalogue, starts verified downloads, displays byte progress, supports cancellation, and exposes `PlayEpisodeRequested` so the application shell can resume or start a session without coupling the view to save policy.
 
-The composition root owns the release manager and injects it through `Configure`. It must recover interrupted installs before exposing gameplay, provide the trusted-key and protected-sequence adapters, and implement an atomic session/install lease. The view must not instantiate infrastructure or make its own HTTP requests.
+The composition root owns the release manager and presentation model. It must recover interrupted installs before exposing gameplay, provide trusted-key and protected-sequence adapters, and use the same `EpisodeAccessCoordinator` for session starts and installs. A session lease must remain held until the runtime session has saved and closed.
 
-This is a source-level integration component only. A Unity project manifest, ProjectSettings, Panel Settings asset, scene, runtime DLL import, Android secure-storage adapter, and device verification are still outstanding. See [Unity integration notes](../../unity/README.md).
+This is a source-level integration component only. A Unity project manifest, ProjectSettings, Panel Settings asset, scene, runtime DLL and dependency import, Android secure-storage adapter, and device verification are still outstanding. See [Unity integration notes](../../unity/README.md) and the [detailed UI integration guide](UNITY_EPISODE_LIBRARY_UI.md).
