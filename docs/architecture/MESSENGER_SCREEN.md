@@ -1,0 +1,56 @@
+# NIGHTWIRE messenger screen
+
+## Scope
+
+The first messenger screen is a Unity UI Toolkit presentation adapter over the portable episode runtime. It is intentionally data-driven: the controller contains no episode-specific dialogue, contact names, or choice labels.
+
+## Files
+
+- `unity/Assets/Nightwire/UI/MessengerScreen.uxml` — screen structure.
+- `unity/Assets/Nightwire/UI/MessengerScreen.uss` — dark messenger visual system and responsive message layout.
+- `unity/Assets/Nightwire/Scripts/MessengerScreenController.cs` — conversation rendering and player choice interaction.
+- `unity/Assets/Nightwire/Scripts/NightwireApplicationRoot.cs` — switches between archive and messenger after an episode opens.
+- `unity/Assets/Nightwire/Scripts/EpisodeSessionHost.cs` — owns the active session and its install-exclusion lease.
+
+## Runtime flow
+
+1. The player chooses an installed episode in the archive.
+2. `EpisodeSessionHost` acquires the episode session lease, verifies the package, then resumes a save or starts a new session.
+3. The entry event selects the opening conversation through its typed `open_conversation` action.
+4. `MessengerScreenController` binds to the active session and calls `BeginConversation` if conversation progress does not exist yet.
+5. Each Unity frame advances the portable conversation clock using elapsed frame time. The portable runtime delivers messages only when authored delays have elapsed.
+6. The controller renders delivered messages, localizes their text keys, and marks them read. This routes the `message_completed` trigger back through the story engine.
+7. When a choice message is waiting, the controller creates buttons from its authored options. Selecting one calls `SelectChoice`, which applies branch targets, story flags, and relationship deltas in the portable runtime.
+8. The back-to-archive action saves and closes the session, releases its lease, and returns to the episode library.
+
+## Content mapping
+
+| Episode message type | Current presentation |
+|---|---|
+| `text`, `system` | Localized text bubble |
+| `choice` | Localized prompt and authored choice buttons |
+| `image` | Inline preview if the asset is unlocked, manifest-listed, hash-verified, and below the inline size limit |
+| `audio`, `video`, `document` | Identified attachment placeholder |
+| `call_invitation` | Incoming-call placeholder with call ID |
+
+Character names and status are resolved from each character profile's localization keys. The episode title is resolved from the package descriptor. The locale is the episode default locale until a player language preference is wired into settings.
+
+## Performance and persistence
+
+Conversation delay ticks update elapsed delay in memory and do not write the save file on every rendered frame. A save is committed when a message delivery boundary is crossed. The application root also checkpoints on pause and saves/closes when leaving the messenger. This preserves partial delay on normal lifecycle transitions without causing continuous disk writes.
+
+Inline image textures are cached for the duration of the screen session and destroyed when the messenger unbinds. The image reader uses the runtime's asset resolver, which checks the asset's unlock state, manifest membership, path, size, and SHA-256 before returning a stream.
+
+## Explicitly not implemented yet
+
+- Audio message playback and waveform UI.
+- Video message playback and full-screen viewer.
+- Prerecorded call screen and synchronized subtitles/effects.
+- Character profile and social feed.
+- Media collection/gallery.
+- Group-chat participant header and multi-avatar layout.
+- Free-form player replies (the v0.1 package contract currently uses authored choices).
+- Push notification and unread conversation inbox.
+- Complete Unity project, scenes, Panel Settings, and verified device build.
+
+These are separate presentation features. The episode package/runtime contract remains the source of story data and does not require a new app release for content using already-supported message types.
