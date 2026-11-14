@@ -221,6 +221,8 @@ namespace Nightwire.Runtime.Saves
                 EnsureNotLink(backupPath, "backup save");
                 EnsureNotLink(restoreTemp, "temporary backup restore save");
                 EnsureNotLink(primaryPath, "primary save");
+                if (File.Exists(restoreTemp)) File.Delete(restoreTemp);
+                EnsureNotLink(restoreTemp, "temporary backup restore save");
                 using (var input = new FileStream(backupPath, FileMode.Open, FileAccess.Read, FileShare.Read))
                 using (var output = new FileStream(restoreTemp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 {
