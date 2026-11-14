@@ -19,7 +19,7 @@ UI Toolkit is selected for this archive screen because it is a multi-resolution,
 - `unity/Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` — UI Toolkit view controller.
 - `unity/Assets/Nightwire/Scripts/Nightwire.Unity.asmdef` — presentation assembly boundary referencing `Nightwire.Runtime`.
 - `src/Nightwire.Runtime/Installation/EpisodeLibraryPresentation.cs` — UI-neutral snapshot/progress adapter.
-- `src/Nightwire.Runtime/Installation/EpisodeAccessCoordinator.cs` — atomic per-episode session/install lease gate.
+- `src/Nightwire.Runtime/Installation/EpisodeLibraryPresentation.cs` — atomic per-episode session/install lease gate.
 
 The visual direction uses near-black navy surfaces, restrained violet accents, compact archive metadata, progress feedback, and explicit offline-ready status. No episode-specific assets are hardcoded into the UI. Buttons use short 140 ms color/scale transitions; there are no looping effects or mandatory motion.
 
