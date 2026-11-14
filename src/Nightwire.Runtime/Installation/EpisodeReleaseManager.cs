@@ -329,6 +329,17 @@ namespace Nightwire.Runtime.Installation
                         ErrorCode = download.ErrorCode, Error = download.Error, Download = download
                     };
 
+                // Admission to the synchronous install commit is linearized against Dispose.
+                // If shutdown wins this gate, no filesystem replacement begins. If this check
+                // wins, the install is already admitted; InstallArchive is synchronous and
+                // cannot be interrupted safely halfway through its rollback-capable swap.
+                lock (_gate)
+                {
+                    if (_disposed || operationToken.IsCancellationRequested)
+                        return Failure("episode_install_cancelled",
+                            "Episode installation was cancelled before its install commit began.", episodeId);
+                }
+
                 var install = _installer.InstallArchive(archivePath, _installRoot, release.EpisodeId, release.EpisodeVersion);
                 if (!install.Success)
                     return new EpisodeManagerOperationResult
