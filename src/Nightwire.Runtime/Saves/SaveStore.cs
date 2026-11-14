@@ -262,7 +262,7 @@ namespace Nightwire.Runtime.Saves
                 throw new SaveStoreException("save_notification_invalid", "Notifications contain invalid data.");
             foreach (var pair in state.CallProgress)
             {
-                if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value == null || pair.Value.ElapsedMilliseconds < 0 || pair.Value.FiredCueIds.Count > _options.MaximumCollectionEntries)
+                if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value == null || pair.Value.ElapsedMilliseconds < 0 || pair.Value.FiredCueIds.Count > _options.MaximumCollectionEntries || pair.Value.FiredSubtitleIds.Count > _options.MaximumCollectionEntries)
                     throw new SaveStoreException("save_call_invalid", "Call progress is invalid.");
             }
             foreach (var pair in state.MinigameProgress)
