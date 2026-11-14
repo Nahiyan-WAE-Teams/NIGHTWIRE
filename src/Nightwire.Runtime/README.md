@@ -42,7 +42,7 @@ A dependency-free console test harness is available:
 dotnet run --project tests/Nightwire.Runtime.Tests
 ```
 
-The harness currently registers 33 test cases covering story events, package loading, conversations, saves/migrations, prerecorded call timelines, minigames, unlocked asset access, staged ZIP installation/update, ZIP traversal rejection, HTTPS download hash verification, signed release signature/sequence verification, and interrupted-install startup recovery. Test/build execution remains deferred; no passing result is claimed.
+The harness currently registers 34 test cases covering story events, package loading, conversations, saves/migrations, prerecorded call timelines, minigames, unlocked asset access, staged ZIP installation/update, ZIP traversal rejection, HTTPS download hash verification, signed release signature/sequence verification, interrupted-install startup recovery, and signed release identity mismatch protection. Test/build execution remains deferred; no passing result is claimed.
 
 ## Official compatibility references
 
@@ -166,3 +166,17 @@ The signed payload schema version 1 contains a monotonically increasing `sequenc
 Key rotation requires a deliberate trust update: ship the next public key in an app update or introduce a separately specified root-signed keyset protocol. Never accept a replacement key merely because it appears in a catalogue signed by an untrusted key. The signing private key must remain in release infrastructure, not the client or repository.
 
 Call `EpisodePackageInstaller.RecoverInterruptedInstalls` once at app startup, before opening episode sessions or beginning another install. It removes abandoned staging directories and restores the newest retained backup when an episode destination is missing. If the new destination already exists, obsolete backups are cleaned. Recovery reports warnings rather than deleting backups when a destination is unsafe. This is idempotent startup repair for the installer's two-move update sequence; the host must ensure no install is concurrently running.
+
+
+## Episode release manager
+
+`Installation/EpisodeReleaseManager.cs` is the portable orchestration boundary for the episode library:
+
+- `HttpReleaseCatalogueTransport` fetches a bounded HTTPS catalogue envelope and rejects redirects. A custom transport must enforce the same HTTPS, size, and redirect policy.
+- `EpisodeReleaseManager.RefreshCatalogueAsync` passes exact envelope bytes to the signed-catalogue acceptance service. The in-memory catalogue is replaced only after signature, expiry, schema, and rollback-sequence checks succeed.
+- `GetLibrary` discovers installed episode directories and re-loads each package to determine whether it is valid and playable offline. It distinguishes available, installed/offline, update available, installed-but-unlisted, and invalid installs.
+- `InstallOrUpdateAsync` downloads only a release from the accepted catalogue, checks signed archive size and SHA-256, checks the host runtime version, obtains an episode install lease, and installs the exact signed episode ID/version. The installer checks that identity while the archive is still staged, before replacing the prior install.
+- Concurrent operations for the same episode are rejected. Progress and cancellation flow through the downloader.
+- `RecoverAtStartup` must run before sessions and installs are opened.
+
+The host must implement `IEpisodeInstallLeaseProvider` so lease acquisition is atomic with session start/close; a simple check of `RuntimeSessionCoordinator.IsActive` is not sufficient to prevent a race. The host also supplies a numeric runtime version, trusted release keys, protected sequence storage, persistent paths, and lifecycle ownership. The manager does not render UI, auto-update in the background, delete player saves, or permit replacing an episode while it is in use. Catalogue state is currently in memory and must be refreshed after app launch; offline play relies on already installed, locally verified packages.
