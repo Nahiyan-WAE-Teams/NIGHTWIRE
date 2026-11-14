@@ -69,6 +69,12 @@ namespace Nightwire.Unity.UI
             TryBindView();
         }
 
+        private void Start()
+        {
+            if (session == null)
+                SetVisible(false);
+        }
+
         private void OnDisable()
         {
             Unbind();
@@ -223,7 +229,7 @@ namespace Nightwire.Unity.UI
                         if (progress == null || !progress.DeliveredMessageIds.Contains(messageId))
                             continue;
 
-                        messageList.Add(BuildMessage(message, otherParticipant));
+                        messageList.Add(BuildMessage(message));
                         if (!progress.ReadMessageIds.Contains(messageId))
                         {
                             var read = session.MarkMessageRead(messageId);
@@ -254,7 +260,7 @@ namespace Nightwire.Unity.UI
             }
         }
 
-        private VisualElement BuildMessage(JsonElement message, string otherParticipant)
+        private VisualElement BuildMessage(JsonElement message)
         {
             string senderId = ReadString(message, "sender_id");
             bool outgoing = string.Equals(senderId, "player", StringComparison.Ordinal);
@@ -307,7 +313,7 @@ namespace Nightwire.Unity.UI
                 bubble.Add(fallback);
             }
 
-            var time = new Label(outgoing ? "YOU" : "NIGHTWIRE");
+            var time = new Label(outgoing ? "YOU" : "DELIVERED");
             time.AddToClassList("message-time");
             bubble.Add(time);
             row.Add(bubble);
