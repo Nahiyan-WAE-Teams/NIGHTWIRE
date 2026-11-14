@@ -201,6 +201,8 @@ namespace Nightwire.Runtime.Saves
                     throw new SaveStoreException("migration_required",
                         $"Save is for episode version '{state.EpisodeVersion}', but '{targetVersion}' is installed. An explicit migration is required.");
                 migration.Migrate(state);
+                if (!string.Equals(state.EpisodeId, migration.EpisodeId, StringComparison.Ordinal))
+                    throw new SaveStoreException("migration_identity_changed", "Episode migrations cannot change the save's episode identity.");
                 state.EpisodeVersion = migration.ToEpisodeVersion;
                 migrated = true;
                 if (visited.Count > 32) throw new SaveStoreException("migration_limit", "Too many sequential save migrations.");
