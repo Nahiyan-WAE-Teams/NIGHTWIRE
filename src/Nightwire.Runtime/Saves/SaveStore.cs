@@ -327,10 +327,14 @@ namespace Nightwire.Runtime.Saves
         private static string MigrationKey(string episodeId, string fromVersion) => episodeId + "\n" + fromVersion;
         private static void EnsureNotLink(string path, string description)
         {
-            if ((File.Exists(path) || Directory.Exists(path)) &&
-                (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-                throw new SaveStoreException("save_path_unsafe",
-                    "Symbolic links and reparse points are not allowed for " + description + ".");
+            try
+            {
+                if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                    throw new SaveStoreException("save_path_unsafe",
+                        "Symbolic links and reparse points are not allowed for " + description + ".");
+            }
+            catch (FileNotFoundException) { }
+            catch (DirectoryNotFoundException) { }
         }
 
         private static string SafeEpisodeDirectory(string episodeId)
