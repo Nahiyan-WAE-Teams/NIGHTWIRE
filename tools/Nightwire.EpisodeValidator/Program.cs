@@ -206,7 +206,7 @@ internal static class Program
         if (!string.IsNullOrWhiteSpace(entryEvent) && !events.ContainsKey(entryEvent))
             Errors.Add($"episode.json: entry_event '{entryEvent}' does not resolve to an event.");
 
-        ValidateCharactersAndConversations(files, root, characters, conversations, posts);
+        ValidateCharactersAndConversations(files, root, characters, conversations, posts, assetById);
         ValidatePosts(posts, characters, assetById);
         ValidateCalls(calls, characters, assetById, events, locales);
         ValidateMinigames(minigames, assetById, events);
@@ -364,13 +364,17 @@ internal static class Program
 
     private static void ValidateCharactersAndConversations(
         List<ManifestFile> files, string root, HashSet<string> characters,
-        Dictionary<string, JsonElement> conversations, Dictionary<string, JsonElement> posts)
+        Dictionary<string, JsonElement> conversations, Dictionary<string, JsonElement> posts,
+        Dictionary<string, Asset> assets)
     {
         foreach (var file in files.Where(f => f.Kind == "character_profile"))
         {
             var fullPath = SafeCombine(root, file.Path);
             if (fullPath is null || !File.Exists(fullPath)) continue;
             using var doc = JsonDocument.Parse(File.ReadAllText(fullPath));
+            var avatarAssetId = GetString(doc.RootElement, "avatar_asset_id");
+            if (avatarAssetId is not null && !assets.ContainsKey(avatarAssetId))
+                Errors.Add($"{file.Path}: avatar_asset_id '{avatarAssetId}' does not resolve.");
             foreach (var conversationId in GetStringArray(doc.RootElement, "conversation_ids", file.Path))
                 if (!conversations.ContainsKey(conversationId))
                     Errors.Add($"{file.Path}: conversation_id '{conversationId}' does not resolve.");
@@ -385,6 +389,7 @@ internal static class Program
         Dictionary<string, Asset> assets, Dictionary<string, JsonElement> calls)
     {
         var allMessageIds = new HashSet<string>(StringComparer.Ordinal);
+        var allOptionIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var (conversationId, conversation) in conversations)
         {
             var participants = GetStringArray(conversation, "participants", conversationId);
@@ -439,6 +444,8 @@ internal static class Program
                         var optionId = GetString(option, "option_id");
                         if (string.IsNullOrWhiteSpace(optionId) || !optionIds.Add(optionId))
                             Errors.Add($"{conversationId}/{messageId}: missing or duplicate option_id '{optionId}'.");
+                        else if (!allOptionIds.Add(optionId))
+                            Errors.Add($"Duplicate option_id across episode: '{optionId}'.");
                     }
                 }
             }
@@ -480,7 +487,7 @@ internal static class Program
                     var commentAuthor = GetString(comment, "author_id");
                     if (commentId is null || !commentIds.Add(commentId))
                         Errors.Add($"Post '{postId}': missing or duplicate comment_id '{commentId}'.");
-                    if (commentAuthor is null || !characters.Contains(commentAuthor))
+                    if (commentAuthor is null || (commentAuthor != "player" && !characters.Contains(commentAuthor)))
                         Errors.Add($"Post '{postId}': comment author '{commentAuthor}' does not resolve to a character.");
                 }
             }
@@ -494,8 +501,9 @@ internal static class Program
     {
         foreach (var (callId, call) in calls)
         {
-            foreach (var participant in GetStringArray(call, "participants", callId))
-                if (!characters.Contains(participant))
+            var participants = GetStringArray(call, "participants", callId).ToHashSet(StringComparer.Ordinal);
+            foreach (var participant in participants)
+                if (participant != "player" && !characters.Contains(participant))
                     Errors.Add($"Call '{callId}': participant '{participant}' has no character profile.");
 
             var mode = GetString(call, "mode");
@@ -516,6 +524,18 @@ internal static class Program
                     var optionalId = GetString(media, optional);
                     if (optionalId is not null && !assets.ContainsKey(optionalId))
                         Errors.Add($"Call '{callId}': {optional} '{optionalId}' does not resolve.");
+                    else if (optionalId is not null && assets.TryGetValue(optionalId, out var optionalAsset))
+                    {
+                        var expectedType = optional switch
+                        {
+                            "audio_asset_id" => "audio",
+                            "video_asset_id" => "video",
+                            "poster_asset_id" => "image",
+                            _ => string.Empty
+                        };
+                        if (optionalAsset.Type != expectedType)
+                            Errors.Add($"Call '{callId}': {optional} must reference a '{expectedType}' asset.");
+                    }
                 }
             }
 
@@ -540,8 +560,8 @@ internal static class Program
                         if (start < 0 || end <= start || end > duration)
                             Errors.Add($"Call '{callId}': subtitle interval {start}-{end} is outside call duration {duration}.");
                         var speaker = GetString(entry, "speaker_id");
-                        if (speaker is not null && !characters.Contains(speaker))
-                            Errors.Add($"Call '{callId}': subtitle speaker '{speaker}' has no character profile.");
+                        if (speaker is not null && !participants.Contains(speaker))
+                            Errors.Add($"Call '{callId}': subtitle speaker '{speaker}' is not a call participant.");
                     }
                 }
             }
@@ -558,8 +578,8 @@ internal static class Program
                     if (at < 0 || at > duration)
                         Errors.Add($"Call '{callId}': cue '{cueId}' is outside call duration.");
                     var speaker = GetString(cue, "speaker_id");
-                    if (speaker is not null && !characters.Contains(speaker))
-                        Errors.Add($"Call '{callId}': cue speaker '{speaker}' has no character profile.");
+                    if (speaker is not null && !participants.Contains(speaker))
+                        Errors.Add($"Call '{callId}': cue speaker '{speaker}' is not a call participant.");
                 }
             }
 
