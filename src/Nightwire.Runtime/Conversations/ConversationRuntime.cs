@@ -112,7 +112,6 @@ namespace Nightwire.Runtime.Conversations
                     break;
                 }
 
-                if (remaining <= 0) break;
             }
 
             if (safety <= 0) return Fail(result, "Conversation exceeded the safe message-advance limit.");
@@ -133,12 +132,13 @@ namespace Nightwire.Runtime.Conversations
             if (!progress.DeliveredMessageIds.Contains(messageId))
                 return Fail(result, $"Message '{messageId}' has not been delivered.");
 
-            if (progress.ReadMessageIds.Add(messageId))
+            if (!progress.ReadMessageIds.Contains(messageId))
             {
                 var story = _storyEngine.ProcessTrigger(package.RuntimeDefinition, state,
                     new StoryTrigger { Type = StoryTriggerType.MessageCompleted, ReferenceId = messageId });
                 result.StoryResults.Add(story);
                 if (!story.Success) return Fail(result, story.Error ?? "Story event failed.");
+                progress.ReadMessageIds.Add(messageId);
             }
 
             result.Success = true;
@@ -175,20 +175,19 @@ namespace Nightwire.Runtime.Conversations
             }
             if (!found) return Fail(result, $"Choice option '{optionId}' is not available.");
 
+            var story = _storyEngine.ProcessTrigger(package.RuntimeDefinition, state,
+                new StoryTrigger { Type = StoryTriggerType.ChoiceSelected, ReferenceId = optionId });
+            result.StoryResults.Add(story);
+            if (!story.Success) return Fail(result, story.Error ?? "Story event failed.");
+
             progress.SelectedOptions[progress.WaitingChoiceMessageId] = optionId;
             progress.ReadMessageIds.Add(progress.WaitingChoiceMessageId);
-
             if (selected.TryGetProperty("next_message_id", out var next))
                 progress.NextMessageId = next.ValueKind == JsonValueKind.Null ? null : next.GetString();
             // If next_message_id is omitted, continue to the next message in authored order.
 
             progress.WaitingChoiceMessageId = null;
             if (progress.NextMessageId == null) progress.IsComplete = true;
-
-            var story = _storyEngine.ProcessTrigger(package.RuntimeDefinition, state,
-                new StoryTrigger { Type = StoryTriggerType.ChoiceSelected, ReferenceId = optionId });
-            result.StoryResults.Add(story);
-            if (!story.Success) return Fail(result, story.Error ?? "Story event failed.");
 
             result.Success = true;
             return result;
