@@ -38,6 +38,7 @@ internal static class Program
         Run("prerecorded call timeline emits cues and completes", CallRuntimeAdvancesTimeline, ref failures);
         Run("sequence minigame validates and solves authored input", MinigameRuntimeSolvesSequence, ref failures);
         Run("save store round-trips call and minigame progress", SaveStoreRoundTripsActivities, ref failures);
+        Run("session coordinator dispatches solved minigame event", SessionDispatchesMinigameCompletion, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -544,6 +545,30 @@ internal static class Program
                 "Minigame progress did not round-trip.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+
+    private static void SessionDispatchesMinigameCompletion()
+    {
+        string root = FindRepositoryRoot();
+        string saves = Path.Combine(Path.GetTempPath(), "nightwire-session-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var coordinator = new RuntimeSessionCoordinator(new SaveStore(saves));
+            var started = coordinator.StartNewSession(Path.Combine(root, "examples", "Episode_001"));
+            Assert(started.Success, started.Error ?? "Session did not start.");
+            coordinator.Progress!.PendingMinigameId = "minigame.signal_sequence";
+            var begin = coordinator.StartMinigame("minigame.signal_sequence");
+            Assert(begin.Success, begin.Error ?? "Minigame did not start.");
+            var solved = coordinator.SubmitSequence("minigame.signal_sequence", new[] { "low", "high", "low" });
+            Assert(solved.Success && solved.Minigame != null && solved.Minigame.Solved,
+                solved.Error ?? "Minigame was not solved.");
+            Assert(coordinator.Progress.PendingMinigameId == null, "Solved minigame remained pending.");
+            Assert(coordinator.Progress.StoryFlags.TryGetValue("signal_sequence_solved", out var flag) &&
+                flag.Kind == StoryFlagValueKind.Boolean && flag.BooleanValue,
+                "Minigame completion event did not update story state.");
+        }
+        finally { if (Directory.Exists(saves)) Directory.Delete(saves, true); }
     }
 
     private sealed class TestEpisodeMigration : IEpisodeProgressMigration
