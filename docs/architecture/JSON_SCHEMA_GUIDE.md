@@ -28,7 +28,7 @@ The sample is intentionally small and contains no media assets. Its manifest rec
 
 ## Validation boundary
 
-JSON Schema checks document shape and field constraints. It cannot, by itself, establish all package-wide relationships. The future package validator must also check:
+The Episode Validator evaluates these Draft 2020-12 schemas for the descriptor, manifest, and every typed document, then performs package-wide integrity and semantic checks. JSON Schema checks document shape and field constraints; it cannot, by itself, establish all package-wide relationships. The future package validator must also check:
 
 - Every manifest path exists, is unique, and stays within the package root.
 - Every package file required by the format is represented in the manifest.
