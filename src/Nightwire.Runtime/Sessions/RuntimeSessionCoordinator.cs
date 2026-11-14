@@ -48,6 +48,7 @@ namespace Nightwire.Runtime.Sessions
 
         public RuntimeSessionResult StartNewSession(string episodeDirectory)
         {
+            if (IsActive) return Fail("session_already_active", "Close the current session before starting another episode.");
             LoadedEpisodePackage package;
             try { package = _loader.Load(episodeDirectory); }
             catch (EpisodePackageLoadException exception) { return Fail(exception.ErrorCode, exception.Message); }
@@ -58,6 +59,7 @@ namespace Nightwire.Runtime.Sessions
 
         public RuntimeSessionResult StartNewSession(LoadedEpisodePackage package)
         {
+            if (IsActive) return Fail("session_already_active", "Close the current session before starting another episode.");
             if (package == null) throw new ArgumentNullException(nameof(package));
             string savePath = _saveStore.GetSavePath(package.Descriptor.EpisodeId);
             if (File.Exists(savePath) || File.Exists(savePath + ".bak"))
@@ -79,6 +81,7 @@ namespace Nightwire.Runtime.Sessions
 
         public RuntimeSessionResult ResumeSession(string episodeDirectory)
         {
+            if (IsActive) return Fail("session_already_active", "Close the current session before resuming another episode.");
             LoadedEpisodePackage package;
             try { package = _loader.Load(episodeDirectory); }
             catch (EpisodePackageLoadException exception) { return Fail(exception.ErrorCode, exception.Message); }
@@ -89,6 +92,7 @@ namespace Nightwire.Runtime.Sessions
 
         public RuntimeSessionResult ResumeSession(LoadedEpisodePackage package)
         {
+            if (IsActive) return Fail("session_already_active", "Close the current session before resuming another episode.");
             if (package == null) throw new ArgumentNullException(nameof(package));
             SaveLoadResult loaded;
             try { loaded = _saveStore.Load(package.Descriptor.EpisodeId, package.Descriptor.EpisodeVersion); }
@@ -195,7 +199,16 @@ namespace Nightwire.Runtime.Sessions
         private RuntimeSessionResult Persist(RuntimeSessionResult result)
         {
             try { _saveStore.Save(Progress!); }
-            catch (SaveStoreException exception) { return Fail(exception.ErrorCode, exception.Message); }
+            catch (SaveStoreException exception)
+            {
+                CloseSession();
+                return Fail(exception.ErrorCode, exception.Message);
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            {
+                CloseSession();
+                return Fail("save_write_failed", exception.Message);
+            }
             return result;
         }
 
