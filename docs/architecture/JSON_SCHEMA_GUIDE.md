@@ -56,3 +56,8 @@ dotnet run --project tools/Nightwire.EpisodeValidator -- examples/Episode_001
 ```
 
 It verifies file inventory, byte sizes, SHA-256 digests, asset references, character/post/conversation/event/call/minigame references, message flow, and localization coverage. It does not yet run the full JSON Schema Draft 2020-12 evaluator; structural schema validation remains a separate step until a schema-validation library and its compatibility are selected.
+
+
+## Runtime loading boundary
+
+The runtime loader is implemented in `src/Nightwire.Runtime/Loading/EpisodePackageLoader.cs`. It verifies package inventory, sizes, SHA-256 hashes, path safety, and selected cross-document references before creating runtime indexes. It does not replace full JSON Schema Draft 2020-12 validation; the CLI validator/schema layer remains part of the release validation pipeline. Signed publisher metadata is also still required for authenticity.
