@@ -95,3 +95,18 @@ The host should use the versioned `SaveStore` described below. Unity lifecycle i
 - Unknown save-format versions are rejected rather than guessed or silently rewritten.
 
 The checksum detects accidental corruption; it is not an authenticity signature and does not protect against a hostile device owner modifying local files. The store is synchronous and expects the host to serialize concurrent access to a given episode save. Cloud sync, encryption/key management, cross-device conflict resolution, and save-format migrations remain future work.
+
+
+## Runtime session coordinator
+
+`Sessions/RuntimeSessionCoordinator` connects the verified package loader, player progress, story event engine, conversation runtime, and local save store into one portable session boundary.
+
+- `StartNewSession` verifies the package, refuses to overwrite an existing primary or backup save, creates episode-owned progress, processes the authored `episode_started` event, and commits the initial save.
+- `ResumeSession` loads the save for the installed episode version, honors explicit migration registrations and backup recovery, then checks that saved active conversations, pending calls/minigames, and message cursors still resolve in the installed content.
+- Conversation begin/advance/read/choice operations are coordinated and saved after successful mutations. The host receives newly delivered message IDs and typed story commands to render.
+- Call and minigame completion APIs verify the matching pending activity before routing the corresponding story trigger.
+- `ProcessExternalTrigger` supports future host-owned gameplay events without allowing episode-authored arbitrary code.
+- `SaveNow` is available for host lifecycle checkpoints; `CloseSession` releases the active package/progress references.
+- The coordinator is single-session and synchronous. The Unity host should serialize calls on its game thread, invoke `SaveNow` at appropriate lifecycle boundaries, and render returned commands. Downloading, archive extraction, media playback, UI, background scheduling, and cloud synchronization remain outside this assembly.
+
+The runtime test harness now includes session start, entry-event dispatch, resume of conversation progress, and overwrite protection cases. These tests are authored but have not been executed in this environment.
