@@ -108,7 +108,7 @@ namespace Nightwire.Unity
         private void PlayEpisodeRequested(string episodeId)
         {
             if (!initialized || releaseManager == null || sessionHost == null) return;
-            var entry = releaseManager.GetLibrary().Find(x =>
+            var entry = releaseManager.GetLibrary().FirstOrDefault(x =>
                 string.Equals(x.EpisodeId, episodeId, StringComparison.Ordinal));
             if (entry == null || string.IsNullOrEmpty(entry.InstallDirectory))
             {
