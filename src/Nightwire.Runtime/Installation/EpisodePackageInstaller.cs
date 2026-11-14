@@ -189,8 +189,9 @@ namespace Nightwire.Runtime.Installation
                         throw Fail("expanded_size_limit", "Manifest expanded size exceeds the configured limit.");
                 }
 
-                var allFiles = new HashSet<string>(expected.Keys, StringComparer.OrdinalIgnoreCase)
-                { "episode.json" };
+                if (!expected.ContainsKey("episode.json"))
+                    throw Fail("descriptor_not_in_manifest", "episode.json must be listed and hashed by manifest.json.");
+                var allFiles = new HashSet<string>(expected.Keys, StringComparer.OrdinalIgnoreCase);
                 foreach (string name in entries.Keys)
                     if (!allFiles.Contains(name) && !string.Equals(name, "manifest.json", StringComparison.OrdinalIgnoreCase))
                         throw Fail("unlisted_archive_entry", $"Archive contains an unlisted file '{name}'.");
@@ -198,7 +199,7 @@ namespace Nightwire.Runtime.Installation
                     if (!entries.ContainsKey(path))
                         throw Fail("archive_file_missing", $"Archive is missing manifest file '{path}'.");
 
-                long actualExpanded = descriptorEntry.Length + manifestEntry.Length;
+                long actualExpanded = manifestEntry.Length;
                 foreach (var pair in expected)
                 {
                     var entry = entries[pair.Key];
@@ -212,7 +213,6 @@ namespace Nightwire.Runtime.Installation
                         throw Fail("compression_ratio_limit", $"Archive entry '{pair.Key}' exceeds the compression-ratio limit.");
                 }
 
-                WriteEntry(descriptorEntry, Path.Combine(staging, "episode.json"), 1024 * 1024, null);
                 WriteEntry(manifestEntry, Path.Combine(staging, "manifest.json"), 8 * 1024 * 1024, null);
                 foreach (var pair in expected)
                 {
