@@ -126,6 +126,8 @@ namespace Nightwire.Runtime.Installation
         private VerifiedReleaseCatalogue? _catalogue;
         private bool _disposed;
         private bool _downloaderDisposed;
+        private int _activeRefreshes;
+        private bool _lifetimeResourcesDisposed;
 
         public VerifiedReleaseCatalogue? CurrentCatalogue
         {
@@ -168,20 +170,28 @@ namespace Nightwire.Runtime.Installation
             CancellationToken cancellationToken = default)
         {
             lock (_gate)
+            {
                 if (_disposed)
                     return CatalogueFailure("manager_disposed", "Episode release manager has been disposed.");
-
-            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken, _lifetimeCancellation.Token);
-            CancellationToken operationToken = linkedCancellation.Token;
-            try { await _refreshGate.WaitAsync(operationToken).ConfigureAwait(false); }
-            catch (OperationCanceledException)
-            {
-                return CatalogueFailure("catalogue_fetch_cancelled", "Release catalogue refresh was cancelled.");
+                _activeRefreshes++;
             }
 
+            bool acquired = false;
             try
             {
+                using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken, _lifetimeCancellation.Token);
+                CancellationToken operationToken = linkedCancellation.Token;
+                try
+                {
+                    await _refreshGate.WaitAsync(operationToken).ConfigureAwait(false);
+                    acquired = true;
+                }
+                catch (OperationCanceledException)
+                {
+                    return CatalogueFailure("catalogue_fetch_cancelled", "Release catalogue refresh was cancelled.");
+                }
+
                 byte[] envelope;
                 try
                 {
@@ -209,7 +219,15 @@ namespace Nightwire.Runtime.Installation
                 }
                 return accepted;
             }
-            finally { _refreshGate.Release(); }
+            catch (OperationCanceledException)
+            {
+                return CatalogueFailure("catalogue_fetch_cancelled", "Release catalogue refresh was cancelled.");
+            }
+            finally
+            {
+                if (acquired) _refreshGate.Release();
+                CompleteRefreshOperation();
+            }
         }
 
         public IReadOnlyList<EpisodeLibraryEntry> GetLibrary()
@@ -346,8 +364,7 @@ namespace Nightwire.Runtime.Installation
             }
             _lifetimeCancellation.Cancel();
             DisposeDownloaderIfReady();
-            // Do not dispose the semaphore here: an in-flight refresh releases it in its
-            // finally block after cancellation has propagated.
+            // Resource disposal is deferred until all refreshes and installs have unwound.
         }
 
         private static void EnsureNoLinkedAncestors(string path)
@@ -370,18 +387,42 @@ namespace Nightwire.Runtime.Installation
             }
         }
 
-        private void DisposeDownloaderIfReady()
+        private void CompleteRefreshOperation()
         {
-            bool dispose = false;
             lock (_gate)
             {
-                if (_disposed && _ownsDownloader && !_downloaderDisposed && _operations.Count == 0)
+                if (_activeRefreshes > 0) _activeRefreshes--;
+            }
+            DisposeResourcesIfReady();
+        }
+
+        private void DisposeDownloaderIfReady() => DisposeResourcesIfReady();
+
+        private void DisposeResourcesIfReady()
+        {
+            bool disposeDownloader = false;
+            bool disposeLifetimeResources = false;
+            lock (_gate)
+            {
+                if (!_disposed) return;
+                if (_ownsDownloader && !_downloaderDisposed && _operations.Count == 0)
                 {
                     _downloaderDisposed = true;
-                    dispose = true;
+                    disposeDownloader = true;
+                }
+                if (!_lifetimeResourcesDisposed && _operations.Count == 0 && _activeRefreshes == 0)
+                {
+                    _lifetimeResourcesDisposed = true;
+                    disposeLifetimeResources = true;
                 }
             }
-            if (dispose) _downloader.Dispose();
+
+            if (disposeDownloader) _downloader.Dispose();
+            if (disposeLifetimeResources)
+            {
+                _refreshGate.Dispose();
+                _lifetimeCancellation.Dispose();
+            }
         }
 
         private static ReleaseCatalogueResult CatalogueFailure(string code, string message) =>
