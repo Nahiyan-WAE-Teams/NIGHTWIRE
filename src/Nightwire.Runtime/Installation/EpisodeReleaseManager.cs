@@ -106,7 +106,7 @@ namespace Nightwire.Runtime.Installation
     /// Orchestrates signed catalogue acceptance, release downloads, verified installs, and offline library discovery.
     /// The host supplies protected sequence storage, trusted keys, transport, and session/install lease coordination.
     /// </summary>
-    public sealed class EpisodeReleaseManager
+    public sealed class EpisodeReleaseManager : IDisposable
     {
         private readonly Uri _catalogueUri;
         private readonly Version _runtimeVersion;
@@ -118,6 +118,8 @@ namespace Nightwire.Runtime.Installation
         private readonly EpisodePackageInstaller _installer;
         private readonly EpisodePackageLoader _loader;
         private readonly IEpisodeInstallLeaseProvider _leaseProvider;
+        private readonly bool _ownsDownloader;
+        private readonly SemaphoreSlim _refreshGate = new SemaphoreSlim(1, 1);
         private readonly object _gate = new object();
         private readonly HashSet<string> _operations = new HashSet<string>(StringComparer.Ordinal);
         private VerifiedReleaseCatalogue? _catalogue;
@@ -144,6 +146,7 @@ namespace Nightwire.Runtime.Installation
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _acceptance = acceptance ?? throw new ArgumentNullException(nameof(acceptance));
             _leaseProvider = leaseProvider ?? throw new ArgumentNullException(nameof(leaseProvider));
+            _ownsDownloader = downloader == null;
             _downloader = downloader ?? new EpisodePackageDownloader();
             _installer = installer ?? new EpisodePackageInstaller();
             _loader = loader ?? new EpisodePackageLoader();
@@ -158,26 +161,36 @@ namespace Nightwire.Runtime.Installation
         public async Task<ReleaseCatalogueResult> RefreshCatalogueAsync(DateTime utcNow,
             CancellationToken cancellationToken = default)
         {
-            byte[] envelope;
-            try
-            {
-                envelope = await _transport.FetchAsync(_catalogueUri, cancellationToken).ConfigureAwait(false);
-            }
+            try { await _refreshGate.WaitAsync(cancellationToken).ConfigureAwait(false); }
             catch (OperationCanceledException)
             {
                 return CatalogueFailure("catalogue_fetch_cancelled", "Release catalogue refresh was cancelled.");
             }
-            catch (Exception exception)
-            {
-                return CatalogueFailure("catalogue_fetch_failed", exception.Message);
-            }
 
-            var accepted = _acceptance.Accept(envelope, utcNow);
-            if (accepted.Success && accepted.Catalogue != null)
+            try
             {
-                lock (_gate) _catalogue = accepted.Catalogue;
+                byte[] envelope;
+                try
+                {
+                    envelope = await _transport.FetchAsync(_catalogueUri, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    return CatalogueFailure("catalogue_fetch_cancelled", "Release catalogue refresh was cancelled.");
+                }
+                catch (Exception exception)
+                {
+                    return CatalogueFailure("catalogue_fetch_failed", exception.Message);
+                }
+
+                var accepted = _acceptance.Accept(envelope, utcNow);
+                if (accepted.Success && accepted.Catalogue != null)
+                {
+                    lock (_gate) _catalogue = accepted.Catalogue;
+                }
+                return accepted;
             }
-            return accepted;
+            finally { _refreshGate.Release(); }
         }
 
         public IReadOnlyList<EpisodeLibraryEntry> GetLibrary()
@@ -289,10 +302,19 @@ namespace Nightwire.Runtime.Installation
             }
             finally
             {
-                lease?.Dispose();
-                lock (_gate) _operations.Remove(episodeId);
+                try { lease?.Dispose(); }
+                finally
+                {
+                    lock (_gate) _operations.Remove(episodeId);
+                }
                 // Keep a successfully downloaded archive as a cache; failed partial downloads are removed by downloader.
             }
+        }
+
+        public void Dispose()
+        {
+            if (_ownsDownloader) _downloader.Dispose();
+            _refreshGate.Dispose();
         }
 
         private static ReleaseCatalogueResult CatalogueFailure(string code, string message) =>
