@@ -5,7 +5,7 @@ A dependency-free .NET command-line tool for validating unpacked NIGHTWIRE episo
 ## Requirements
 
 - .NET 10 SDK (LTS).
-- No third-party NuGet packages.
+- NuGet dependency: `JsonSchema.Net` 9.7.0 (Draft 2020-12 support).
 
 ## Run
 
@@ -23,7 +23,7 @@ Exit codes:
 ## Checks
 
 - Required episode descriptor and manifest.
-- Supported document schema version.
+- Full JSON Schema Draft 2020-12 validation for the descriptor, manifest, and every typed document.
 - Episode/manifest identity and default locale declaration.
 - Manifest paths, duplicate/case-colliding paths, file existence, inventory completeness.
 - File byte counts and SHA-256 digests.
@@ -37,11 +37,11 @@ Exit codes:
 - Localization files for every declared locale and referenced localization-key coverage.
 - Rejection of unsafe relative paths and symbolic links/reparse points.
 
-The validator checks the current v0.1 contract and package-level semantics. The JSON Schema files remain the machine-readable structural contract; this initial CLI does not implement the full JSON Schema Draft 2020-12 evaluation algorithm.
+The validator evaluates the checked-in Draft 2020-12 schemas for every typed package document, with format validation enabled, then performs package-wide semantic and integrity checks. The schema directory is discovered from the repository checkout; run the CLI from within the NIGHTWIRE repository so the matching `schemas/0.1` contract is available.
 
 ## Current limitations
 
-- The CLI performs semantic checks for calls, minigames, and posts but does not execute the full JSON Schema Draft 2020-12 evaluator.
+- The CLI requires the matching repository `schemas/0.1` directory at validation time; it does not silently fall back to weaker validation if schemas are missing.
 - This tool validates an unpacked directory. Archive extraction safety and signed release metadata belong to the future installer.
 - It does not execute code from episode packages.
 
