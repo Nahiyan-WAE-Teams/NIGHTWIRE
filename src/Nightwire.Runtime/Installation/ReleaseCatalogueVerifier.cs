@@ -84,6 +84,8 @@ namespace Nightwire.Runtime.Installation
 
                 using var envelope = JsonDocument.Parse(envelopeBytes);
                 var root = envelope.RootElement;
+                EnsureNoDuplicateProperties(root);
+                EnsureAllowedProperties(root, "key_id", "algorithm", "payload", "signature");
                 string keyId = String(root, "key_id");
                 string algorithm = String(root, "algorithm");
                 if (!string.Equals(algorithm, "ECDSA-P256-SHA256", StringComparison.Ordinal))
@@ -109,6 +111,8 @@ namespace Nightwire.Runtime.Installation
 
                 using var payloadDocument = JsonDocument.Parse(payload);
                 var data = payloadDocument.RootElement;
+                EnsureNoDuplicateProperties(data);
+                EnsureAllowedProperties(data, "schema_version", "sequence", "issued_utc", "expires_utc", "releases");
                 if (Integer(data, "schema_version") != 1)
                     return Error("catalogue_schema_unsupported", "Release catalogue schema version is unsupported.");
                 long sequence = Long(data, "sequence");
@@ -129,6 +133,8 @@ namespace Nightwire.Runtime.Installation
                 var identities = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var item in releasesElement.EnumerateArray())
                 {
+                    EnsureAllowedProperties(item, "episode_id", "episode_version", "archive_url",
+                        "archive_size_bytes", "archive_sha256", "minimum_runtime_version");
                     string episodeId = String(item, "episode_id");
                     string version = String(item, "episode_version");
                     string identity = episodeId + "@" + version;
@@ -139,13 +145,16 @@ namespace Nightwire.Runtime.Installation
                         return Error("release_url_invalid", "Every release archive URL must be HTTPS and contain no embedded credentials.");
                     long size = Long(item, "archive_size_bytes");
                     string hash = String(item, "archive_sha256");
+                    string minimumRuntimeVersion = String(item, "minimum_runtime_version");
                     if (size <= 0 || !IsSha256(hash))
                         return Error("release_archive_metadata_invalid", "Release archive size or SHA-256 is invalid.");
+                    if (!SafeRuntimeVersion(minimumRuntimeVersion))
+                        return Error("runtime_version_invalid", "Minimum runtime version must use numeric major.minor.patch format.");
                     releases.Add(new EpisodeReleaseEntry
                     {
                         EpisodeId = episodeId, EpisodeVersion = version, ArchiveUrl = url,
                         ArchiveSizeBytes = size, ArchiveSha256 = hash.ToLowerInvariant(),
-                        MinimumRuntimeVersion = String(item, "minimum_runtime_version")
+                        MinimumRuntimeVersion = minimumRuntimeVersion
                     });
                 }
 
@@ -183,12 +192,47 @@ namespace Nightwire.Runtime.Installation
         }
 
         private static int Integer(JsonElement element, string name) => checked((int)Long(element, name));
+
+        private static void EnsureNoDuplicateProperties(JsonElement element)
+        {
+            if (element.ValueKind == JsonValueKind.Object)
+            {
+                var names = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var property in element.EnumerateObject())
+                {
+                    if (!names.Add(property.Name))
+                        throw new FormatException("Duplicate JSON property '" + property.Name + "' is not allowed.");
+                    EnsureNoDuplicateProperties(property.Value);
+                }
+            }
+            else if (element.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in element.EnumerateArray())
+                    EnsureNoDuplicateProperties(item);
+            }
+        }
+
+        private static void EnsureAllowedProperties(JsonElement element, params string[] allowed)
+        {
+            if (element.ValueKind != JsonValueKind.Object)
+                throw new FormatException("Catalogue documents and release entries must be JSON objects.");
+            var names = new HashSet<string>(allowed, StringComparer.Ordinal);
+            foreach (var property in element.EnumerateObject())
+                if (!names.Contains(property.Name))
+                    throw new FormatException("Unknown catalogue property '" + property.Name + "' is not allowed.");
+        }
+
         private static bool IsAsciiLetterOrDigit(char c) =>
             (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
-        private static bool SafeId(string value) => value.Length <= 64 && value != "." && value != ".." &&
-            value.All(c => IsAsciiLetterOrDigit(c) || c == '.' || c == '_' || c == '-');
+        private static bool SafeId(string value) => value.Length >= 3 && value.Length <= 64 &&
+            ((value[0] >= 'a' && value[0] <= 'z') || (value[0] >= '0' && value[0] <= '9')) &&
+            value.All(c => (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-');
         private static bool SafeVersion(string value) => value.Length <= 64 &&
-            value.All(c => IsAsciiLetterOrDigit(c) || c == '.' || c == '+' || c == '-' );
+            System.Text.RegularExpressions.Regex.IsMatch(value,
+                "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$");
+        private static bool SafeRuntimeVersion(string value) =>
+            Version.TryParse(value, out var parsed) && parsed.Major >= 0 && parsed.Minor >= 0 &&
+            parsed.Build >= 0 && parsed.Revision < 0;
         private static bool IsSha256(string value) => value.Length == 64 &&
             value.All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
         private static ReleaseCatalogueResult Error(string code, string message) =>
