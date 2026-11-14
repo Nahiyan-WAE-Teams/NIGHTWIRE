@@ -65,3 +65,17 @@ var openingConversation = package.RuntimeDefinition.ConversationIds;
 The loader currently consumes the unpacked directory layout. It verifies every manifest-listed file before parsing content, then rejects unlisted files and unresolved cross-file references. It enforces configurable defaults of 512 MiB total package size and 8 MiB per JSON file. These limits can be changed through `EpisodePackageLoaderOptions`.
 
 The loader does not authenticate who published a package. A future installer must verify a signed release index before treating downloaded content as trusted.
+
+
+## Conversation runtime
+
+`Conversations/ConversationRuntime` interprets the verified conversation documents in a loaded package. The host advances time explicitly through `Advance`; there are no background timers or Unity dependencies in the core.
+
+- Authored `delay_seconds` values gate message delivery and can be advanced deterministically by the host.
+- A delivered choice pauses progression until a valid option is selected.
+- `next_message_id` selects an explicit branch; an omitted property continues in authored order, while an explicit JSON null ends the conversation.
+- Delivery, read state, selected options, the current/next message, and partially elapsed delay are stored in `EpisodeProgressState.ConversationProgress`, not in episode files.
+- Marking a delivered message read emits the `message_completed` story trigger; selecting an option emits `choice_selected`.
+- The runtime does not implement free-form player replies, live networking, or presentation/typing animations. UI code can render typing indicators using the same authored delay information without changing story state.
+
+The host should serialize the player progress object using a versioned save format. Save serialization and migration are not yet implemented in this library.
