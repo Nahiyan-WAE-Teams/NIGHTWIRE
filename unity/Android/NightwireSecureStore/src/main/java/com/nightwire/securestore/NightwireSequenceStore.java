@@ -33,7 +33,7 @@ public final class NightwireSequenceStore {
 
     private NightwireSequenceStore() { }
 
-    public static long loadSequence(Context context, String namespace) throws Exception {
+    public static synchronized long loadSequence(Context context, String namespace) throws Exception {
         SharedPreferences preferences = preferences(context, namespace);
         String alias = preferences.getString(KEY_ALIAS, null);
         if (alias == null) {
@@ -42,7 +42,9 @@ public final class NightwireSequenceStore {
             }
             return 0L;
         }
-        if (!alias.startsWith(ALIAS_PREFIX)) {
+        if (!alias.startsWith(ALIAS_PREFIX) ||
+                !alias.substring(ALIAS_PREFIX.length()).matches(
+                        "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")) {
             throw new IllegalStateException("Sequence key alias is invalid.");
         }
 
@@ -69,7 +71,7 @@ public final class NightwireSequenceStore {
         return sequence;
     }
 
-    public static void saveSequence(Context context, String namespace, long sequence) throws Exception {
+    public static synchronized void saveSequence(Context context, String namespace, long sequence) throws Exception {
         if (sequence < 1L) throw new IllegalArgumentException("Sequence must be positive.");
         SharedPreferences preferences = preferences(context, namespace);
         long current = loadSequence(context, namespace);
