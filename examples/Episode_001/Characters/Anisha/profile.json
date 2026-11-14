@@ -1,0 +1,12 @@
+{
+  "schema_version": "0.1",
+  "character_id": "anisha",
+  "display_name_key": "character.anisha.name",
+  "bio_key": "character.anisha.bio",
+  "avatar_asset_id": null,
+  "status_key": "character.anisha.status",
+  "conversation_ids": [
+    "anisha.day01"
+  ],
+  "post_ids": []
+}
