@@ -901,22 +901,24 @@ internal static class Program
         Directory.CreateDirectory(root);
         try
         {
-            string archive = Path.Combine(root, "linked.zip");
-            using (var file = new FileStream(archive, FileMode.CreateNew))
-            using (var zip = new ZipArchive(file, ZipArchiveMode.Create))
+            int[] linkAttributes = { unchecked((int)0xA1FF0000), 0x400 };
+            string[] entryNames = { "unix-link", "windows-link" };
+            for (int index = 0; index < linkAttributes.Length; index++)
             {
-                var unixLink = zip.CreateEntry("unix-link");
-                unixLink.ExternalAttributes = unchecked((int)0xA1FF0000);
-                using (var writer = new StreamWriter(unixLink.Open())) writer.Write("target");
+                string archive = Path.Combine(root, "linked-" + index + ".zip");
+                using (var file = new FileStream(archive, FileMode.CreateNew))
+                using (var zip = new ZipArchive(file, ZipArchiveMode.Create))
+                {
+                    var link = zip.CreateEntry(entryNames[index]);
+                    link.ExternalAttributes = linkAttributes[index];
+                    using (var writer = new StreamWriter(link.Open())) writer.Write("target");
+                }
 
-                var windowsLink = zip.CreateEntry("windows-link");
-                windowsLink.ExternalAttributes = 0x400;
-                using (var writer = new StreamWriter(windowsLink.Open())) writer.Write("target");
+                var result = new EpisodePackageInstaller().InstallArchive(archive,
+                    Path.Combine(root, "installed-" + index));
+                Assert(!result.Success && result.ErrorCode == "archive_symlink_rejected",
+                    "ZIP link entry was not rejected for attributes 0x" + linkAttributes[index].ToString("X8") + ".");
             }
-
-            var result = new EpisodePackageInstaller().InstallArchive(archive, Path.Combine(root, "installed"));
-            Assert(!result.Success && result.ErrorCode == "archive_symlink_rejected",
-                "ZIP symbolic links or Windows reparse points were not rejected.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
