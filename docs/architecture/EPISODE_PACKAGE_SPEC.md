@@ -532,3 +532,12 @@ The portable runtime interprets prerecorded call cue/subtitle timelines and eval
 The host is responsible for actual audio/video playback and Unity presentation. It advances the call runtime from the media player's elapsed clock, renders returned cue/subtitle entries, and persists session results. Call completion is accepted only after the authored duration has elapsed. Minigame completion events are emitted only after the configured answer is solved; a timeout or exhausted attempts does not count as success.
 
 Call and minigame in-progress state is player-owned and saved separately from episode content. Save data includes timeline cursor and fired-entry IDs for calls, plus elapsed time, attempts, input sequence, matched evidence pairs, and solved status for minigames.
+
+
+## 20. Episode asset runtime boundary
+
+The portable asset access layer is `src/Nightwire.Runtime/Assets/EpisodeAssetResolver.cs`. It resolves a stable asset ID only when the ID exists in the loaded package manifest and is present in the player's `UnlockedAssetIds` state. This intentionally separates an asset being downloaded with the episode from being revealed to the player. The existing `unlock_asset` event action is the v0.1 mechanism for granting access.
+
+An opened asset is returned as a disposable handle with its ID, media type, MIME type, relative path, size, and read-only stream. Before returning content, the resolver rechecks the path under the canonical episode root, rejects path traversal and symbolic links/reparse points, applies a configurable per-asset size limit, and rechecks the manifest file size and SHA-256. It does not modify the original file.
+
+The resolver is a content-access boundary, not a media player or downloader. Unity adapters remain responsible for image/audio/video decoding, rendering, caching policy, and handle lifetime. Schema 0.1 has no implicit public/default asset flag: assets are locked until explicitly unlocked by story progression. If profile avatars or other assets should be visible from the beginning, the package format should gain an explicit, validated visibility policy rather than treating all packaged media as public.
