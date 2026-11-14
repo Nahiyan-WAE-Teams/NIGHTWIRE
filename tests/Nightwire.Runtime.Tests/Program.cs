@@ -37,6 +37,8 @@ internal static class Program
         Run("session coordinator prevents accidental new-game overwrite", SessionPreventsOverwrite, ref failures);
         Run("prerecorded call timeline emits cues and completes", CallRuntimeAdvancesTimeline, ref failures);
         Run("sequence minigame validates and solves authored input", MinigameRuntimeSolvesSequence, ref failures);
+        Run("frequency minigame applies authored tolerance", MinigameRuntimeSolvesFrequency, ref failures);
+        Run("evidence minigame requires every authored pair", MinigameRuntimeMatchesEvidence, ref failures);
         Run("save store round-trips call and minigame progress", SaveStoreRoundTripsActivities, ref failures);
         Run("session coordinator dispatches solved minigame event", SessionDispatchesMinigameCompletion, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
@@ -518,6 +520,37 @@ internal static class Program
         var solved = runtime.SubmitSequence(package, state, "minigame.signal_sequence", new[] { "low", "high", "low" });
         Assert(solved.Success && solved.Solved && state.MinigameProgress["minigame.signal_sequence"].IsComplete,
             "Correct sequence did not solve the minigame.");
+    }
+
+
+    private static void MinigameRuntimeSolvesFrequency()
+    {
+        string root = FindRepositoryRoot();
+        var package = new EpisodePackageLoader().Load(Path.Combine(root, "examples", "Episode_001"));
+        using var doc = JsonDocument.Parse(@"{""minigame_id"":""game.frequency"",""type"":""frequency_tuning"",""attempt_limit"":2,""configuration"":{""minimum_frequency"":80,""maximum_frequency"":120,""target_frequency"":100,""tolerance"":2}}");
+        package.Minigames["game.frequency"] = doc.RootElement.Clone();
+        var state = CreateState(); state.PendingMinigameId = "game.frequency";
+        var runtime = new MinigameRuntime();
+        Assert(runtime.Start(package, state, "game.frequency").Success, "Frequency minigame did not start.");
+        var result = runtime.SubmitFrequency(package, state, "game.frequency", 101.5);
+        Assert(result.Success && result.Solved && state.MinigameProgress["game.frequency"].IsComplete,
+            "Frequency inside tolerance did not solve the puzzle.");
+    }
+
+    private static void MinigameRuntimeMatchesEvidence()
+    {
+        string root = FindRepositoryRoot();
+        var package = new EpisodePackageLoader().Load(Path.Combine(root, "examples", "Episode_001"));
+        using var doc = JsonDocument.Parse(@"{""minigame_id"":""game.evidence"",""type"":""evidence_matching"",""attempt_limit"":4,""configuration"":{""items"":[{""item_id"":""photo""},{""item_id"":""time""},{""item_id"":""place""},{""item_id"":""signal""}],""pairs"":[{""left_item_id"":""photo"",""right_item_id"":""place""},{""left_item_id"":""time"",""right_item_id"":""signal""}]}}");
+        package.Minigames["game.evidence"] = doc.RootElement.Clone();
+        var state = CreateState(); state.PendingMinigameId = "game.evidence";
+        var runtime = new MinigameRuntime();
+        Assert(runtime.Start(package, state, "game.evidence").Success, "Evidence minigame did not start.");
+        var first = runtime.MatchEvidence(package, state, "game.evidence", "photo", "place");
+        Assert(first.Success && !first.Solved, "One matching pair incorrectly completed the puzzle.");
+        var second = runtime.MatchEvidence(package, state, "game.evidence", "time", "signal");
+        Assert(second.Success && second.Solved && state.MinigameProgress["game.evidence"].IsComplete,
+            "All matching pairs did not complete the puzzle.");
     }
 
     private static void SaveStoreRoundTripsActivities()
