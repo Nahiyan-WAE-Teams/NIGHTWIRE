@@ -243,7 +243,7 @@ internal static class Program
         {
             Type = StoryActionType.SetStoryFlag,
             Flag = "episode_started",
-            Value = true
+            FlagValue = StoryFlagValue.FromBoolean(true)
         });
         episode.Events.Add(start);
         return episode;
