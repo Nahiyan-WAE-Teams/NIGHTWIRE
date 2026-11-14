@@ -17,3 +17,6 @@ __pycache__/
 [Bb]uilds/
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
+
+# Local Unity dependency staging output
+/.nightwire-unity-publish/
