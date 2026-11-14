@@ -44,7 +44,7 @@ namespace Nightwire.Runtime.Loading
                     throw Fail("invalid_manifest_name", "Format 0.1 requires the manifest file to be named manifest.json.");
                 EnsureRuntimeCompatible(descriptor.MinimumRuntimeVersion, _options.RuntimeVersion);
 
-                using (JsonDocument manifestDocument = ReadJson(Path.Combine(root, descriptor.Manifest), _options.MaximumJsonFileBytes);
+                using (JsonDocument manifestDocument = ReadJson(Path.Combine(root, descriptor.Manifest), _options.MaximumJsonFileBytes))
                 {
                 var manifest = ParseManifest(manifestDocument.RootElement);
                 if (!string.Equals(manifest.SchemaVersion, descriptor.SchemaVersion, StringComparison.Ordinal))
