@@ -552,7 +552,7 @@ The runtime provides a transport downloader and a local ZIP installer, independe
 3. `EpisodePackageInstaller` opens the ZIP and validates entry names before writing anything. It rejects traversal, duplicate/case-colliding names, symbolic links, unlisted entries, missing manifest files, excessive entry counts, expanded-size excess, and configured compression-ratio excess.
 4. The installer reads the descriptor and manifest with bounded sizes, requires `episode.json` to be listed in the manifest, extracts each listed file to a fresh staging directory, and verifies the declared byte size and SHA-256 while streaming.
 5. The normal `EpisodePackageLoader` performs the full runtime compatibility and cross-reference validation against the staged package.
-6. A new package is published by moving staging into the episode-ID directory. An update first moves the previous complete directory to a temporary backup, then publishes the new validated directory; if publishing fails, it attempts to restore the previous install.
+6. A new package is published by moving staging into the episode-ID directory. An update first moves the previous complete directory to a temporary backup, then publishes the new validated directory; if publishing fails, it attempts to restore the previous install. These are two directory moves rather than one atomic transaction, so startup recovery for an interruption between moves remains a production-hardening item.
 
 The archive contract is ZIP with `episode.json`, `manifest.json`, and exactly the manifest-listed files. The manifest lists and hashes `episode.json`, but never lists itself. Directory entries are optional and ignored; all actual file entries must be declared.
 
