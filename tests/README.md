@@ -16,8 +16,9 @@ python -m unittest discover -s tests -v
 ```
 
 The Python integration suite builds the validator in Release configuration once, then checks:
-- the sample package passes;
+- the sample package passes schema, integrity, and semantic validation;
 - a modified file fails SHA-256 integrity validation;
+- a descriptor missing a required schema property is rejected even when its manifest hash is refreshed;
 - a choice pointing to a missing message fails semantic validation;
 - a path-traversal manifest entry is rejected.
 
