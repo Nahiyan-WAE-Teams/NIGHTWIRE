@@ -657,7 +657,9 @@ internal static class Program
             }
 
             var completionEvent = GetString(minigame, "completion_event_id");
-            if (completionEvent is not null &&
+            if (completionEvent is null)
+                Errors.Add($"Minigame '{minigameId}': missing completion_event_id.");
+            else if (
                 (!events.TryGetValue(completionEvent, out var completion) ||
                  !completion.TryGetProperty("trigger", out var trigger) ||
                  GetString(trigger, "type") != "minigame_completed" ||
