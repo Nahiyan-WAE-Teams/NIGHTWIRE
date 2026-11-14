@@ -150,14 +150,15 @@ namespace Nightwire.Unity.UI
 
             episodeList.Clear();
             foreach (var episode in snapshot.Episodes)
-                episodeList.Add(BuildEpisodeCard(episode));
+                episodeList.Add(BuildEpisodeCard(episode, snapshot.IsOperationBusy));
 
             emptyState.style.display = snapshot.Episodes.Count == 0
                 ? DisplayStyle.Flex : DisplayStyle.None;
-            refreshButton.SetEnabled(!snapshot.IsRefreshing);
+            refreshButton.SetEnabled(!snapshot.IsRefreshing && !snapshot.IsOperationBusy);
+            cancelButton.SetEnabled(snapshot.IsOperationBusy);
         }
 
-        private VisualElement BuildEpisodeCard(EpisodeLibraryRow episode)
+        private VisualElement BuildEpisodeCard(EpisodeLibraryRow episode, bool operationBusy)
         {
             var card = new VisualElement();
             card.AddToClassList("episode-card");
@@ -187,7 +188,7 @@ namespace Nightwire.Unity.UI
             actions.AddToClassList("episode-actions");
             var action = new Button { text = ActionText(episode) };
             action.AddToClassList("episode-action");
-            action.SetEnabled(!episode.IsBusy && (CanInstall(episode) || CanPlay(episode)));
+            action.SetEnabled(!operationBusy && !episode.IsBusy && (CanInstall(episode) || CanPlay(episode)));
             string id = episode.EpisodeId;
             action.clicked += () => ActionClicked(id, action, episode);
             actions.Add(action);
