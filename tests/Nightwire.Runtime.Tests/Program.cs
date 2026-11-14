@@ -62,6 +62,7 @@ internal static class Program
         Run("episode installer rejects ZIP path traversal", EpisodeInstallerRejectsTraversal, ref failures);
         Run("episode installer rejects ZIP symbolic links and reparse points", EpisodeInstallerRejectsArchiveLinks, ref failures);
         Run("episode installer rejects ZIP special files", EpisodeInstallerRejectsArchiveSpecialFiles, ref failures);
+        Run("episode installer rejects ZIP file-directory path collisions", EpisodeInstallerRejectsPathTypeConflicts, ref failures);
         Run("episode downloader verifies a trusted archive hash", EpisodeDownloaderChecksTrustedHash, ref failures);
         Run("episode downloader rejects a linked destination ancestor", EpisodeDownloaderRejectsLinkedDestinationAncestor, ref failures);
         Run("signed release catalogue verifies signatures, rejects rollback, duplicate JSON keys, and malformed runtime versions", ReleaseCatalogueVerifiesSignatureAndSequence, ref failures);
@@ -927,6 +928,45 @@ internal static class Program
                     Path.Combine(root, "installed-" + index));
                 Assert(!result.Success && result.ErrorCode == "archive_symlink_rejected",
                     "ZIP link entry was not rejected for attributes 0x" + linkAttributes[index].ToString("X8") + ".");
+            }
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void EpisodeInstallerRejectsPathTypeConflicts()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-install-path-conflict-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            for (int scenario = 0; scenario < 3; scenario++)
+            {
+                string archive = Path.Combine(root, "conflict-" + scenario + ".zip");
+                using (var file = new FileStream(archive, FileMode.CreateNew))
+                using (var zip = new ZipArchive(file, ZipArchiveMode.Create))
+                {
+                    if (scenario == 0)
+                    {
+                        using (var writer = new StreamWriter(zip.CreateEntry("node").Open())) writer.Write("file");
+                        using (var writer = new StreamWriter(zip.CreateEntry("node/child").Open())) writer.Write("child");
+                    }
+                    else if (scenario == 1)
+                    {
+                        zip.CreateEntry("node/");
+                        using (var writer = new StreamWriter(zip.CreateEntry("node").Open())) writer.Write("file");
+                    }
+                    else
+                    {
+                        zip.CreateEntry("node/");
+                        zip.CreateEntry("node/");
+                    }
+                }
+
+                var result = new EpisodePackageInstaller().InstallArchive(archive,
+                    Path.Combine(root, "installed-" + scenario));
+                Assert(!result.Success && (result.ErrorCode == "archive_path_type_conflict" ||
+                    result.ErrorCode == "duplicate_archive_path"),
+                    "ZIP file/directory path collision was not rejected for scenario " + scenario + ".");
             }
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
