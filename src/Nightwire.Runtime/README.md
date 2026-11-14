@@ -42,7 +42,7 @@ A dependency-free console test harness is available:
 dotnet run --project tests/Nightwire.Runtime.Tests
 ```
 
-The harness currently registers 34 test cases covering story events, package loading, conversations, saves/migrations, prerecorded call timelines, minigames, unlocked asset access, staged ZIP installation/update, ZIP traversal rejection, HTTPS download hash verification, signed release signature/sequence verification, interrupted-install startup recovery, and signed release identity mismatch protection. Test/build execution remains deferred; no passing result is claimed.
+The harness currently registers 35 test cases covering story events, package loading, conversations, saves/migrations, prerecorded call timelines, minigames, unlocked asset access, staged ZIP installation/update, ZIP traversal rejection, HTTPS download hash verification, signed release signature/sequence verification, interrupted-install startup recovery, signed release identity mismatch protection, and signed catalogue-to-offline-install orchestration. Test/build execution remains deferred; no passing result is claimed.
 
 ## Official compatibility references
 
