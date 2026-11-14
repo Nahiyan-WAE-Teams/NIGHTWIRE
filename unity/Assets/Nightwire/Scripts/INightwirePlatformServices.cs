@@ -6,9 +6,9 @@ using UnityEngine;
 namespace Nightwire.Unity
 {
     /// <summary>
-    /// Platform-owned security and release configuration boundary.
-    /// Implementations must obtain sequence state from rollback-resistant storage
-    /// and return only app-provisioned ECDSA P-256 public keys.
+    /// Platform-owned release configuration boundary.
+    /// A production provider must fail closed unless it can protect the accepted sequence
+    /// against preference rollback and return app-provisioned ECDSA P-256 public keys.
     /// </summary>
     public interface INightwirePlatformServices
     {
