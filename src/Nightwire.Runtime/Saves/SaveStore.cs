@@ -148,7 +148,11 @@ namespace Nightwire.Runtime.Saves
             if (envelope == null)
                 throw new SaveStoreException("save_invalid", "The save file is invalid.", primaryError ?? new InvalidDataException());
 
-            EpisodeProgressState state = envelope.Payload!.ToState(envelope.EpisodeId, envelope.EpisodeVersion);
+            ValidatePayload(envelope.Payload!);
+            EpisodeProgressState state;
+            try { state = envelope.Payload!.ToState(envelope.EpisodeId, envelope.EpisodeVersion); }
+            catch (Exception exception) when (exception is ArgumentException || exception is InvalidDataException || exception is NullReferenceException)
+            { throw new SaveStoreException("save_payload_invalid", "Save payload contains invalid or duplicate entries.", exception); }
             bool migrated = MigrateToInstalledVersion(state, installedEpisodeVersion);
             ValidateState(state);
             return new SaveLoadResult
@@ -193,9 +197,7 @@ namespace Nightwire.Runtime.Saves
             {
                 if (!visited.Add(state.EpisodeVersion))
                     throw new SaveStoreException("migration_cycle", "Episode save migration contains a version cycle.");
-                if (!_migrations.TryGetValue(MigrationKey(state.EpisodeId, state.EpisodeVersion), out var migration) ||
-                    !string.Equals(migration.ToEpisodeVersion, targetVersion, StringComparison.Ordinal) &&
-                    _migrations.ContainsKey(MigrationKey(state.EpisodeId, migration.ToEpisodeVersion)) == false)
+                if (!_migrations.TryGetValue(MigrationKey(state.EpisodeId, state.EpisodeVersion), out var migration))
                     throw new SaveStoreException("migration_required",
                         $"Save is for episode version '{state.EpisodeVersion}', but '{targetVersion}' is installed. An explicit migration is required.");
                 migration.Migrate(state);
@@ -219,6 +221,8 @@ namespace Nightwire.Runtime.Saves
                 throw new SaveStoreException("save_state_limit", "Save state exceeds a configured collection limit.");
             foreach (var pair in state.ConversationProgress)
             {
+                if (string.IsNullOrWhiteSpace(pair.Key))
+                    throw new SaveStoreException("save_conversation_invalid", "Conversation progress IDs cannot be empty.");
                 if (pair.Value == null || pair.Value.DeliveredMessageIds.Count > _options.MaximumCollectionEntries ||
                     pair.Value.ReadMessageIds.Count > _options.MaximumCollectionEntries ||
                     pair.Value.SelectedOptions.Count > _options.MaximumCollectionEntries ||
@@ -248,6 +252,7 @@ namespace Nightwire.Runtime.Saves
 
         private sealed class SaveEnvelope
         {
+            public SaveEnvelope() { }
             public int SaveFormatVersion { get; set; }
             public string EpisodeId { get; set; } = string.Empty;
             public string EpisodeVersion { get; set; } = string.Empty;
@@ -258,6 +263,7 @@ namespace Nightwire.Runtime.Saves
 
         private sealed class SavePayload
         {
+            public SavePayload() { }
             public string? ActiveConversationId { get; set; }
             public string? PendingCallId { get; set; }
             public string? PendingMinigameId { get; set; }
@@ -301,6 +307,7 @@ namespace Nightwire.Runtime.Saves
 
         private sealed class ConversationPayload
         {
+            public ConversationPayload() { }
             public string ConversationId { get; set; } = string.Empty;
             public string? CurrentMessageId { get; set; }
             public string? NextMessageId { get; set; }
@@ -334,6 +341,7 @@ namespace Nightwire.Runtime.Saves
 
         private sealed class StoryFlagPayload
         {
+            public StoryFlagPayload() { }
             public string Name { get; set; } = string.Empty;
             public StoryFlagValueKind Kind { get; set; }
             public bool BooleanValue { get; set; }
