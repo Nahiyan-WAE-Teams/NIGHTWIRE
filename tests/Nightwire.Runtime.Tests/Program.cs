@@ -901,8 +901,16 @@ internal static class Program
         Directory.CreateDirectory(root);
         try
         {
-            int[] linkAttributes = { unchecked((int)0xA1FF0000), 0x400 };
-            string[] entryNames = { "unix-link", "windows-link" };
+            int[] linkAttributes =
+            {
+                unchecked((int)0xA1FF0000), 0x400,
+                unchecked((int)0xA1FF0000), 0x400
+            };
+            string[] entryNames =
+            {
+                "unix-link", "windows-link",
+                "unix-directory-link/", "windows-directory-link/"
+            };
             for (int index = 0; index < linkAttributes.Length; index++)
             {
                 string archive = Path.Combine(root, "linked-" + index + ".zip");
