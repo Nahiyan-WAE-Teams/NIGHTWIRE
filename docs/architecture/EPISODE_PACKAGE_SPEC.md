@@ -32,6 +32,7 @@ Episode_001/
 │   ├── Anisha/
 │   │   ├── profile.json
 │   │   ├── Posts/
+│   │   │   └── post01.json
 │   │   └── Conversations/
 │   └── Anna/
 │       ├── profile.json
@@ -40,6 +41,9 @@ Episode_001/
 ├── GroupChats/
 ├── Events/
 ├── Calls/
+│   └── call01.json
+├── Minigames/
+│   └── frequency01.json
 ├── Media/
 │   ├── Images/
 │   ├── Audio/
@@ -256,16 +260,26 @@ Every trigger and action must be schema-validated and supported by the runtime. 
 
 ## 8. Calls and minigames
 
-Calls are separate definitions referenced by call_invitation messages or events. A call definition may specify:
-- call_id
-- participants
-- presentation mode (audio or video)
-- media asset IDs
-- subtitle/localization track
-- sequence of authored beats
-- completion event
+Calls are separate, prerecorded media sessions referenced by `call_invitation` messages or story events. They are not live network calls. The runtime plays local audio/video assets downloaded with the episode, so a fully installed episode can replay them offline.
 
-Minigames are also separate definitions. Episode data selects a supported minigame type and supplies validated configuration. It cannot supply executable scripts or native plugins.
+A call definition contains:
+- Stable `call_id`, mode (`audio` or `video`), and `prerecorded` presentation marker.
+- Character participants and total duration in milliseconds.
+- Required audio or video asset ID, plus optional companion audio and poster assets.
+- Locale-specific subtitle tracks with start/end timestamps and localization keys.
+- Ordered presentation cues at timestamps, limited to known visual effects, speaker focus, and overlay text.
+- A completion event ID that must resolve to a matching `call_ended` event.
+
+The runtime owns playback, pause/resume, subtitles, audio routing, visual effects, and reduced-motion behavior. Episode data only selects approved assets and allowlisted cues; it cannot inject shaders, scripts, plugins, or arbitrary commands. Media files are immutable episode assets and are verified by the manifest.
+
+Minigames are declarative definitions. The first proposed supported types are:
+- `frequency_tuning`: tune a frequency into an authored target range.
+- `sequence_reconstruction`: reproduce a sequence using a declared symbol set.
+- `evidence_matching`: connect authored evidence items into defined pairs.
+
+Each minigame has localized title/instructions, validated configuration, optional attempt/time limits, and a completion event. Evidence item media references must resolve through manifest asset IDs. The runtime implements each minigame type; packages cannot provide executable game logic or native plugins.
+
+Character social posts are individual `character_post` documents under each character's `Posts/` folder. A post contains an author, publication timestamp, localized body, optional media assets, and authored comments. Character profile `post_ids` must resolve to these documents.
 
 ## 9. Localization
 
@@ -371,6 +385,9 @@ Draft JSON Schema files for format 0.1 are stored in `schemas/0.1/`:
 - `conversation.schema.json`
 - `event.schema.json`
 - `localization.schema.json`
+- `call.schema.json`
+- `minigame.schema.json`
+- `character-post.schema.json`
 
 A small linked example package is stored in `examples/Episode_001/`. Its manifest includes the byte sizes and SHA-256 digests of each listed file; the manifest does not hash itself. The example intentionally has no media assets yet, so its asset list is empty.
 
@@ -381,6 +398,6 @@ See [JSON Schema Guide](JSON_SCHEMA_GUIDE.md) for the schema mapping and current
 
 ## 16. Initial package validator
 
-A dependency-free .NET 10 command-line validator is provided in `tools/Nightwire.EpisodeValidator`. It currently checks the unpacked package's manifest integrity, path safety, inventory completeness, asset references, character and conversation references, message sender/choice references, event entry and message triggers, supported event actions, and localization coverage.
+A dependency-free .NET 10 command-line validator is provided in `tools/Nightwire.EpisodeValidator`. It currently checks the unpacked package's manifest integrity, path safety, inventory completeness, asset references, character and conversation references, message sender/choice references, character post references, call media/subtitle/timing/completion references, minigame configuration/completion references, event entry and message/call/minigame triggers, supported event actions, and localization coverage.
 
-It does not yet execute the complete JSON Schema Draft 2020-12 schemas. It is an initial semantic/package-integrity validator, not yet the final release validator. Archive extraction safety, signed release metadata, call/minigame definition contracts, and automated tests remain future work.
+It does not yet execute the complete JSON Schema Draft 2020-12 schemas. It is an initial semantic/package-integrity validator, not yet the final release validator. Archive extraction safety, signed release metadata, complete JSON Schema Draft 2020-12 evaluation, and runtime playback remain future work.
