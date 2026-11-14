@@ -147,6 +147,7 @@ namespace Nightwire.Runtime.Saves
             }
             if (envelope == null)
                 throw new SaveStoreException("save_invalid", "The save file is invalid.", primaryError ?? new InvalidDataException());
+            if (recovered) RestoreBackup(backup, path);
 
             ValidatePayload(envelope.Payload!);
             EpisodeProgressState state;
@@ -182,10 +183,36 @@ namespace Nightwire.Runtime.Saves
                 string.IsNullOrWhiteSpace(envelope.PayloadSha256))
                 throw new SaveStoreException("save_envelope_invalid", "Save metadata is incomplete.");
 
-            byte[] payloadBytes = JsonSerializer.SerializeToUtf8Bytes(envelope.Payload, JsonOptions);
-            if (!string.Equals(Sha256(payloadBytes), envelope.PayloadSha256, StringComparison.OrdinalIgnoreCase))
-                throw new SaveStoreException("save_checksum_mismatch", "Save payload checksum does not match.");
+            using (JsonDocument document = JsonDocument.Parse(bytes))
+            {
+                if (!document.RootElement.TryGetProperty("payload", out var payloadElement))
+                    throw new SaveStoreException("save_envelope_invalid", "Save payload is missing.");
+                byte[] payloadBytes = Encoding.UTF8.GetBytes(payloadElement.GetRawText());
+                if (!string.Equals(Sha256(payloadBytes), envelope.PayloadSha256, StringComparison.OrdinalIgnoreCase))
+                    throw new SaveStoreException("save_checksum_mismatch", "Save payload checksum does not match.");
+            }
             return envelope;
+        }
+
+        private static void RestoreBackup(string backupPath, string primaryPath)
+        {
+            string restoreTemp = primaryPath + ".restore.tmp";
+            try
+            {
+                using (var input = new FileStream(backupPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var output = new FileStream(restoreTemp, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    input.CopyTo(output);
+                    output.Flush(true);
+                }
+                File.Move(restoreTemp, primaryPath, true);
+            }
+            catch (Exception exception)
+            {
+                TryDelete(restoreTemp);
+                throw new SaveStoreException("save_backup_restore_failed",
+                    "The backup was readable but could not be restored to the primary save path.", exception);
+            }
         }
 
         private bool MigrateToInstalledVersion(EpisodeProgressState state, string targetVersion)
