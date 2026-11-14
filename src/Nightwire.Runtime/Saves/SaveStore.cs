@@ -87,15 +87,17 @@ namespace Nightwire.Runtime.Saves
 
             var payload = SavePayload.FromState(state);
             byte[] payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOptions);
-            string checksum = Sha256(payloadBytes);
+            string savedAtUtc = DateTimeOffset.UtcNow.ToString("O");
+            string checksum = ComputeEnvelopeChecksum(CurrentSaveFormatVersion, state.EpisodeId,
+                state.EpisodeVersion, savedAtUtc, payloadBytes);
             var envelope = new SaveEnvelope
             {
                 SaveFormatVersion = CurrentSaveFormatVersion,
                 EpisodeId = state.EpisodeId,
                 EpisodeVersion = state.EpisodeVersion,
-                SavedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+                SavedAtUtc = savedAtUtc,
                 Payload = payload,
-                PayloadSha256 = checksum
+                EnvelopeSha256 = checksum
             };
             byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(envelope, JsonOptions);
             if (bytes.LongLength > _options.MaximumSaveBytes)
@@ -147,13 +149,13 @@ namespace Nightwire.Runtime.Saves
             }
             if (envelope == null)
                 throw new SaveStoreException("save_invalid", "The save file is invalid.", primaryError ?? new InvalidDataException());
-            if (recovered) RestoreBackup(backup, path);
-
             ValidatePayload(envelope.Payload!);
             EpisodeProgressState state;
             try { state = envelope.Payload!.ToState(envelope.EpisodeId, envelope.EpisodeVersion); }
             catch (Exception exception) when (exception is ArgumentException || exception is InvalidDataException || exception is NullReferenceException)
             { throw new SaveStoreException("save_payload_invalid", "Save payload contains invalid or duplicate entries.", exception); }
+            ValidateState(state);
+            if (recovered) RestoreBackup(backup, path);
             bool migrated = MigrateToInstalledVersion(state, installedEpisodeVersion);
             ValidateState(state);
             return new SaveLoadResult
@@ -180,7 +182,7 @@ namespace Nightwire.Runtime.Saves
             if (!string.Equals(envelope.EpisodeId, expectedEpisodeId, StringComparison.Ordinal))
                 throw new SaveStoreException("episode_id_mismatch", "Save belongs to a different episode.");
             if (string.IsNullOrWhiteSpace(envelope.EpisodeVersion) || string.IsNullOrWhiteSpace(envelope.SavedAtUtc) ||
-                string.IsNullOrWhiteSpace(envelope.PayloadSha256))
+                string.IsNullOrWhiteSpace(envelope.EnvelopeSha256))
                 throw new SaveStoreException("save_envelope_invalid", "Save metadata is incomplete.");
 
             using (JsonDocument document = JsonDocument.Parse(bytes))
@@ -188,8 +190,10 @@ namespace Nightwire.Runtime.Saves
                 if (!document.RootElement.TryGetProperty("payload", out var payloadElement))
                     throw new SaveStoreException("save_envelope_invalid", "Save payload is missing.");
                 byte[] payloadBytes = Encoding.UTF8.GetBytes(payloadElement.GetRawText());
-                if (!string.Equals(Sha256(payloadBytes), envelope.PayloadSha256, StringComparison.OrdinalIgnoreCase))
-                    throw new SaveStoreException("save_checksum_mismatch", "Save payload checksum does not match.");
+                string expectedChecksum = ComputeEnvelopeChecksum(envelope.SaveFormatVersion, envelope.EpisodeId,
+                    envelope.EpisodeVersion, envelope.SavedAtUtc, payloadBytes);
+                if (!string.Equals(expectedChecksum, envelope.EnvelopeSha256, StringComparison.OrdinalIgnoreCase))
+                    throw new SaveStoreException("save_checksum_mismatch", "Save envelope checksum does not match.");
             }
             return envelope;
         }
@@ -299,6 +303,26 @@ namespace Nightwire.Runtime.Saves
             return episodeId;
         }
 
+        private static string ComputeEnvelopeChecksum(int formatVersion, string episodeId,
+            string episodeVersion, string savedAtUtc, byte[] payloadBytes)
+        {
+            byte[] metadata = JsonSerializer.SerializeToUtf8Bytes(new ChecksumMetadata
+            {
+                SaveFormatVersion = formatVersion,
+                EpisodeId = episodeId,
+                EpisodeVersion = episodeVersion,
+                SavedAtUtc = savedAtUtc
+            }, JsonOptions);
+            byte[] input = new byte[4 + metadata.Length + payloadBytes.Length];
+            input[0] = (byte)(metadata.Length >> 24);
+            input[1] = (byte)(metadata.Length >> 16);
+            input[2] = (byte)(metadata.Length >> 8);
+            input[3] = (byte)metadata.Length;
+            Buffer.BlockCopy(metadata, 0, input, 4, metadata.Length);
+            Buffer.BlockCopy(payloadBytes, 0, input, 4 + metadata.Length, payloadBytes.Length);
+            return Sha256(input);
+        }
+
         private static string Sha256(byte[] bytes)
         {
             using (var sha = SHA256.Create())
@@ -306,6 +330,14 @@ namespace Nightwire.Runtime.Saves
         }
 
         private static void TryDelete(string path) { try { if (File.Exists(path)) File.Delete(path); } catch { } }
+
+        private sealed class ChecksumMetadata
+        {
+            public int SaveFormatVersion { get; set; }
+            public string EpisodeId { get; set; } = string.Empty;
+            public string EpisodeVersion { get; set; } = string.Empty;
+            public string SavedAtUtc { get; set; } = string.Empty;
+        }
 
         private sealed class SaveEnvelope
         {
@@ -315,7 +347,7 @@ namespace Nightwire.Runtime.Saves
             public string EpisodeVersion { get; set; } = string.Empty;
             public string SavedAtUtc { get; set; } = string.Empty;
             public SavePayload? Payload { get; set; }
-            public string PayloadSha256 { get; set; } = string.Empty;
+            public string EnvelopeSha256 { get; set; } = string.Empty;
         }
 
         private sealed class SavePayload
