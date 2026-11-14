@@ -218,13 +218,22 @@ namespace Nightwire.Runtime.Saves
             string restoreTemp = primaryPath + ".restore.tmp";
             try
             {
+                EnsureNotLink(backupPath, "backup save");
+                EnsureNotLink(restoreTemp, "temporary backup restore save");
+                EnsureNotLink(primaryPath, "primary save");
                 using (var input = new FileStream(backupPath, FileMode.Open, FileAccess.Read, FileShare.Read))
-                using (var output = new FileStream(restoreTemp, FileMode.Create, FileAccess.Write, FileShare.None))
+                using (var output = new FileStream(restoreTemp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 {
                     input.CopyTo(output);
                     output.Flush(true);
                 }
+                EnsureNotLink(restoreTemp, "temporary backup restore save");
+                EnsureNotLink(primaryPath, "primary save");
                 File.Move(restoreTemp, primaryPath, true);
+            }
+            catch (SaveStoreException)
+            {
+                throw;
             }
             catch (Exception exception)
             {
