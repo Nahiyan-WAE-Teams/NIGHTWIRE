@@ -28,7 +28,7 @@ The sample is intentionally small and contains no media assets. Its manifest rec
 
 ## Validation boundary
 
-The Episode Validator evaluates these Draft 2020-12 schemas for the descriptor, manifest, and every typed document, then performs package-wide integrity and semantic checks. JSON Schema checks document shape and field constraints; it cannot, by itself, establish all package-wide relationships. The future package validator must also check:
+The Episode Validator evaluates these Draft 2020-12 schemas for the descriptor, manifest, and every typed document, then performs package-wide integrity and semantic checks. JSON Schema checks document shape and field constraints; it cannot, by itself, establish all package-wide relationships. The package validator additionally checks:
 
 - Every manifest path exists, is unique, and stays within the package root.
 - Every package file required by the format is represented in the manifest.
@@ -48,7 +48,7 @@ Unknown trigger, action, or message types must fail validation. Episode data is 
 
 ## Command-line package validation
 
-The repository includes a dependency-free .NET 10 command-line validator at `tools/Nightwire.EpisodeValidator`.
+The repository includes a .NET 10 command-line validator at `tools/Nightwire.EpisodeValidator`, using `JsonSchema.Net` 9.7.0 for Draft 2020-12 evaluation.
 
 Run it from the repository root:
 
@@ -56,9 +56,9 @@ Run it from the repository root:
 dotnet run --project tools/Nightwire.EpisodeValidator -- examples/Episode_001
 ```
 
-It verifies file inventory, byte sizes, SHA-256 digests, asset references, character/post/conversation/event/call/minigame references, message flow, and localization coverage. It does not yet run the full JSON Schema Draft 2020-12 evaluator; structural schema validation remains a separate step until a schema-validation library and its compatibility are selected.
+It evaluates the checked-in schemas for the descriptor, manifest, character profiles/posts, conversations, events, calls, minigames, and localization dictionaries. Format validation is enabled. It then verifies file inventory, byte sizes, SHA-256 digests, asset references, cross-document references, message flow, and localization coverage. The CLI locates `schemas/0.1` by walking upward from the episode directory, current working directory, and executable directory; run it from the repository checkout.
 
 
 ## Runtime loading boundary
 
-The runtime loader is implemented in `src/Nightwire.Runtime/Loading/EpisodePackageLoader.cs`. It verifies package inventory, sizes, SHA-256 hashes, path safety, and selected cross-document references before creating runtime indexes. It does not replace full JSON Schema Draft 2020-12 validation; the CLI validator/schema layer remains part of the release validation pipeline. Signed release-catalogue verification is implemented in `src/Nightwire.Runtime/Installation/ReleaseCatalogueVerifier.cs`; the app must provision trusted public keys and persist the highest accepted catalogue sequence. Production signing infrastructure and key rotation remain release-engineering responsibilities.
+The runtime loader is implemented in `src/Nightwire.Runtime/Loading/EpisodePackageLoader.cs`. It verifies package inventory, sizes, SHA-256 hashes, path safety, and selected cross-document references before creating runtime indexes. The portable runtime loader retains these security-critical checks independently; full Draft 2020-12 schema evaluation is performed by the release validator before publishing episode packages. Signed release-catalogue verification is implemented in `src/Nightwire.Runtime/Installation/ReleaseCatalogueVerifier.cs`; the app must provision trusted public keys and persist the highest accepted catalogue sequence. Production signing infrastructure and key rotation remain release-engineering responsibilities.
