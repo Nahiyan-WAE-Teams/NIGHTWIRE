@@ -129,6 +129,7 @@ namespace Nightwire.Runtime.Installation
                     return Error("release_count_invalid", "Release catalogue contains an invalid number of releases.");
                 var releases = new List<EpisodeReleaseEntry>();
                 var identities = new HashSet<string>(StringComparer.Ordinal);
+                var episodeIds = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var item in releasesElement.EnumerateArray())
                 {
                     EnsureAllowedProperties(item, "episode_id", "episode_version", "archive_url",
@@ -136,8 +137,9 @@ namespace Nightwire.Runtime.Installation
                     string episodeId = String(item, "episode_id");
                     string version = String(item, "episode_version");
                     string identity = episodeId + "@" + version;
-                    if (!SafeId(episodeId) || !SafeVersion(version) || !identities.Add(identity))
-                        return Error("release_identity_invalid", "Release catalogue contains an unsafe or duplicate release identity.");
+                    if (!SafeId(episodeId) || !SafeVersion(version) || !identities.Add(identity) ||
+                        !episodeIds.Add(episodeId))
+                        return Error("release_identity_invalid", "Release catalogue contains an unsafe or duplicate episode identity.");
                     if (!Uri.TryCreate(String(item, "archive_url"), UriKind.Absolute, out var url) ||
                         url.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(url.UserInfo))
                         return Error("release_url_invalid", "Every release archive URL must be HTTPS and contain no embedded credentials.");
