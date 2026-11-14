@@ -41,12 +41,21 @@ namespace Nightwire.Runtime.Minigames
         {
             if (!TryGet(package, state, minigameId, out var definition, out var progress, out var error)) return Fail(error!);
             if (RequiredString(definition, "type") != "sequence_reconstruction") return Fail("This minigame does not accept sequence input.");
+            if (IsExpired(definition, progress)) return Fail("The minigame time limit has expired.");
             if (progress.AttemptsUsed >= AttemptLimit(definition)) return Fail("No attempts remain.");
+            if (IsExpired(definition, progress)) return Fail("The minigame time limit has expired.");
+            if (sequence == null) return Fail("Sequence input is required.");
             if (!definition.GetProperty("configuration").TryGetProperty("sequence", out var expected)) return Fail("Sequence configuration is missing.");
+            if (sequence.Count != expected.GetArrayLength() || sequence.Count > 32) return Fail("Sequence input has an invalid length.");
+            var allowed = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var symbol in definition.GetProperty("configuration").GetProperty("symbols").EnumerateArray())
+                allowed.Add(symbol.GetString() ?? string.Empty);
+            if (sequence.Any(symbol => string.IsNullOrEmpty(symbol) || !allowed.Contains(symbol)))
+                return Fail("Sequence contains a symbol not allowed by this puzzle.");
             progress.AttemptsUsed++;
             progress.SequenceInput.Clear();
             progress.SequenceInput.AddRange(sequence);
-            bool solved = expected.GetArrayLength() == sequence.Count;
+            bool solved = true;
             for (int i = 0; solved && i < sequence.Count; i++) solved = string.Equals(expected[i].GetString(), sequence[i], StringComparison.Ordinal);
             if (solved) progress.IsComplete = true;
             var result = Snapshot(definition, progress);
@@ -126,6 +135,7 @@ namespace Nightwire.Runtime.Minigames
             if (!state.MinigameProgress.TryGetValue(id, out progress!)) { error = "Minigame has not been started."; return false; }
             return true;
         }
+        private static bool IsExpired(JsonElement d, MinigameProgressState p) => d.TryGetProperty("time_limit_seconds", out var limit) && p.ElapsedSeconds >= limit.GetDouble();
         private static int AttemptLimit(JsonElement d) => d.TryGetProperty("attempt_limit", out var v) ? v.GetInt32() : int.MaxValue;
         private static int Remaining(JsonElement d, MinigameProgressState p) => Math.Max(0, AttemptLimit(d) - p.AttemptsUsed);
         private static string RequiredString(JsonElement d, string key) => d.TryGetProperty(key, out var v) ? v.GetString() ?? string.Empty : string.Empty;
