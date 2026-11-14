@@ -38,6 +38,7 @@ internal static class Program
         Run("conversation choices select the authored branch", ConversationRuntimeBranchesOnChoice, ref failures);
         Run("choice effects update story flags and relationship scores", ConversationChoiceEffectsPersist, ref failures);
         Run("save store round-trips player progress", SaveStoreRoundTripsProgress, ref failures);
+        Run("save store rejects a symlinked episode directory", SaveStoreRejectsSymlinkedEpisodeDirectory, ref failures);
         Run("save store recovers from a corrupt primary using backup", SaveStoreRecoversBackup, ref failures);
         Run("save store rejects a different episode identity", SaveStoreRejectsEpisodeMismatch, ref failures);
         Run("save store detects episode-version metadata tampering", SaveStoreRejectsMetadataTampering, ref failures);
@@ -388,6 +389,31 @@ internal static class Program
                 "Notifications did not round-trip.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void SaveStoreRejectsSymlinkedEpisodeDirectory()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-save-link-root-" + Guid.NewGuid().ToString("N"));
+        string outside = Path.Combine(Path.GetTempPath(), "nightwire-save-link-outside-" + Guid.NewGuid().ToString("N"));
+        string episodeDirectory = Path.Combine(root, "nightwire.ep001");
+        Directory.CreateDirectory(root);
+        Directory.CreateDirectory(outside);
+        try
+        {
+            Directory.CreateSymbolicLink(episodeDirectory, outside);
+            bool rejected = false;
+            try { new SaveStore(root).Save(CreateState()); }
+            catch (SaveStoreException exception) { rejected = exception.ErrorCode == "save_path_unsafe"; }
+            Assert(rejected, "Save store followed a symbolic link outside its save root.");
+            Assert(!Directory.EnumerateFileSystemEntries(outside).Any(),
+                "Save store wrote data through the symbolic link.");
+        }
+        finally
+        {
+            if (Directory.Exists(episodeDirectory)) Directory.Delete(episodeDirectory);
+            if (Directory.Exists(outside)) Directory.Delete(outside, true);
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
     }
 
     private static void SaveStoreRecoversBackup()
