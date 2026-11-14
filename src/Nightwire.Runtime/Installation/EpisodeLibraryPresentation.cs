@@ -122,6 +122,7 @@ namespace Nightwire.Runtime.Installation
         private readonly Dictionary<string, EpisodeLibraryRow> _rows =
             new Dictionary<string, EpisodeLibraryRow>(StringComparer.Ordinal);
         private CancellationTokenSource? _operationCancellation;
+        private CancellationTokenSource? _refreshCancellation;
         private bool _refreshing;
         private bool _disposed;
         private string? _catalogueError;
@@ -159,29 +160,54 @@ namespace Nightwire.Runtime.Installation
         public async Task<ReleaseCatalogueResult> RefreshAsync(DateTime utcNow,
             CancellationToken cancellationToken = default)
         {
-            ThrowIfDisposed();
-            lock (_gate) _refreshing = true;
+            CancellationTokenSource refreshSource;
+            lock (_gate)
+            {
+                if (_disposed) throw new ObjectDisposedException(nameof(EpisodeLibraryPresentation));
+                if (_refreshCancellation != null)
+                    return new ReleaseCatalogueResult
+                    {
+                        Success = false,
+                        ErrorCode = "library_refresh_in_progress",
+                        Error = "A library refresh is already running."
+                    };
+                refreshSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                _refreshCancellation = refreshSource;
+                _refreshing = true;
+            }
             Publish();
 
-            ReleaseCatalogueResult result;
             try
             {
-                result = await _manager.RefreshCatalogueAsync(utcNow, cancellationToken);
+                ReleaseCatalogueResult result = await _manager.RefreshCatalogueAsync(
+                    utcNow, refreshSource.Token);
+                bool publish;
                 lock (_gate)
                 {
-                    _refreshing = false;
-                    _catalogueAvailable = result.Success || _manager.CurrentCatalogue != null;
-                    _catalogueError = result.Success ? null : result.Error;
+                    publish = !_disposed;
+                    if (publish)
+                    {
+                        _catalogueAvailable = result.Success || _manager.CurrentCatalogue != null;
+                        _catalogueError = result.Success ? null : result.Error;
+                    }
                 }
-                RebuildRows();
-                Publish();
+                if (publish)
+                {
+                    RebuildRows();
+                    Publish();
+                }
                 return result;
             }
-            catch
+            finally
             {
-                lock (_gate) _refreshing = false;
+                lock (_gate)
+                {
+                    if (ReferenceEquals(_refreshCancellation, refreshSource))
+                        _refreshCancellation = null;
+                    if (!_disposed) _refreshing = false;
+                }
+                refreshSource.Dispose();
                 Publish();
-                throw;
             }
         }
 
@@ -196,6 +222,8 @@ namespace Nightwire.Runtime.Installation
             CancellationToken operationToken;
             lock (_gate)
             {
+                if (_disposed)
+                    return FailedOperation("library_disposed", "Episode library presentation has been disposed.", episodeId);
                 if (_operationCancellation != null)
                     return FailedOperation("library_operation_in_progress", "Another library operation is already running.", episodeId);
                 operationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -270,7 +298,10 @@ namespace Nightwire.Runtime.Installation
 
         public void CancelCurrentOperation()
         {
-            lock (_gate) _operationCancellation?.Cancel();
+            CancellationTokenSource? operation;
+            lock (_gate) operation = _operationCancellation;
+            try { operation?.Cancel(); }
+            catch (AggregateException) { /* Cancellation must not interrupt presentation teardown. */ }
         }
 
         public void ReloadInstalledLibrary()
@@ -310,6 +341,10 @@ namespace Nightwire.Runtime.Installation
 
         private void Publish()
         {
+            lock (_gate)
+            {
+                if (_disposed) return;
+            }
             var handlers = Changed;
             if (handlers == null) return;
             var snapshot = Snapshot;
@@ -342,17 +377,30 @@ namespace Nightwire.Runtime.Installation
 
         private void ThrowIfDisposed()
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(EpisodeLibraryPresentation));
+            lock (_gate)
+            {
+                if (_disposed) throw new ObjectDisposedException(nameof(EpisodeLibraryPresentation));
+            }
         }
 
         public void Dispose()
         {
+            CancellationTokenSource? operation;
+            CancellationTokenSource? refresh;
             lock (_gate)
             {
                 if (_disposed) return;
                 _disposed = true;
-                _operationCancellation?.Cancel();
+                operation = _operationCancellation;
+                refresh = _refreshCancellation;
             }
+
+            // Cancel outside the presentation lock: cancellation callbacks may resume
+            // asynchronous work that needs to acquire this same lock during cleanup.
+            try { refresh?.Cancel(); }
+            catch (AggregateException) { /* All cancellation callbacks are still attempted. */ }
+            try { operation?.Cancel(); }
+            catch (AggregateException) { /* All cancellation callbacks are still attempted. */ }
         }
     }
 }
