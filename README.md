@@ -17,7 +17,7 @@ NIGHTWIRE is designed around a reusable game runtime and independently downloada
 
 The repository is being established. The first milestone is the episode package contract and its validation rules. Runtime implementation follows after that contract is reviewed.
 
-See [the episode package specification](docs/architecture/EPISODE_PACKAGE_SPEC.md).
+See [the episode package specification](docs/architecture/EPISODE_PACKAGE_SPEC.md), the [JSON Schema guide](docs/architecture/JSON_SCHEMA_GUIDE.md), and the [sample Episode 001](examples/Episode_001/episode.json).
 
 ## Planned technology
 
