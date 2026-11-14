@@ -1,4 +1,7 @@
 using System;
+using System.IO;
+using System.Linq;
+using Nightwire.Runtime.Loading;
 using Nightwire.Runtime.Domain;
 using Nightwire.Runtime.Progression;
 
@@ -11,6 +14,9 @@ internal static class Program
         Run("one-shot event cannot execute twice", OneShotEventIsIdempotent, ref failures);
         Run("invalid action batch does not partially mutate state", InvalidBatchIsAtomic, ref failures);
         Run("asset unlock and call start produce typed commands", AssetAndCallActionsExecute, ref failures);
+        Run("episode loader verifies and indexes the sample package", EpisodeLoaderLoadsSample, ref failures);
+        Run("episode loader rejects modified manifest content", EpisodeLoaderRejectsTampering, ref failures);
+        Run("episode loader rejects unlisted files", EpisodeLoaderRejectsUnlistedFiles, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -38,7 +44,7 @@ internal static class Program
 
         Assert(result.Success, result.Error ?? "Expected success.");
         Assert(state.ActiveConversationId == "conversation.opening", "Opening conversation was not selected.");
-        Assert(state.StoryFlags.TryGetValue("episode_started", out var value) && value, "Story flag was not set.");
+        Assert(state.StoryFlags.TryGetValue("episode_started", out var value) && value.Kind == StoryFlagValueKind.Boolean && value.BooleanValue, "Story flag was not set.");
         Assert(result.Commands.Count == 2, "Expected two typed commands.");
     }
 
@@ -69,7 +75,7 @@ internal static class Program
         {
             Type = StoryActionType.SetStoryFlag,
             Flag = "must_not_be_written",
-            Value = true
+            FlagValue = StoryFlagValue.FromBoolean(true)
         });
         episode.Events.Add(validSibling);
 
@@ -83,7 +89,7 @@ internal static class Program
         {
             Type = StoryActionType.SetStoryFlag,
             Flag = "must_not_be_written",
-            Value = true
+            FlagValue = StoryFlagValue.FromBoolean(true)
         });
         invalidEvent.Actions.Add(new StoryActionDefinition
         {
@@ -138,6 +144,77 @@ internal static class Program
         Assert(state.UnlockedAssetIds.Contains("asset.photo"), "Asset was not unlocked.");
         Assert(state.PendingCallId == "call.anisha", "Call was not queued.");
         Assert(result.Commands.Count == 2, "Expected two runtime commands.");
+    }
+
+
+    private static void EpisodeLoaderLoadsSample()
+    {
+        string root = FindRepositoryRoot();
+        var package = new EpisodePackageLoader().Load(Path.Combine(root, "examples", "Episode_001"));
+        Assert(package.Descriptor.EpisodeId == "nightwire.ep001", "Episode identity was not loaded.");
+        Assert(package.Conversations.ContainsKey("anisha.day01"), "Conversation was not indexed.");
+        Assert(package.CharacterProfiles.ContainsKey("anisha"), "Character profile was not indexed.");
+        Assert(package.CharacterPosts.ContainsKey("anisha.post01"), "Character post was not indexed.");
+        Assert(package.RuntimeDefinition.Events.Count == 2, "Story events were not parsed.");
+        Assert(package.Localization["en"].ContainsKey("episode.title"), "Localization was not loaded.");
+    }
+
+    private static void EpisodeLoaderRejectsTampering()
+    {
+        string copy = CopySamplePackage();
+        try
+        {
+            string conversation = Path.Combine(copy, "Characters", "Anisha", "Conversations", "day01.json");
+            File.AppendAllText(conversation, " ");
+            bool rejected = false;
+            try { new EpisodePackageLoader().Load(copy); }
+            catch (EpisodePackageLoadException exception) { rejected = exception.ErrorCode == "size_mismatch" || exception.ErrorCode == "hash_mismatch"; }
+            Assert(rejected, "Tampered package file was not rejected.");
+        }
+        finally { Directory.Delete(copy, true); }
+    }
+
+    private static void EpisodeLoaderRejectsUnlistedFiles()
+    {
+        string copy = CopySamplePackage();
+        try
+        {
+            File.WriteAllText(Path.Combine(copy, "unexpected.txt"), "not in manifest");
+            bool rejected = false;
+            try { new EpisodePackageLoader().Load(copy); }
+            catch (EpisodePackageLoadException exception) { rejected = exception.ErrorCode == "unlisted_file"; }
+            Assert(rejected, "Unlisted package file was not rejected.");
+        }
+        finally { Directory.Delete(copy, true); }
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(Directory.GetCurrentDirectory());
+        while (current != null)
+        {
+            if (Directory.Exists(Path.Combine(current.FullName, "examples", "Episode_001")))
+                return current.FullName;
+            current = current.Parent;
+        }
+        throw new DirectoryNotFoundException("Could not locate NIGHTWIRE repository root.");
+    }
+
+    private static string CopySamplePackage()
+    {
+        string source = Path.Combine(FindRepositoryRoot(), "examples", "Episode_001");
+        string target = Path.Combine(Path.GetTempPath(), "nightwire-test-" + Guid.NewGuid().ToString("N"));
+        CopyDirectory(source, target);
+        return target;
+    }
+
+    private static void CopyDirectory(string source, string target)
+    {
+        Directory.CreateDirectory(target);
+        foreach (string file in Directory.GetFiles(source))
+            File.Copy(file, Path.Combine(target, Path.GetFileName(file)));
+        foreach (string directory in Directory.GetDirectories(source))
+            CopyDirectory(directory, Path.Combine(target, Path.GetFileName(directory)));
     }
 
     private static EpisodeRuntimeDefinition CreateEpisode()
