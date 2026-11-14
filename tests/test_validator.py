@@ -126,6 +126,18 @@ class EpisodeValidatorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("unsafe relative path", result.stderr)
 
+    def test_descriptor_must_satisfy_json_schema(self) -> None:
+        relative = "episode.json"
+        descriptor_path = self.package / relative
+        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        descriptor.pop("title_key")
+        descriptor_path.write_text(json.dumps(descriptor, indent=2) + "\n", encoding="utf-8")
+        self.refresh_manifest_entry(relative)
+        result = self.run_validator()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("schema violation", result.stderr)
+        self.assertIn("title_key", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
