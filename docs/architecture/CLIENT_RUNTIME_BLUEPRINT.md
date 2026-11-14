@@ -182,3 +182,19 @@ Writes should be atomic (write temporary, flush, replace) and recover from inter
 12. Accessibility, lifecycle, performance, and end-to-end tests.
 
 Do not build all screens as disconnected mockups. Each UI surface must be backed by the same domain state and navigation commands.
+
+
+## 14. First Unity presentation integration
+
+The first Unity-facing implementation is `unity/Assets/Nightwire/Scripts/UI/EpisodeLibraryScreen.cs`, a UI Toolkit component backed by the portable `EpisodeReleaseManager`.
+
+The screen:
+- Renders installed, downloadable, update-available, unlisted, and invalid episode states.
+- Refreshes the signed catalogue through the manager.
+- Starts verified downloads and displays byte progress.
+- Exposes `OpenEpisodeRequested` so the application shell can resume or start a session without coupling the view to save policy.
+- Cancels in-flight UI operations when its GameObject is destroyed.
+
+The composition root owns the release manager and injects it through `Configure`. It must recover interrupted installs before exposing gameplay, provide the trusted-key and protected-sequence adapters, and implement an atomic session/install lease. The view must not instantiate infrastructure or make its own HTTP requests.
+
+This is a source-level integration component only. A Unity project manifest, ProjectSettings, Panel Settings asset, scene, runtime DLL import, Android secure-storage adapter, and device verification are still outstanding. See [Unity integration notes](../../unity/README.md).
