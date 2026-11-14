@@ -30,7 +30,7 @@ Current baseline: Unity 6.3 LTS (to be verified at editor setup), .NET Standard 
 
 ## Development status
 
-A Unity scene-based playable game is not implemented yet. The portable C# runtime includes domain/progress models, allowlisted story/call/minigame interpreters, a verified episode loader, deterministic conversation runtime, versioned saves, unlocked asset access, HTTPS archive downloading, staged ZIP installation, ECDSA P-256 signed release-catalogue verification, startup recovery for interrupted installs, and the episode release manager for signed catalogue refresh, verified downloads, offline library discovery, and session-safe updates. full Unity scene composition, app-side trusted-key provisioning and protected sequence storage, production signing infrastructure, cloud synchronization, encryption, save-format migrations, and actual test execution remain pending. The runtime test harness registers 36 cases; none are claimed as passing because execution remains deferred.
+A Unity scene-based playable game is not implemented yet. The portable C# runtime includes domain/progress models, allowlisted story/call/minigame interpreters, a verified episode loader, deterministic conversation runtime, versioned saves, unlocked asset access, HTTPS archive downloading, staged ZIP installation, ECDSA P-256 signed release-catalogue verification, startup recovery for interrupted installs, and the episode release manager for signed catalogue refresh, verified downloads, offline library discovery, and session-safe updates. Unity scene composition, app-side trusted-key provisioning and protected sequence storage, production signing infrastructure, cloud synchronization, encryption, save-format migrations, and actual test execution remain pending. The runtime test harness registers 36 cases; none are claimed as passing because execution remains deferred.
 
 
 ## Validate an episode package
@@ -55,10 +55,10 @@ python -m unittest discover -s tests -v
 See [tests/README.md](tests/README.md). GitHub Actions remains intentionally deferred.
 
 
-The release manager requires host-provided trusted signing keys, protected catalogue sequence storage, a numeric runtime version, and an atomic session/install lease adapter. The actual Unity UI and Android platform adapters are not present yet. Build, runtime tests, validator tests, and CI remain deferred and have not been run.
+The release manager requires host-provided trusted signing keys, protected catalogue sequence storage, a numeric runtime version, and an atomic session/install lease adapter. The Unity UI Toolkit archive source is present, but scene integration and Android platform adapters are not complete. Build, runtime tests, validator tests, and CI remain deferred and have not been run.
 
 
 The initial Unity episode archive screen source is under `unity/Assets/Nightwire`. It is not yet a complete Unity project: scene assets, runtime assembly import, System.Text.Json dependency packaging, Editor validation, and Android IL2CPP verification remain pending.
 
 
-The initial Unity presentation source and setup boundary are documented in [unity/README.md](unity/README.md). It is a UI Toolkit component, not yet a complete Unity project or playable scene.
+The initial Unity presentation source and setup boundary are documented in [unity/README.md](unity/README.md). It is not yet a complete Unity project or playable scene.
