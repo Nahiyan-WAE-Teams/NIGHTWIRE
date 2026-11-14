@@ -105,6 +105,7 @@ internal static class Program
         var conversations = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         var events = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         var allLocalizationKeys = new HashSet<string>(StringComparer.Ordinal);
+        CollectLocalizationKeys(episode, allLocalizationKeys);
 
         foreach (var file in files)
         {
@@ -170,8 +171,8 @@ internal static class Program
             Errors.Add($"episode.json: entry_event '{entryEvent}' does not resolve to an event.");
 
         ValidateCharactersAndConversations(files, root, characters, conversations);
-        ValidateConversations(conversations, characters, assetById);
-        ValidateEvents(events, conversations, assetById);
+        var messageIds = ValidateConversations(conversations, characters, assetById);
+        ValidateEvents(events, conversations, assetById, messageIds);
 
         foreach (var locale in locales)
         {
@@ -333,7 +334,7 @@ internal static class Program
         }
     }
 
-    private static void ValidateConversations(
+    private static HashSet<string> ValidateConversations(
         Dictionary<string, JsonElement> conversations, HashSet<string> characters,
         Dictionary<string, Asset> assets)
     {
@@ -399,14 +400,21 @@ internal static class Program
                 }
             }
         }
+        return allMessageIds;
     }
 
     private static void ValidateEvents(
         Dictionary<string, JsonElement> events, Dictionary<string, JsonElement> conversations,
-        Dictionary<string, Asset> assets)
+        Dictionary<string, Asset> assets, HashSet<string> messageIds)
     {
         foreach (var (eventId, storyEvent) in events)
         {
+            if (storyEvent.TryGetProperty("trigger", out var trigger) && GetString(trigger, "type") == "message_completed")
+            {
+                var triggerMessage = GetString(trigger, "message_id");
+                if (triggerMessage is null || !messageIds.Contains(triggerMessage))
+                    Errors.Add($"{eventId}: message_completed trigger references missing message '{triggerMessage}'.");
+            }
             if (!storyEvent.TryGetProperty("actions", out var actions) || actions.ValueKind != JsonValueKind.Array)
                 continue;
             foreach (var action in actions.EnumerateArray())
