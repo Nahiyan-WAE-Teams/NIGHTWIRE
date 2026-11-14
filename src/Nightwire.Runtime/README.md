@@ -86,7 +86,7 @@ The host should use the versioned `SaveStore` described below. Unity lifecycle i
 
 `Saves/SaveStore` persists player progress outside the episode package. Construct it with the game's persistent save root, then call `Save(state)` and `Load(episodeId, installedEpisodeVersion)`.
 
-- Save format version 1 uses a typed payload and SHA-256 integrity checksum over the exact serialized payload bytes.
+- Save format version 1 uses a typed payload and SHA-256 integrity checksum covering save metadata and exact serialized payload bytes.
 - Conversation delivery/read state, selected options, partial delays, story flags, relationships, unlocked assets, completed events, notifications, and pending actions are persisted.
 - A completed temporary file is flushed and atomically moved into place. The previous committed save is retained as `save.json.bak`.
 - If the primary save is invalid, loading attempts the last-known-good backup, restores it to the primary path, and reports `RecoveredFromBackup`.
