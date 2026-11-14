@@ -247,6 +247,7 @@ namespace Nightwire.Runtime.Saves
                 throw new SaveStoreException("save_state_invalid", "Episode ID and version are required.");
             if (state.Notifications.Count > _options.MaximumNotifications ||
                 state.ConversationProgress.Count > _options.MaximumCollectionEntries ||
+                state.CallProgress.Count > _options.MaximumCollectionEntries || state.MinigameProgress.Count > _options.MaximumCollectionEntries ||
                 state.CompletedEventIds.Count > _options.MaximumCollectionEntries ||
                 state.UnlockedAssetIds.Count > _options.MaximumCollectionEntries ||
                 state.StoryFlags.Count > _options.MaximumCollectionEntries ||
@@ -259,6 +260,16 @@ namespace Nightwire.Runtime.Saves
             if (state.Notifications.Any(x => x == null || string.IsNullOrWhiteSpace(x.NotificationId) ||
                 string.IsNullOrWhiteSpace(x.TitleKey) || string.IsNullOrWhiteSpace(x.BodyKey)))
                 throw new SaveStoreException("save_notification_invalid", "Notifications contain invalid data.");
+            foreach (var pair in state.CallProgress)
+            {
+                if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value == null || pair.Value.ElapsedMilliseconds < 0 || pair.Value.FiredCueIds.Count > _options.MaximumCollectionEntries)
+                    throw new SaveStoreException("save_call_invalid", "Call progress is invalid.");
+            }
+            foreach (var pair in state.MinigameProgress)
+            {
+                if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value == null || pair.Value.AttemptsUsed < 0 || double.IsNaN(pair.Value.ElapsedSeconds) || double.IsInfinity(pair.Value.ElapsedSeconds) || pair.Value.ElapsedSeconds < 0 || pair.Value.SequenceInput.Count > 32 || pair.Value.MatchedItemIds.Count > _options.MaximumCollectionEntries)
+                    throw new SaveStoreException("save_minigame_invalid", "Minigame progress is invalid.");
+            }
             foreach (var pair in state.ConversationProgress)
             {
                 if (string.IsNullOrWhiteSpace(pair.Key))
@@ -274,7 +285,7 @@ namespace Nightwire.Runtime.Saves
 
         private void ValidatePayload(SavePayload payload)
         {
-            if (payload.Conversations == null || payload.CompletedEventIds == null || payload.UnlockedAssetIds == null ||
+            if (payload.Conversations == null || payload.Calls == null || payload.Minigames == null || payload.CompletedEventIds == null || payload.UnlockedAssetIds == null ||
                 payload.StoryFlags == null || payload.RelationshipScores == null || payload.Notifications == null)
                 throw new SaveStoreException("save_payload_invalid", "Save payload collections cannot be null.");
             int total = payload.Conversations.Count + payload.CompletedEventIds.Count + payload.UnlockedAssetIds.Count +
@@ -357,6 +368,8 @@ namespace Nightwire.Runtime.Saves
             public string? PendingCallId { get; set; }
             public string? PendingMinigameId { get; set; }
             public List<ConversationPayload> Conversations { get; set; } = new List<ConversationPayload>();
+            public List<CallPayload> Calls { get; set; } = new List<CallPayload>();
+            public List<MinigamePayload> Minigames { get; set; } = new List<MinigamePayload>();
             public List<string> CompletedEventIds { get; set; } = new List<string>();
             public List<string> UnlockedAssetIds { get; set; } = new List<string>();
             public List<StoryFlagPayload> StoryFlags { get; set; } = new List<StoryFlagPayload>();
@@ -371,6 +384,8 @@ namespace Nightwire.Runtime.Saves
                     PendingCallId = state.PendingCallId,
                     PendingMinigameId = state.PendingMinigameId,
                     Conversations = state.ConversationProgress.Select(pair => ConversationPayload.From(pair.Key, pair.Value)).ToList(),
+                    Calls = state.CallProgress.Select(pair => CallPayload.From(pair.Key, pair.Value)).ToList(),
+                    Minigames = state.MinigameProgress.Select(pair => MinigamePayload.From(pair.Key, pair.Value)).ToList(),
                     CompletedEventIds = state.CompletedEventIds.OrderBy(x => x, StringComparer.Ordinal).ToList(),
                     UnlockedAssetIds = state.UnlockedAssetIds.OrderBy(x => x, StringComparer.Ordinal).ToList(),
                     StoryFlags = state.StoryFlags.OrderBy(x => x.Key, StringComparer.Ordinal)
@@ -385,11 +400,55 @@ namespace Nightwire.Runtime.Saves
                 var state = new EpisodeProgressState { EpisodeId = episodeId, EpisodeVersion = episodeVersion,
                     ActiveConversationId = ActiveConversationId, PendingCallId = PendingCallId, PendingMinigameId = PendingMinigameId };
                 foreach (var item in Conversations) state.ConversationProgress.Add(item.ConversationId, item.ToState());
+                foreach (var item in Calls) state.CallProgress.Add(item.CallId, item.ToState());
+                foreach (var item in Minigames) state.MinigameProgress.Add(item.MinigameId, item.ToState());
                 foreach (string id in CompletedEventIds) state.CompletedEventIds.Add(id);
                 foreach (string id in UnlockedAssetIds) state.UnlockedAssetIds.Add(id);
                 foreach (var flag in StoryFlags) state.StoryFlags.Add(flag.Name, flag.ToValue());
                 foreach (var score in RelationshipScores) state.RelationshipScores.Add(score.Key, score.Value);
                 foreach (var notification in Notifications) state.Notifications.Add(CloneNotification(notification));
+                return state;
+            }
+        }
+
+
+        private sealed class CallPayload
+        {
+            public string CallId { get; set; } = string.Empty;
+            public long ElapsedMilliseconds { get; set; }
+            public bool IsComplete { get; set; }
+            public List<string> FiredCueIds { get; set; } = new List<string>();
+            public static CallPayload From(string id, CallProgressState state) => new CallPayload
+            {
+                CallId = id, ElapsedMilliseconds = state.ElapsedMilliseconds, IsComplete = state.IsComplete,
+                FiredCueIds = state.FiredCueIds.OrderBy(x => x, StringComparer.Ordinal).ToList()
+            };
+            public CallProgressState ToState()
+            {
+                var state = new CallProgressState { ElapsedMilliseconds = ElapsedMilliseconds, IsComplete = IsComplete };
+                foreach (string id in FiredCueIds) state.FiredCueIds.Add(id);
+                return state;
+            }
+        }
+
+        private sealed class MinigamePayload
+        {
+            public string MinigameId { get; set; } = string.Empty;
+            public int AttemptsUsed { get; set; }
+            public double ElapsedSeconds { get; set; }
+            public List<string> SequenceInput { get; set; } = new List<string>();
+            public List<string> MatchedItemIds { get; set; } = new List<string>();
+            public static MinigamePayload From(string id, MinigameProgressState state) => new MinigamePayload
+            {
+                MinigameId = id, AttemptsUsed = state.AttemptsUsed, ElapsedSeconds = state.ElapsedSeconds,
+                SequenceInput = new List<string>(state.SequenceInput),
+                MatchedItemIds = state.MatchedItemIds.OrderBy(x => x, StringComparer.Ordinal).ToList()
+            };
+            public MinigameProgressState ToState()
+            {
+                var state = new MinigameProgressState { AttemptsUsed = AttemptsUsed, ElapsedSeconds = ElapsedSeconds };
+                state.SequenceInput.AddRange(SequenceInput);
+                foreach (string id in MatchedItemIds) state.MatchedItemIds.Add(id);
                 return state;
             }
         }
