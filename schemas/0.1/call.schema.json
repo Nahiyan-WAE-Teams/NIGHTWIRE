@@ -13,7 +13,8 @@
     "duration_ms",
     "media",
     "subtitle_tracks",
-    "cues"
+    "cues",
+    "completion_event_id"
   ],
   "properties": {
     "schema_version": {
