@@ -100,6 +100,7 @@ namespace Nightwire.Unity
                     };
                 }
 
+                coordinator.SessionClosed += RuntimeSessionClosed;
                 _session = coordinator;
                 _sessionLease = lease;
                 return new EpisodeSessionOpenResult { Success = true, SessionResult = result };
@@ -114,11 +115,12 @@ namespace Nightwire.Unity
 
         public RuntimeSessionResult? SaveCheckpoint()
         {
-            if (_session == null) return null;
+            var session = _session;
+            if (session == null) return null;
             RuntimeSessionResult result;
             try
             {
-                result = _session.SaveNow();
+                result = session.SaveNow();
             }
             catch
             {
@@ -126,8 +128,9 @@ namespace Nightwire.Unity
                 throw;
             }
 
-            // The runtime closes itself when persistence fails. Do not retain a stale lease.
-            if (!result.Success && !_session.IsActive)
+            // RuntimeSessionCoordinator notifies this host synchronously when a persistence
+            // failure closes the session, releasing the lease before control returns here.
+            if (!result.Success && !session.IsActive)
                 ReleaseSession();
             return result;
         }
@@ -159,12 +162,31 @@ namespace Nightwire.Unity
             };
         }
 
+        private void RuntimeSessionClosed()
+        {
+            var session = _session;
+            if (session != null)
+                session.SessionClosed -= RuntimeSessionClosed;
+            _session = null;
+
+            var lease = _sessionLease;
+            _sessionLease = null;
+            lease?.Dispose();
+        }
+
         private void ReleaseSession()
         {
-            _session?.CloseSession();
+            var session = _session;
             _session = null;
-            _sessionLease?.Dispose();
+            if (session != null)
+            {
+                session.SessionClosed -= RuntimeSessionClosed;
+                session.CloseSession();
+            }
+
+            var lease = _sessionLease;
             _sessionLease = null;
+            lease?.Dispose();
         }
 
         private static EpisodeSessionOpenResult Failure(string code, string message) =>
