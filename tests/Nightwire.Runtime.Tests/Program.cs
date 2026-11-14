@@ -839,7 +839,7 @@ internal static class Program
             "\",\"expires_utc\":\"" + expires + "\",\"releases\":[{\"episode_id\":\"nightwire.ep001\",\"episode_version\":\"1.0.0\",\"archive_url\":\"https://cdn.example.test/ep001.zip\",\"archive_size_bytes\":1234,\"archive_sha256\":\"" + new string('a', 64) +
             "\",\"minimum_runtime_version\":\"1.0.0\"}]}";
         byte[] payload = System.Text.Encoding.UTF8.GetBytes(payloadText);
-        byte[] signature = key.SignData(payload, HashAlgorithmName.SHA256);
+        byte[] signature = key.SignData(payload, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
         string envelopeText = "{\"key_id\":\"release-2026\",\"algorithm\":\"ECDSA-P256-SHA256\",\"payload\":\"" +
             Convert.ToBase64String(payload) + "\",\"signature\":\"" + Convert.ToBase64String(signature) + "\"}";
         var verifier = new ReleaseCatalogueVerifier(new[]
