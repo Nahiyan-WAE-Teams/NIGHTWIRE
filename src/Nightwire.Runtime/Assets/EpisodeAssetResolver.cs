@@ -127,8 +127,22 @@ namespace Nightwire.Runtime.Assets
 
         private static void EnsureNotLink(string path, string description)
         {
-            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-                throw new IOException($"Symbolic links and reparse points are not allowed: {description}.");
+            string current = Path.GetFullPath(path);
+            while (!string.IsNullOrEmpty(current))
+            {
+                try
+                {
+                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                        throw new IOException($"Symbolic links and reparse points are not allowed: {description}.");
+                }
+                catch (FileNotFoundException) { }
+                catch (DirectoryNotFoundException) { }
+
+                string? parent = Path.GetDirectoryName(current);
+                if (string.IsNullOrEmpty(parent) || string.Equals(parent, current, StringComparison.Ordinal))
+                    break;
+                current = parent;
+            }
         }
 
         private static EpisodeAssetOpenResult DisposeAndFail(FileStream? stream, string code, string message)
