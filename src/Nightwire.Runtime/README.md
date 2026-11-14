@@ -16,7 +16,7 @@ Unity 6 documents .NET Standard 2.1 as its cross-platform API compatibility prof
 
 - Episode descriptor and manifest models.
 - Verified unpacked-package loader with manifest inventory, file-size and SHA-256 checks.
-- Safe relative-path checks, symlink/reparse-point rejection, unlisted-file rejection, and package/JSON size limits.
+- Safe relative-path checks, symlink/reparse-point rejection across package roots and their ancestors, unlisted-file rejection, and package/JSON size limits. Save, install, and download roots also reject linked ancestors before creating or accessing files.
 - Indexed character profiles, conversations, posts, calls, minigames, events, assets, and localization dictionaries.
 - Cross-reference checks for characters, messages, choices, calls, minigames, assets, and event actions.
 - Episode/runtime compatibility and default/supported locale checks.
@@ -42,7 +42,7 @@ A dependency-free console test harness is available:
 dotnet run --project tests/Nightwire.Runtime.Tests
 ```
 
-The harness currently registers 39 test cases covering story events, package loading, conversations, saves/migrations, prerecorded call timelines, minigames, unlocked asset access, staged ZIP installation/update, ZIP traversal rejection, HTTPS download hash verification, signed release signature/sequence verification, interrupted-install startup recovery, signed release identity mismatch protection, and signed catalogue-to-offline-install orchestration, and per-episode session/install exclusion. Test/build execution remains deferred; no passing result is claimed.
+The harness currently registers 43 test cases covering story events, package loading, conversations, saves/migrations, prerecorded call timelines, minigames, unlocked asset access, staged ZIP installation/update, ZIP traversal rejection, HTTPS download hash verification, signed release signature/sequence verification, interrupted-install startup recovery, signed release identity mismatch protection, and signed catalogue-to-offline-install orchestration, and per-episode session/install exclusion. Test/build execution remains deferred; no passing result is claimed.
 
 ## Official compatibility references
 
