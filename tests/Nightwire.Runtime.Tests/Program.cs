@@ -945,6 +945,17 @@ internal static class Program
         Assert(!invalidRuntimeResult.Success && invalidRuntimeResult.ErrorCode == "runtime_version_invalid",
             "Malformed minimum runtime version was accepted.");
 
+        string invalidTimestampPayloadText = payloadText.Replace(issued, issued.TrimEnd('Z'));
+        byte[] invalidTimestampPayload = System.Text.Encoding.UTF8.GetBytes(invalidTimestampPayloadText);
+        byte[] invalidTimestampSignature = key.SignData(invalidTimestampPayload, HashAlgorithmName.SHA256,
+            DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+        string invalidTimestampEnvelope = string.Concat(
+            "{\\"key_id\\":\\"release-2026\\",\\"algorithm\\":\\"ECDSA-P256-SHA256\\",\\"payload\\":\\"",
+            Convert.ToBase64String(invalidTimestampPayload), "\\",\\"signature\\":\\"",
+            Convert.ToBase64String(invalidTimestampSignature), "\\"}");
+        var invalidTimestampResult = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(invalidTimestampEnvelope), DateTime.UtcNow);
+        Assert(!invalidTimestampResult.Success, "A catalogue timestamp without an explicit UTC offset was accepted.");
+
         envelopeText = envelopeText.Replace(Convert.ToBase64String(signature), Convert.ToBase64String(new byte[64]));
         var tampered = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow);
         Assert(!tampered.Success && tampered.ErrorCode == "signature_invalid", "Invalid catalogue signature was accepted.");
