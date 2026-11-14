@@ -37,3 +37,16 @@ JSON Schema checks document shape and field constraints. It cannot, by itself, e
 - Runtime-required feature declarations are supported by the target runtime.
 
 Unknown trigger, action, or message types must fail validation. Episode data is declarative content; it must never be evaluated as C#, JavaScript, or another executable language.
+
+
+## Command-line package validation
+
+The repository includes a dependency-free .NET 10 command-line validator at `tools/Nightwire.EpisodeValidator`.
+
+Run it from the repository root:
+
+```bash
+dotnet run --project tools/Nightwire.EpisodeValidator -- examples/Episode_001
+```
+
+It verifies file inventory, byte sizes, SHA-256 digests, asset references, character/conversation/event references, message flow, and localization coverage. It does not yet run the full JSON Schema Draft 2020-12 evaluator; structural schema validation remains a separate step until a schema-validation library and its compatibility are selected.
