@@ -30,7 +30,7 @@ Unity 6 documents .NET Standard 2.1 as its cross-platform API compatibility prof
 
 ## Boundaries
 
-The package loader verifies an already-unpacked episode directory and exposes cloned JSON documents plus a typed story-event runtime definition. It does not extract archives, download packages, authenticate publisher signatures, render Unity UI, play media, or implement cloud saves. Archive extraction and signed release verification remain installer responsibilities.
+The package loader verifies an already-unpacked episode directory and exposes cloned JSON documents plus a typed story-event runtime definition. Archive extraction and staged installation are implemented separately in `Installation/`; streaming download is also implemented. Publisher signature verification, release-catalogue authentication, rendering/UI, media playback, and cloud saves remain outside the runtime core.
 
 The loader performs package-integrity and cross-reference checks but is not a full JSON Schema Draft 2020-12 evaluator. Release validation must still run the package validator/schema layer before installation. The Unity presentation layer must consume typed runtime commands and must never execute arbitrary episode-provided code.
 
@@ -42,7 +42,7 @@ A dependency-free console test harness is available:
 dotnet run --project tests/Nightwire.Runtime.Tests
 ```
 
-It covers episode-start execution, one-shot idempotency, atomic rejection of invalid action batches, typed asset/call commands, sample package loading, tamper/unlisted-file rejection, and minimum-runtime compatibility. It has not been executed in this environment.
+The harness currently registers 31 test cases covering story events, package loading, conversations, saves/migrations, prerecorded call timelines, minigames, unlocked asset access, staged ZIP installation/update, ZIP traversal rejection, and HTTPS download hash verification. Test/build execution remains deferred; no passing result is claimed.
 
 ## Official compatibility references
 
