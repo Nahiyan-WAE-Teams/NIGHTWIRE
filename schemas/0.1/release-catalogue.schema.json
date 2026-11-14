@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nightwire.dev/schemas/0.1/release-catalogue.schema.json",
+  "title": "NIGHTWIRE Signed Release Catalogue Payload",
+  "description": "The exact UTF-8 JSON payload bytes are signed externally using ECDSA P-256 with SHA-256 and IEEE-P1363 signature encoding. The envelope is defined in the episode package specification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "sequence", "issued_utc", "expires_utc", "releases"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "issued_utc": { "type": "string", "format": "date-time" },
+    "expires_utc": { "type": "string", "format": "date-time" },
+    "releases": {
+      "type": "array",
+      "maxItems": 256,
+      "items": { "$ref": "#/$defs/release" }
+    }
+  },
+  "$defs": {
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_id",
+        "episode_version",
+        "archive_url",
+        "archive_size_bytes",
+        "archive_sha256",
+        "minimum_runtime_version"
+      ],
+      "properties": {
+        "episode_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "episode_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9.+-]+$"
+        },
+        "archive_url": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "archive_size_bytes": { "type": "integer", "minimum": 1 },
+        "archive_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "minimum_runtime_version": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    }
+  }
+}
