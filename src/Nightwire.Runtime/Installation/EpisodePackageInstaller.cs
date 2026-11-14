@@ -236,6 +236,7 @@ namespace Nightwire.Runtime.Installation
                     throw Fail("too_many_archive_entries", "Archive contains too many entries.");
 
                 var entries = new Dictionary<string, ZipArchiveEntry>(StringComparer.OrdinalIgnoreCase);
+                var explicitDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var entry in zip.Entries)
                 {
                     string name = entry.FullName;
@@ -253,7 +254,10 @@ namespace Nightwire.Runtime.Installation
                             throw Fail("archive_special_file_rejected", "Directory entries must have directory metadata.");
                         if (entry.Length != 0)
                             throw Fail("archive_directory_payload_rejected", "Directory entries cannot contain file data.");
-                        ValidateArchivePath(name.Substring(0, name.Length - 1));
+                        string directoryName = name.Substring(0, name.Length - 1);
+                        ValidateArchivePath(directoryName);
+                        if (!explicitDirectories.Add(directoryName))
+                            throw Fail("duplicate_archive_path", "Archive contains duplicate or case-colliding directory paths.");
                         continue;
                     }
                     if (unixMode != 0 && unixMode != 0x8000)
@@ -261,6 +265,24 @@ namespace Nightwire.Runtime.Installation
                     ValidateArchivePath(name);
                     if (!entries.TryAdd(name, entry))
                         throw Fail("duplicate_archive_path", "Archive contains duplicate or case-colliding paths.");
+                }
+
+                // Reject file/directory collisions before any archive content is extracted.
+                foreach (string directory in explicitDirectories)
+                {
+                    if (entries.ContainsKey(directory))
+                        throw Fail("archive_path_type_conflict", $"Archive path '{directory}' is declared as both a file and a directory.");
+                }
+                foreach (string file in entries.Keys)
+                {
+                    int separator = file.IndexOf('/');
+                    while (separator >= 0)
+                    {
+                        string parent = file.Substring(0, separator);
+                        if (entries.ContainsKey(parent))
+                            throw Fail("archive_path_type_conflict", $"File '{parent}' cannot also be a parent directory.");
+                        separator = file.IndexOf('/', separator + 1);
+                    }
                 }
 
                 if (!entries.TryGetValue("episode.json", out var descriptorEntry) ||
