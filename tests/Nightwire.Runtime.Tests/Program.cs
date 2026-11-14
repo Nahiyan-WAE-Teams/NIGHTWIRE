@@ -1086,6 +1086,23 @@ internal static class Program
         var rollback = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow, 8);
         Assert(!rollback.Success && rollback.ErrorCode == "catalogue_rollback", "Old catalogue sequence was accepted.");
 
+        string duplicateEpisodePayloadText = payloadText.Substring(0, payloadText.Length - 2) +
+            ",{\"episode_id\":\"nightwire.ep001\",\"episode_version\":\"1.1.0\",\"archive_url\":\"https://cdn.example.test/ep001-v2.zip\",\"archive_size_bytes\":1234,\"archive_sha256\":\"" +
+            new string('b', 64) + "\",\"minimum_runtime_version\":\"1.0.0\"}]}";
+        byte[] duplicateEpisodePayload = System.Text.Encoding.UTF8.GetBytes(duplicateEpisodePayloadText);
+        byte[] duplicateEpisodeSignature = key.SignData(duplicateEpisodePayload, HashAlgorithmName.SHA256,
+            DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+        string duplicateEpisodeEnvelope = JsonSerializer.Serialize(new
+        {
+            key_id = "release-2026",
+            algorithm = "ECDSA-P256-SHA256",
+            payload = Convert.ToBase64String(duplicateEpisodePayload),
+            signature = Convert.ToBase64String(duplicateEpisodeSignature)
+        });
+        var duplicateEpisodeResult = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(duplicateEpisodeEnvelope), DateTime.UtcNow);
+        Assert(!duplicateEpisodeResult.Success && duplicateEpisodeResult.ErrorCode == "release_identity_invalid",
+            "A catalogue containing multiple versions of the same episode was accepted.");
+
         string duplicateEnvelope = envelopeText.Replace(
             @"""key_id"":""release-2026""",
             @"""key_id"":""release-2026"",""key_id"":""release-2026""");
