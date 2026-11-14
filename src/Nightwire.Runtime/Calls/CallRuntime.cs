@@ -37,7 +37,7 @@ namespace Nightwire.Runtime.Calls
             if (progress.IsComplete) return Success(progress);
 
             long duration = RequiredInt64(definition, "duration_ms");
-            progress.ElapsedMilliseconds = Math.Min(duration, checked(progress.ElapsedMilliseconds + deltaMilliseconds));
+            progress.ElapsedMilliseconds = deltaMilliseconds >= duration - progress.ElapsedMilliseconds ? duration : progress.ElapsedMilliseconds + deltaMilliseconds;
             var result = Success(progress);
             if (definition.TryGetProperty("cues", out var cues))
             {
