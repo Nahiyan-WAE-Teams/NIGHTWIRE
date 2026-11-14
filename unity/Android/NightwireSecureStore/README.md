@@ -9,6 +9,7 @@ This Android library implements `IReleaseCatalogueSequenceStore` through the Jav
 - Encrypts the accepted sequence with AES-GCM and binds ciphertext to the app namespace and key alias using authenticated additional data.
 - Serializes load and update operations at the Java class boundary so concurrent callers cannot race sequence reads, key rotation, and preference commits.
 - Validates the stored key alias against the generated UUID format before accessing AndroidKeyStore.
+- Treats an empty preference record as a first launch only when no NIGHTWIRE sequence key exists in AndroidKeyStore. If preferences are cleared or restored independently while a key remains, loading fails closed instead of resetting the sequence to zero. This implementation reserves one sequence namespace per app installation; a different configured namespace will also fail closed when an older NIGHTWIRE key remains.
 - Rotates the key for every accepted sequence. It deletes the previous hardware key before committing the new preference record. Replaying an old preferences snapshot then points to a key that has been deleted.
 - If StrongBox is unavailable, a key is missing, a record is corrupt, or persistence fails, the provider throws. It never silently falls back to plaintext or software-backed keys.
 
