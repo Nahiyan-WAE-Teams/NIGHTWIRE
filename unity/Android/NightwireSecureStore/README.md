@@ -7,6 +7,8 @@ This Android library implements `IReleaseCatalogueSequenceStore` through the Jav
 - Requires Android API 28 or later and a device with StrongBox Keymaster support.
 - Generates non-exportable AES-256 keys in `AndroidKeyStore` with StrongBox explicitly required.
 - Encrypts the accepted sequence with AES-GCM and binds ciphertext to the app namespace and key alias using authenticated additional data.
+- Serializes load and update operations at the Java class boundary so concurrent callers cannot race sequence reads, key rotation, and preference commits.
+- Validates the stored key alias against the generated UUID format before accessing AndroidKeyStore.
 - Rotates the key for every accepted sequence. It deletes the previous hardware key before committing the new preference record. Replaying an old preferences snapshot then points to a key that has been deleted.
 - If StrongBox is unavailable, a key is missing, a record is corrupt, or persistence fails, the provider throws. It never silently falls back to plaintext or software-backed keys.
 
