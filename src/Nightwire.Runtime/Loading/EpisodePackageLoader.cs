@@ -234,6 +234,8 @@ namespace Nightwire.Runtime.Loading
             if (!package.EventDocuments.ContainsKey(package.Descriptor.EntryEventId))
                 throw Fail("entry_event_missing", $"Entry event '{package.Descriptor.EntryEventId}' does not exist.");
 
+            if (!package.Descriptor.SupportedLocales.Contains(package.Descriptor.DefaultLocale))
+                throw Fail("default_locale_unsupported", "The default locale must be included in supported_locales.");
             if (!package.Localization.ContainsKey(package.Descriptor.DefaultLocale))
                 throw Fail("default_locale_missing", $"Default locale '{package.Descriptor.DefaultLocale}' has no localization file.");
             foreach (string locale in package.Descriptor.SupportedLocales)
@@ -267,14 +269,21 @@ namespace Nightwire.Runtime.Loading
                     if (!runtime.MessageIds.Add(messageId) || !localMessageIds.Add(messageId))
                         throw Fail("duplicate_message_id", $"Duplicate message ID '{messageId}'.");
                     string type = RequiredString(message, "type", messageId);
+                    if (!new[] { "text", "image", "video", "audio", "document", "choice", "system", "call_invitation" }.Contains(type))
+                        throw Fail("unsupported_message_type", $"Message '{messageId}' uses unsupported type '{type}'.");
                     if (type != "system")
                     {
                         string sender = RequiredString(message, "sender_id", messageId);
                         if (!participants.Contains(sender)) throw Fail("sender_not_participant", $"Sender '{sender}' is not a participant in '{pair.Key}'.");
                     }
                     string? assetId = OptionalString(message, "asset_id");
-                    if (!string.IsNullOrEmpty(assetId) && !runtime.AssetIds.Contains(assetId))
-                        throw Fail("message_asset_missing", $"Message '{messageId}' references missing asset '{assetId}'.");
+                    if (!string.IsNullOrEmpty(assetId))
+                    {
+                        if (!package.AssetsById.TryGetValue(assetId, out var messageAsset))
+                            throw Fail("message_asset_missing", $"Message '{messageId}' references missing asset '{assetId}'.");
+                        if (!string.Equals(messageAsset.Type, type, StringComparison.Ordinal))
+                            throw Fail("message_asset_type_mismatch", $"Message '{messageId}' type '{type}' does not match asset '{assetId}' type '{messageAsset.Type}'.");
+                    }
                     string? callId = OptionalString(message, "call_id");
                     if (!string.IsNullOrEmpty(callId) && !runtime.CallIds.Contains(callId))
                         throw Fail("call_missing", $"Message '{messageId}' references missing call '{callId}'.");
@@ -305,6 +314,13 @@ namespace Nightwire.Runtime.Loading
                 if (!runtime.CharacterIds.Contains(author)) throw Fail("post_author_missing", $"Post '{pair.Key}' has unknown author '{author}'.");
                 foreach (string asset in StringArray(pair.Value, "media_asset_ids"))
                     if (!runtime.AssetIds.Contains(asset)) throw Fail("post_asset_missing", $"Post '{pair.Key}' references missing asset '{asset}'.");
+                if (pair.Value.TryGetProperty("comments", out var comments))
+                    foreach (var comment in comments.EnumerateArray())
+                    {
+                        string commentAuthor = RequiredString(comment, "author_id", pair.Key);
+                        if (commentAuthor != "player" && !runtime.CharacterIds.Contains(commentAuthor))
+                            throw Fail("post_comment_author_missing", $"Post '{pair.Key}' has unknown comment author '{commentAuthor}'.");
+                    }
             }
 
             foreach (var pair in package.Calls)
@@ -350,6 +366,7 @@ namespace Nightwire.Runtime.Loading
 
             foreach (var pair in package.Minigames)
             {
+                ValidateMinigameConfiguration(package, pair.Key, pair.Value);
                 string completion = RequiredString(pair.Value, "completion_event_id", pair.Key);
                 if (!package.RuntimeDefinition.Events.Any(e => e.EventId == completion && e.TriggerType == StoryTriggerType.MinigameCompleted && e.TriggerReferenceId == pair.Key))
                     throw Fail("minigame_completion_event_missing", $"Minigame '{pair.Key}' has no matching minigame_completed completion event.");
@@ -396,6 +413,51 @@ namespace Nightwire.Runtime.Loading
             ValidateLocalizationCoverage(package);
         }
 
+        private static void ValidateMinigameConfiguration(LoadedEpisodePackage package, string minigameId, JsonElement minigame)
+        {
+            string type = RequiredString(minigame, "type", minigameId);
+            var config = minigame.GetProperty("configuration");
+            if (type == "sequence_reconstruction")
+            {
+                var symbols = new HashSet<string>(StringArray(config, "symbols"), StringComparer.Ordinal);
+                if (symbols.Count < 2) throw Fail("minigame_symbols_invalid", $"Minigame '{minigameId}' needs at least two unique symbols.");
+                foreach (string symbol in StringArray(config, "sequence"))
+                    if (!symbols.Contains(symbol)) throw Fail("minigame_sequence_symbol_unknown", $"Minigame '{minigameId}' sequence uses undeclared symbol '{symbol}'.");
+            }
+            else if (type == "frequency_tuning")
+            {
+                double minimum = config.GetProperty("minimum_frequency").GetDouble();
+                double maximum = config.GetProperty("maximum_frequency").GetDouble();
+                double target = config.GetProperty("target_frequency").GetDouble();
+                double tolerance = config.GetProperty("tolerance").GetDouble();
+                if (!(minimum < maximum) || target < minimum || target > maximum || tolerance <= 0)
+                    throw Fail("minigame_frequency_invalid", $"Minigame '{minigameId}' has invalid frequency bounds, target, or tolerance.");
+            }
+            else if (type == "evidence_matching")
+            {
+                var itemIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var item in config.GetProperty("items").EnumerateArray())
+                {
+                    string itemId = RequiredString(item, "item_id", minigameId);
+                    if (!itemIds.Add(itemId)) throw Fail("minigame_item_duplicate", $"Minigame '{minigameId}' contains duplicate item '{itemId}'.");
+                    string? assetId = OptionalString(item, "asset_id");
+                    if (!string.IsNullOrEmpty(assetId) && !package.RuntimeDefinition.AssetIds.Contains(assetId))
+                        throw Fail("minigame_asset_missing", $"Minigame '{minigameId}' references missing asset '{assetId}'.");
+                }
+                foreach (var pair in config.GetProperty("pairs").EnumerateArray())
+                {
+                    string left = RequiredString(pair, "left_item_id", minigameId);
+                    string right = RequiredString(pair, "right_item_id", minigameId);
+                    if (!itemIds.Contains(left) || !itemIds.Contains(right) || left == right)
+                        throw Fail("minigame_pair_invalid", $"Minigame '{minigameId}' contains an invalid evidence pair.");
+                }
+            }
+            else
+            {
+                throw Fail("unsupported_minigame_type", $"Minigame '{minigameId}' uses unsupported type '{type}'.");
+            }
+        }
+
         private static void CheckCallAsset(LoadedEpisodePackage package, string callId, JsonElement media, string property, string expectedType, bool optional = false)
         {
             string? assetId = OptionalString(media, property);
@@ -429,8 +491,22 @@ namespace Nightwire.Runtime.Loading
                     if (message.TryGetProperty("options", out var options))
                         foreach (var option in options.EnumerateArray()) AddIfPresent(required, option, "text_key");
                 }
-            foreach (var p in package.CharacterPosts.Values) AddIfPresent(required, p, "body_key");
-            foreach (var p in package.Minigames.Values) { AddIfPresent(required, p, "title_key"); AddIfPresent(required, p, "instructions_key"); }
+            foreach (var p in package.CharacterPosts.Values)
+            {
+                AddIfPresent(required, p, "body_key");
+                if (p.TryGetProperty("comments", out var comments))
+                    foreach (var comment in comments.EnumerateArray()) AddIfPresent(required, comment, "body_key");
+            }
+            foreach (var p in package.Minigames.Values)
+            {
+                AddIfPresent(required, p, "title_key"); AddIfPresent(required, p, "instructions_key");
+                if (p.TryGetProperty("configuration", out var config))
+                {
+                    AddIfPresent(required, config, "hint_key"); AddIfPresent(required, config, "unit_key");
+                    if (config.TryGetProperty("items", out var items))
+                        foreach (var item in items.EnumerateArray()) AddIfPresent(required, item, "label_key");
+                }
+            }
             foreach (var p in package.Calls.Values)
             {
                 foreach (var track in p.GetProperty("subtitle_tracks").EnumerateArray())
