@@ -10,6 +10,8 @@ using Nightwire.Runtime.Saves;
 using Nightwire.Runtime.Sessions;
 using Nightwire.Runtime.Calls;
 using Nightwire.Runtime.Minigames;
+using Nightwire.Runtime.Assets;
+using System.Security.Cryptography;
 
 internal static class Program
 {
@@ -42,6 +44,8 @@ internal static class Program
         Run("evidence minigame requires every authored pair", MinigameRuntimeMatchesEvidence, ref failures);
         Run("save store round-trips call and minigame progress", SaveStoreRoundTripsActivities, ref failures);
         Run("session coordinator dispatches solved minigame event", SessionDispatchesMinigameCompletion, ref failures);
+        Run("asset resolver enforces unlocks and opens verified read-only content", AssetResolverEnforcesUnlockAndIntegrity, ref failures);
+        Run("asset resolver rejects content modified after package load", AssetResolverRejectsPostLoadTampering, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -643,6 +647,78 @@ internal static class Program
                 "Minigame completion event did not update story state.");
         }
         finally { if (Directory.Exists(saves)) Directory.Delete(saves, true); }
+    }
+
+
+    private static void AssetResolverEnforcesUnlockAndIntegrity()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-asset-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var package = CreateAssetTestPackage(root, "original episode image bytes");
+            var state = CreateState();
+            var resolver = new EpisodeAssetResolver(package, state);
+            var locked = resolver.Open("asset.test");
+            Assert(!locked.Success && locked.ErrorCode == "asset_locked", "Locked asset was opened.");
+            Assert(!resolver.IsUnlocked("asset.test"), "Locked asset reported as unlocked.");
+
+            state.UnlockedAssetIds.Add("asset.test");
+            Assert(resolver.IsUnlocked("asset.test"), "Unlocked asset was not recognized.");
+            var opened = resolver.Open("asset.test");
+            Assert(opened.Success && opened.Asset != null, opened.Error ?? "Unlocked asset did not open.");
+            using (opened.Asset!)
+            {
+                Assert(opened.Asset!.Type == "image" && opened.Asset.MimeType == "image/png", "Asset metadata was not preserved.");
+                Assert(opened.Asset.Content.CanRead && !opened.Asset.Content.CanWrite, "Asset stream is not read-only.");
+                using (var reader = new StreamReader(opened.Asset.Content, System.Text.Encoding.UTF8, false, 1024, true))
+                    Assert(reader.ReadToEnd() == "original episode image bytes", "Asset content did not match the original bytes.");
+            }
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void AssetResolverRejectsPostLoadTampering()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-asset-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var package = CreateAssetTestPackage(root, "original bytes");
+            File.WriteAllText(Path.Combine(root, "Media", "image.bin"), "changed bytes");
+            var state = CreateState();
+            state.UnlockedAssetIds.Add("asset.test");
+            var result = new EpisodeAssetResolver(package, state).Open("asset.test");
+            Assert(!result.Success && result.ErrorCode == "asset_size_mismatch" || !result.Success && result.ErrorCode == "asset_hash_mismatch",
+                "Asset modified after package load was not rejected.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static LoadedEpisodePackage CreateAssetTestPackage(string root, string content)
+    {
+        Directory.CreateDirectory(Path.Combine(root, "Media"));
+        string relativePath = "Media/image.bin";
+        string fullPath = Path.Combine(root, "Media", "image.bin");
+        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(content);
+        File.WriteAllBytes(fullPath, bytes);
+        using var sha = SHA256.Create();
+        string digest = BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", string.Empty).ToLowerInvariant();
+
+        var package = new LoadedEpisodePackage
+        {
+            RootDirectory = root,
+            Descriptor = new EpisodePackageDescriptor { EpisodeId = "nightwire.ep001", EpisodeVersion = "1.0.0" }
+        };
+        package.Manifest.Files.Add(new EpisodeManifestFile
+        {
+            Path = relativePath, Kind = "media", SizeBytes = bytes.Length, Sha256 = digest
+        });
+        var asset = new EpisodeManifestAsset
+        {
+            AssetId = "asset.test", Type = "image", Path = relativePath, MimeType = "image/png"
+        };
+        package.Manifest.Assets.Add(asset);
+        package.AssetsById.Add(asset.AssetId, asset);
+        return package;
     }
 
     private sealed class TestEpisodeMigration : IEpisodeProgressMigration
