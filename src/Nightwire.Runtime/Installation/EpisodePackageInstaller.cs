@@ -287,17 +287,27 @@ namespace Nightwire.Runtime.Installation
                 path.Contains("\\") || path.Contains(":") || path.Contains("\0"))
                 throw Fail("unsafe_archive_path", $"Unsafe archive path '{path}'.");
             foreach (string segment in path.Split('/'))
-                if (segment.Length == 0 || segment == "." || segment == "..")
-                    throw Fail("unsafe_archive_path", $"Unsafe archive path '{path}'.");
-            foreach (char c in path)
-                if (!(char.IsLetterOrDigit(c) || c == '/' || c == '.' || c == '_' || c == '-'))
-                    throw Fail("unsafe_archive_path", $"Unsupported archive path character in '{path}'.");
+            {
+                if (segment.Length == 0 || segment == "." || segment == ".." || segment.EndsWith(".", StringComparison.Ordinal))
+                    throw Fail("unsafe_archive_path", $"Unsafe archive path segment in '{path}'.");
+                foreach (char c in segment)
+                    if (!IsAsciiLetterOrDigit(c) && c != '.' && c != '_' && c != '-')
+                        throw Fail("unsafe_archive_path", $"Unsupported archive path character in '{path}'.");
+                string deviceName = segment.Split('.')[0].ToUpperInvariant();
+                if (deviceName == "CON" || deviceName == "PRN" || deviceName == "AUX" || deviceName == "NUL" ||
+                    (deviceName.Length == 4 && (deviceName.StartsWith("COM", StringComparison.Ordinal) ||
+                    deviceName.StartsWith("LPT", StringComparison.Ordinal)) && deviceName[3] >= '1' && deviceName[3] <= '9'))
+                    throw Fail("unsafe_archive_path", $"Reserved filesystem name in '{path}'.");
+            }
         }
+
+        private static bool IsAsciiLetterOrDigit(char c) =>
+            (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
 
         private static void EnsureSafeEpisodeId(string id)
         {
             if (string.IsNullOrWhiteSpace(id) || id.Length > 64 ||
-                id.Any(c => !(char.IsLetterOrDigit(c) || c == '.' || c == '_' || c == '-')) ||
+                id.Any(c => !IsAsciiLetterOrDigit(c) && c != '.' && c != '_' && c != '-') ||
                 id == "." || id == "..")
                 throw Fail("unsafe_episode_id", "Episode ID is not safe for use as an installation directory.");
         }
