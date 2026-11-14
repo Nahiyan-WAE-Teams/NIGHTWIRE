@@ -29,7 +29,7 @@ The tests use only Python's standard library. They do not run GitHub Actions; CI
 
 ## C# runtime tests
 
-The portable runtime test harness covers story-event execution, package loading, conversation progression, versioned save persistence, signed catalogue signature/rollback checks, duplicate JSON property and duplicate episode identity rejection, malformed minimum-runtime version rejection, explicit timestamp-offset enforcement, rejection of symlinked package, save, install, and download directory ancestors, cancellation-safe release-manager disposal during active and queued catalogue refreshes, including late transport completion before sequence persistence, and ZIP Unix/Windows link-entry rejection (including directory-shaped link entries), and FIFO/special-file rejection:
+The portable runtime test harness covers story-event execution, package loading, conversation progression, versioned save persistence, signed catalogue signature/rollback checks, duplicate JSON property and duplicate episode identity rejection, malformed minimum-runtime version rejection, explicit timestamp-offset enforcement, rejection of symlinked package, save, install, and download directory ancestors, cancellation-safe release-manager disposal during active and queued catalogue refreshes, including late transport completion before sequence persistence, and ZIP Unix/Windows link-entry rejection (including directory-shaped link entries), FIFO/special-file rejection, ZIP file/directory path collision rejection, and followed-redirect rejection for downloads and catalogue fetches:
 
 ```bash
 dotnet run --project tests/Nightwire.Runtime.Tests
