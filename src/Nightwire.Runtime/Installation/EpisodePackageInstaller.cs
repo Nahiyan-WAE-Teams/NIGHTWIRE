@@ -58,9 +58,9 @@ namespace Nightwire.Runtime.Installation
             int removedStaging = 0;
             int removedBackups = 0;
             string root = Path.GetFullPath(installRoot);
+            EnsureNoLinkedAncestors(root);
             Directory.CreateDirectory(root);
-            if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
-                throw new IOException("Install root cannot be a symbolic link or reparse point.");
+            EnsureNoLinkedAncestors(root);
 
             foreach (string staging in Directory.GetDirectories(root, ".install-*", SearchOption.TopDirectoryOnly))
             {
@@ -145,9 +145,9 @@ namespace Nightwire.Runtime.Installation
                     throw Fail("archive_size_invalid", "Episode archive is empty or exceeds the configured archive limit.");
 
                 string root = Path.GetFullPath(installRoot);
+                EnsureNoLinkedAncestors(root);
                 Directory.CreateDirectory(root);
-                if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
-                    throw Fail("unsafe_install_root", "Install root cannot be a symbolic link or reparse point.");
+                EnsureNoLinkedAncestors(root);
 
                 staging = Path.Combine(root, ".install-" + Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(staging);
@@ -358,6 +358,26 @@ namespace Nightwire.Runtime.Installation
                 total += read;
                 if (total > maxBytes) throw Fail("metadata_too_large", "Metadata expanded beyond its size limit.");
                 output.Write(buffer, 0, read);
+            }
+        }
+
+        private static void EnsureNoLinkedAncestors(string path)
+        {
+            string current = Path.GetFullPath(path);
+            while (!string.IsNullOrEmpty(current))
+            {
+                try
+                {
+                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                        throw Fail("unsafe_install_root", "Install root or one of its parent directories is a symbolic link or reparse point.");
+                }
+                catch (FileNotFoundException) { }
+                catch (DirectoryNotFoundException) { }
+
+                string? parent = Path.GetDirectoryName(current);
+                if (string.IsNullOrEmpty(parent) || string.Equals(parent, current, StringComparison.Ordinal))
+                    break;
+                current = parent;
             }
         }
 
