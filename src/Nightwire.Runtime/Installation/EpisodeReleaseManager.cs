@@ -281,6 +281,7 @@ namespace Nightwire.Runtime.Installation
             string? archivePath = null;
             try
             {
+                operationToken.ThrowIfCancellationRequested();
                 if (!_leaseProvider.TryAcquireInstallLease(episodeId, out lease) || lease == null)
                     return Failure("episode_session_active", "Episode cannot be updated while a gameplay session is active.", episodeId);
                 if (!Version.TryParse(release.MinimumRuntimeVersion, out var minimumRuntimeVersion) ||
@@ -292,6 +293,7 @@ namespace Nightwire.Runtime.Installation
                 archivePath = Path.Combine(_downloadRoot, episodeId + "-" + release.EpisodeVersion + ".zip");
                 var download = await _downloader.DownloadReleaseAsync(release, archivePath, progress, operationToken)
                     .ConfigureAwait(false);
+                operationToken.ThrowIfCancellationRequested();
                 if (!download.Success)
                     return new EpisodeManagerOperationResult
                     {
