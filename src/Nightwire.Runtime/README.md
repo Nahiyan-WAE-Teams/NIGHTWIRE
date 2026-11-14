@@ -104,7 +104,7 @@ The checksum detects accidental corruption; it is not an authenticity signature 
 
 - `StartNewSession` verifies the package, refuses to overwrite an existing primary or backup save, creates episode-owned progress, processes the authored `episode_started` event, and commits the initial save.
 - `ResumeSession` loads the save for the installed episode version, honors explicit migration registrations and backup recovery, then checks that saved active conversations, pending calls/minigames, and message cursors still resolve in the installed content.
-- Conversation begin/advance/read/choice operations are coordinated and saved after successful mutations. The host receives newly delivered message IDs and typed story commands to render.
+- Conversation begin/read/choice operations are coordinated and saved after successful mutations. Conversation advance ticks keep partial delay in memory and save on delivery boundaries; hosts checkpoint with `SaveNow` on pause/close. The host receives newly delivered message IDs and typed story commands to render.
 - Call and minigame completion APIs verify the matching pending activity before routing the corresponding story trigger.
 - `ProcessExternalTrigger` supports future host-owned gameplay events without allowing episode-authored arbitrary code.
 - `SaveNow` is available for host lifecycle checkpoints; `CloseSession` releases the active package/progress references.
