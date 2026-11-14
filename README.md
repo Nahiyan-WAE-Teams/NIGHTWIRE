@@ -15,9 +15,9 @@ NIGHTWIRE is designed around a reusable game runtime and independently downloada
 
 ## Current development stage
 
-The repository is being established. The first milestone is the episode package contract and its validation rules. Runtime implementation follows after that contract is reviewed.
+The episode package contract, initial schemas, sample package, and semantic validator are in place as drafts. Current work is defining the reusable client runtime before Unity implementation.
 
-See [the episode package specification](docs/architecture/EPISODE_PACKAGE_SPEC.md), the [JSON Schema guide](docs/architecture/JSON_SCHEMA_GUIDE.md), and the [sample Episode 001](examples/Episode_001/episode.json). The v0.1 contracts include character posts, prerecorded calls, and declarative minigames.
+See the [episode package specification](docs/architecture/EPISODE_PACKAGE_SPEC.md), [JSON Schema guide](docs/architecture/JSON_SCHEMA_GUIDE.md), [client runtime blueprint](docs/architecture/CLIENT_RUNTIME_BLUEPRINT.md), [public Moonvale reference research](docs/research/MOONVALE_PUBLIC_REFERENCE.md), and [sample Episode 001](examples/Episode_001/episode.json). The v0.1 contracts include character posts, prerecorded calls, and declarative minigames.
 
 ## Planned technology
 
@@ -30,7 +30,7 @@ Exact Unity, .NET profile, and package dependency versions will be selected and 
 
 ## Development status
 
-No playable game or runtime implementation is claimed yet. Documentation in this repository describes the proposed architecture until implementation and tests establish otherwise.
+No playable game or Unity runtime is claimed yet. The next implementation milestone is the runtime domain and package-loading foundation; documentation remains a draft until implementation and tests establish otherwise.
 
 
 ## Validate an episode package
