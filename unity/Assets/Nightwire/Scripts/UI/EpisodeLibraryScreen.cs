@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Nightwire.Runtime.Installation;
@@ -84,6 +85,7 @@ namespace Nightwire.Presentation
 
             _refreshButton = new Button(RefreshClicked) { text = "REFRESH" };
             _refreshButton.AddToClassList("refresh-button");
+            StyleActionButton(_refreshButton);
             headingRow.Add(_refreshButton);
 
             _status = new Label("Connect to the archive to check releases.");
@@ -138,6 +140,16 @@ namespace Nightwire.Presentation
             {
                 var card = new VisualElement();
                 card.AddToClassList("episode-card");
+                card.style.backgroundColor = new Color(0.055f, 0.07f, 0.13f);
+                card.style.paddingLeft = 16;
+                card.style.paddingRight = 16;
+                card.style.paddingTop = 16;
+                card.style.paddingBottom = 16;
+                card.style.marginBottom = 12;
+                card.style.borderTopLeftRadius = 10;
+                card.style.borderTopRightRadius = 10;
+                card.style.borderBottomLeftRadius = 10;
+                card.style.borderBottomRightRadius = 10;
                 _episodeList.Add(card);
 
                 var titleRow = new VisualElement();
@@ -146,16 +158,24 @@ namespace Nightwire.Presentation
 
                 var title = new Label(FormatEpisodeTitle(entry.EpisodeId));
                 title.AddToClassList("episode-title");
+                title.style.fontSize = 15;
+                title.style.unityFontStyleAndWeight = FontStyle.Bold;
                 titleRow.Add(title);
 
                 var version = new Label(entry.InstalledVersion != null
                     ? "INSTALLED  ·  " + entry.InstalledVersion
                     : entry.AvailableVersion != null ? "AVAILABLE  ·  " + entry.AvailableVersion : "LOCAL PACKAGE");
                 version.AddToClassList("version");
+                version.style.fontSize = 9;
+                version.style.color = new Color(0.72f, 0.48f, 0.91f);
                 titleRow.Add(version);
 
                 var detail = new Label(StatusText(entry.Status));
                 detail.AddToClassList("detail");
+                detail.style.fontSize = 11;
+                detail.style.color = new Color(0.64f, 0.69f, 0.8f);
+                detail.style.marginTop = 8;
+                detail.style.marginBottom = 12;
                 card.Add(detail);
 
                 if (entry.Status == EpisodeLibraryStatus.InstalledOffline ||
@@ -166,6 +186,7 @@ namespace Nightwire.Presentation
                         text = "OPEN EPISODE"
                     };
                     open.AddToClassList("primary-button");
+                    StyleActionButton(open);
                     card.Add(open);
                 }
                 else if (entry.Status == EpisodeLibraryStatus.AvailableToDownload ||
@@ -176,11 +197,13 @@ namespace Nightwire.Presentation
                     progressLabel.AddToClassList("progress-label");
                     var progressBar = new ProgressBar { lowValue = 0, highValue = 100, value = 0 };
                     progressBar.AddToClassList("download-progress");
+                    progressBar.style.marginTop = 8;
                     var action = new Button(() => InstallClicked(id, progressLabel, progressBar))
                     {
                         text = entry.Status == EpisodeLibraryStatus.UpdateAvailable ? "UPDATE EPISODE" : "DOWNLOAD EPISODE"
                     };
                     action.AddToClassList("primary-button");
+                    StyleActionButton(action);
                     card.Add(action);
                     card.Add(progressLabel);
                     card.Add(progressBar);
@@ -238,6 +261,20 @@ namespace Nightwire.Presentation
                 SetStatus("Episode operation failed.");
             }
             finally { if (this != null) SetBusy(false); }
+        }
+
+        private static void StyleActionButton(Button button)
+        {
+            button.style.backgroundColor = new Color(0.34f, 0.12f, 0.48f);
+            button.style.color = new Color(0.97f, 0.96f, 1f);
+            button.style.paddingTop = 10;
+            button.style.paddingBottom = 10;
+            button.style.paddingLeft = 14;
+            button.style.paddingRight = 14;
+            button.style.borderTopLeftRadius = 6;
+            button.style.borderTopRightRadius = 6;
+            button.style.borderBottomLeftRadius = 6;
+            button.style.borderBottomRightRadius = 6;
         }
 
         private void SetBusy(bool busy)
