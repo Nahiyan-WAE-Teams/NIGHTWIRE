@@ -36,6 +36,7 @@ internal static class Program
         Run("session coordinator resumes conversation progress", SessionResumesConversation, ref failures);
         Run("session coordinator prevents accidental new-game overwrite", SessionPreventsOverwrite, ref failures);
         Run("prerecorded call timeline emits cues and completes", CallRuntimeAdvancesTimeline, ref failures);
+        Run("session coordinator dispatches call completion event", SessionDispatchesCallCompletion, ref failures);
         Run("sequence minigame validates and solves authored input", MinigameRuntimeSolvesSequence, ref failures);
         Run("frequency minigame applies authored tolerance", MinigameRuntimeSolvesFrequency, ref failures);
         Run("evidence minigame requires every authored pair", MinigameRuntimeMatchesEvidence, ref failures);
@@ -505,6 +506,46 @@ internal static class Program
         Assert(second.Subtitles.Count == 0, "Subtitle was emitted more than once.");
         var final = runtime.Advance(package, state, "call.test", 1200, "en");
         Assert(final.Completed && final.ElapsedMilliseconds == 2000, "Call did not complete.");
+    }
+
+
+    private static void SessionDispatchesCallCompletion()
+    {
+        string root = FindRepositoryRoot();
+        string saves = Path.Combine(Path.GetTempPath(), "nightwire-session-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var coordinator = new RuntimeSessionCoordinator(new SaveStore(saves));
+            Assert(coordinator.StartNewSession(Path.Combine(root, "examples", "Episode_001")).Success,
+                "Session did not start.");
+            var package = coordinator.Package!;
+            using var call = JsonDocument.Parse(@"{""call_id"":""call.test"",""duration_ms"":1000,""cues"":[],""subtitle_tracks"":[]}");
+            package.Calls["call.test"] = call.RootElement.Clone();
+            package.RuntimeDefinition.CallIds.Add("call.test");
+            var completion = new StoryEventDefinition
+            {
+                EventId = "event.call.test.complete",
+                TriggerType = StoryTriggerType.CallEnded,
+                TriggerReferenceId = "call.test"
+            };
+            completion.Actions.Add(new StoryActionDefinition
+            {
+                Type = StoryActionType.SetStoryFlag,
+                Flag = "call_test_finished",
+                FlagValue = StoryFlagValue.FromBoolean(true)
+            });
+            package.RuntimeDefinition.Events.Add(completion);
+            coordinator.Progress!.PendingCallId = "call.test";
+            Assert(coordinator.StartCallPlayback("call.test").Success, "Call playback did not start.");
+            var advanced = coordinator.AdvanceCallPlayback("call.test", 1000, "en");
+            Assert(advanced.Success && advanced.CallTimeline != null && advanced.CallTimeline.Completed,
+                advanced.Error ?? "Call timeline did not complete.");
+            Assert(coordinator.Progress.PendingCallId == null, "Completed call remained pending.");
+            Assert(coordinator.Progress.StoryFlags.TryGetValue("call_test_finished", out var flag) &&
+                flag.Kind == StoryFlagValueKind.Boolean && flag.BooleanValue,
+                "Call completion event did not update story state.");
+        }
+        finally { if (Directory.Exists(saves)) Directory.Delete(saves, true); }
     }
 
     private static void MinigameRuntimeSolvesSequence()
