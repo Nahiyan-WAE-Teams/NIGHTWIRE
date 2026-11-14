@@ -67,7 +67,7 @@ namespace Nightwire.Runtime.Installation
             foreach (var key in trustedKeys)
             {
                 if (key == null || string.IsNullOrWhiteSpace(key.KeyId) ||
-                    key.SubjectPublicKeyInfo == null || key.SubjectPublicKeyInfo.Length == 0 ||
+                    key.SubjectPublicKeyInfo == null || key.SubjectPublicKeyInfo.Length == 0 || key.SubjectPublicKeyInfo.Length > 512 ||
                     !_trustedKeys.TryAdd(key.KeyId, (byte[])key.SubjectPublicKeyInfo.Clone()))
                     throw new ArgumentException("Trusted release keys must have unique IDs and valid public key bytes.", nameof(trustedKeys));
             }
@@ -99,7 +99,9 @@ namespace Nightwire.Runtime.Installation
                 using (var ecdsa = ECDsa.Create())
                 {
                     ecdsa.ImportSubjectPublicKeyInfo(publicKey, out int bytesRead);
-                    if (bytesRead != publicKey.Length || ecdsa.KeySize != 256)
+                    var parameters = ecdsa.ExportParameters(false);
+                    if (bytesRead != publicKey.Length || ecdsa.KeySize != 256 ||
+                        !string.Equals(parameters.Curve.Oid.Value, "1.2.840.10045.3.1.7", StringComparison.Ordinal))
                         return Error("trusted_key_invalid", "Trusted key must be a complete ECDSA P-256 SubjectPublicKeyInfo key.");
                     if (!ecdsa.VerifyData(payload, signature, HashAlgorithmName.SHA256))
                         return Error("signature_invalid", "Release catalogue signature verification failed.");
@@ -159,7 +161,7 @@ namespace Nightwire.Runtime.Installation
             }
             catch (Exception exception) when (exception is JsonException || exception is FormatException ||
                 exception is CryptographicException || exception is ArgumentException || exception is InvalidOperationException ||
-                exception is KeyNotFoundException || exception is OverflowException)
+                exception is KeyNotFoundException || exception is OverflowException || exception is NotSupportedException)
             {
                 return Error("catalogue_invalid", exception.Message);
             }
