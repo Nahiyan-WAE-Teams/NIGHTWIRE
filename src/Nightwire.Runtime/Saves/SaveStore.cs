@@ -221,6 +221,13 @@ namespace Nightwire.Runtime.Saves
                 state.StoryFlags.Count > _options.MaximumCollectionEntries ||
                 state.RelationshipScores.Count > _options.MaximumCollectionEntries)
                 throw new SaveStoreException("save_state_limit", "Save state exceeds a configured collection limit.");
+            if (state.StoryFlags.Any(pair => pair.Value == null ||
+                (pair.Value.Kind == StoryFlagValueKind.Number &&
+                 (double.IsNaN(pair.Value.NumberValue) || double.IsInfinity(pair.Value.NumberValue)))))
+                throw new SaveStoreException("save_flag_invalid", "Story flags contain an invalid value.");
+            if (state.Notifications.Any(x => x == null || string.IsNullOrWhiteSpace(x.NotificationId) ||
+                string.IsNullOrWhiteSpace(x.TitleKey) || string.IsNullOrWhiteSpace(x.BodyKey)))
+                throw new SaveStoreException("save_notification_invalid", "Notifications contain invalid data.");
             foreach (var pair in state.ConversationProgress)
             {
                 if (string.IsNullOrWhiteSpace(pair.Key))
@@ -234,13 +241,34 @@ namespace Nightwire.Runtime.Saves
             }
         }
 
+        private void ValidatePayload(SavePayload payload)
+        {
+            if (payload.Conversations == null || payload.CompletedEventIds == null || payload.UnlockedAssetIds == null ||
+                payload.StoryFlags == null || payload.RelationshipScores == null || payload.Notifications == null)
+                throw new SaveStoreException("save_payload_invalid", "Save payload collections cannot be null.");
+            int total = payload.Conversations.Count + payload.CompletedEventIds.Count + payload.UnlockedAssetIds.Count +
+                payload.StoryFlags.Count + payload.RelationshipScores.Count;
+            if (total > _options.MaximumCollectionEntries || payload.Notifications.Count > _options.MaximumNotifications)
+                throw new SaveStoreException("save_payload_limit", "Save payload exceeds configured collection limits.");
+            if (payload.Conversations.Any(x => x == null || string.IsNullOrWhiteSpace(x.ConversationId) ||
+                x.DeliveredMessageIds == null || x.ReadMessageIds == null || x.SelectedOptions == null ||
+                double.IsNaN(x.ElapsedDelaySeconds) || double.IsInfinity(x.ElapsedDelaySeconds) || x.ElapsedDelaySeconds < 0))
+                throw new SaveStoreException("save_payload_invalid", "Conversation save data is incomplete or invalid.");
+            if (payload.CompletedEventIds.Any(string.IsNullOrWhiteSpace) || payload.UnlockedAssetIds.Any(string.IsNullOrWhiteSpace) ||
+                payload.StoryFlags.Any(x => x == null || string.IsNullOrWhiteSpace(x.Name) ||
+                    (x.Kind == StoryFlagValueKind.Number && (double.IsNaN(x.NumberValue) || double.IsInfinity(x.NumberValue)))) ||
+                payload.Notifications.Any(x => x == null || string.IsNullOrWhiteSpace(x.NotificationId) ||
+                    string.IsNullOrWhiteSpace(x.TitleKey) || string.IsNullOrWhiteSpace(x.BodyKey)))
+                throw new SaveStoreException("save_payload_invalid", "Save payload contains an empty or invalid identifier/value.");
+        }
+
         private static string MigrationKey(string episodeId, string fromVersion) => episodeId + "\n" + fromVersion;
         private static string SafeEpisodeDirectory(string episodeId)
         {
             if (string.IsNullOrWhiteSpace(episodeId) || episodeId.Length > 128 ||
-                episodeId.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
-                episodeId.Contains("/") || episodeId.Contains("\\") || episodeId == "." || episodeId == "..")
-                throw new SaveStoreException("episode_id_invalid", "Episode ID cannot be used as a save directory.");
+                episodeId.Any(ch => !(char.IsLetterOrDigit(ch) || ch == '.' || ch == '_' || ch == '-')) ||
+                episodeId == "." || episodeId == "..")
+                throw new SaveStoreException("episode_id_invalid", "Episode ID must contain only letters, digits, dots, underscores, and hyphens.");
             return episodeId;
         }
 
