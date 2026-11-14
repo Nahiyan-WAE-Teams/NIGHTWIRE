@@ -1,0 +1,1 @@
+-keep class com.nightwire.securestore.NightwireSequenceStore { public *; }
