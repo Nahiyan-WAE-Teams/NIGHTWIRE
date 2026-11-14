@@ -61,6 +61,7 @@ internal static class Program
         Run("episode installer installs and updates a verified package", EpisodeInstallerInstallsAndUpdates, ref failures);
         Run("episode installer rejects ZIP path traversal", EpisodeInstallerRejectsTraversal, ref failures);
         Run("episode downloader verifies a trusted archive hash", EpisodeDownloaderChecksTrustedHash, ref failures);
+        Run("episode downloader rejects a linked destination ancestor", EpisodeDownloaderRejectsLinkedDestinationAncestor, ref failures);
         Run("signed release catalogue verifies signatures, rejects rollback, duplicate JSON keys, and malformed runtime versions", ReleaseCatalogueVerifiesSignatureAndSequence, ref failures);
         Run("installer startup recovery restores interrupted update backup", InstallerRecoveryRestoresPreviousInstall, ref failures);
         Run("installer rejects a symlinked ancestor of its install root", InstallerRejectsSymlinkedRootAncestor, ref failures);
@@ -908,6 +909,33 @@ internal static class Program
             Assert(!File.Exists(Path.Combine(root, "outside.txt")), "ZIP traversal wrote outside staging.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void EpisodeDownloaderRejectsLinkedDestinationAncestor()
+    {
+        string parent = Path.Combine(Path.GetTempPath(), "nightwire-download-parent-" + Guid.NewGuid().ToString("N"));
+        string outside = Path.Combine(Path.GetTempPath(), "nightwire-download-outside-" + Guid.NewGuid().ToString("N"));
+        string linked = Path.Combine(parent, "linked");
+        string destination = Path.Combine(linked, "downloads", "episode.zip");
+        Directory.CreateDirectory(parent);
+        Directory.CreateDirectory(outside);
+        try
+        {
+            Directory.CreateSymbolicLink(linked, outside);
+            using var downloader = new EpisodePackageDownloader();
+            var result = downloader.DownloadAsync(new Uri("https://example.invalid/episode.zip"), destination)
+                .GetAwaiter().GetResult();
+            Assert(!result.Success && result.ErrorCode == "download_io_failed",
+                "Downloader accepted a destination beneath a linked ancestor.");
+            Assert(!Directory.Exists(Path.Combine(outside, "downloads")),
+                "Downloader created its destination through a linked ancestor.");
+        }
+        finally
+        {
+            if (Directory.Exists(linked)) Directory.Delete(linked);
+            if (Directory.Exists(outside)) Directory.Delete(outside, true);
+            if (Directory.Exists(parent)) Directory.Delete(parent, true);
+        }
     }
 
     private static void EpisodeDownloaderChecksTrustedHash()
