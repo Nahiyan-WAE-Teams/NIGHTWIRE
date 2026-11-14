@@ -63,6 +63,8 @@ namespace Nightwire.Unity.UI
         private void OnEnable()
         {
             if (document == null) document = GetComponent<UIDocument>();
+            if (session == null && document != null && document.rootVisualElement != null)
+                document.rootVisualElement.style.display = DisplayStyle.None;
             TryBindView();
         }
 
