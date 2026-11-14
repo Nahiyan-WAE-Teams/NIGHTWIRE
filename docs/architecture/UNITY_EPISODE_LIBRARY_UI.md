@@ -17,10 +17,11 @@ UI Toolkit is selected for this archive screen because it is a multi-resolution,
 - `unity/Assets/Nightwire/UI/EpisodeLibraryView.uxml` — screen hierarchy and named controls.
 - `unity/Assets/Nightwire/UI/EpisodeLibraryView.uss` — dark archive styling and responsive flex layout.
 - `unity/Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` — UI Toolkit view controller.
+- `unity/Assets/Nightwire/Scripts/Nightwire.Unity.asmdef` — presentation assembly boundary referencing `Nightwire.Runtime`.
 - `src/Nightwire.Runtime/Installation/EpisodeLibraryPresentation.cs` — UI-neutral snapshot/progress adapter.
 - `src/Nightwire.Runtime/Installation/EpisodeAccessCoordinator.cs` — atomic per-episode session/install lease gate.
 
-The visual direction uses near-black navy surfaces, restrained violet accents, compact archive metadata, progress feedback, and explicit offline-ready status. No episode-specific assets are hardcoded into the UI.
+The visual direction uses near-black navy surfaces, restrained violet accents, compact archive metadata, progress feedback, and explicit offline-ready status. No episode-specific assets are hardcoded into the UI. Buttons use short 140 ms color/scale transitions; there are no looping effects or mandatory motion.
 
 ## Unity scene setup
 
@@ -61,3 +62,5 @@ This makes the session-start versus install-start decision atomic inside the pro
 The portable runtime currently references `System.Text.Json 10.0.15` through its .NET project. Unity's .NET Standard 2.1 API profile does not automatically restore arbitrary NuGet package dependencies from the .csproj. Before the Unity project is considered buildable, the exact System.Text.Json dependency set must be imported and tested under Unity's Mono and Android IL2CPP backends, including linker preservation and cryptography support. Do not mark the runtime assembly as integrated until that device compatibility check is complete.
 
 The Unity UI files have not been compiled or executed in the Editor yet. Build, play-mode tests, and Android device verification remain pending.
+
+UI Toolkit USS transitions are documented for Unity 6.3 and support short changes to color and transform properties: https://docs.unity.com/en-us/engine/6000.3/manual/uitoolkits/uielements/uie-uss/properties/reference
