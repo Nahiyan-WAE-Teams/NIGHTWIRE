@@ -75,16 +75,16 @@ namespace Nightwire.Unity
 
             public long LoadHighestAcceptedSequence()
             {
-                using (var activity = new AndroidJavaClass("com.unity3d.player.UnityPlayer")
-                    .GetStatic<AndroidJavaObject>("currentActivity"))
+                using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+                using (var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
                 using (var store = new AndroidJavaClass(JavaClass))
                     return store.CallStatic<long>("loadSequence", activity, _namespace);
             }
 
             public void SaveHighestAcceptedSequence(long sequence)
             {
-                using (var activity = new AndroidJavaClass("com.unity3d.player.UnityPlayer")
-                    .GetStatic<AndroidJavaObject>("currentActivity"))
+                using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+                using (var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
                 using (var store = new AndroidJavaClass(JavaClass))
                     store.CallStatic("saveSequence", activity, _namespace, sequence);
             }
