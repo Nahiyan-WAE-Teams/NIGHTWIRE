@@ -238,23 +238,22 @@ Example:
 }
 ```
 
-Initial trigger candidates:
+The v0.1 trigger allowlist is:
 - episode_started
 - message_completed
 - choice_selected
-- asset_unlocked
 - call_ended
 - minigame_completed
 
-Initial action candidates:
+The v0.1 action allowlist is:
 - open_conversation
-- send_message_sequence
 - show_notification
-- start_call
 - unlock_asset
 - set_story_flag
-- adjust_relationship
+- start_call
 - start_minigame
+
+New triggers or actions require a schema/runtime capability addition. Do not put arbitrary commands or executable expressions in event documents.
 
 Every trigger and action must be schema-validated and supported by the runtime. Unknown action types fail validation rather than being silently executed.
 
