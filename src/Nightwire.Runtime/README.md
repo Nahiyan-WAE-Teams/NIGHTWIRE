@@ -8,12 +8,18 @@ Portable domain/progression foundation for the Unity client.
 - Runtime library target: .NET Standard 2.1.
 - C# language level: 9.0.
 - No UnityEngine dependency in this assembly.
-- No third-party packages in the core.
+- JSON parsing: System.Text.Json 10.0.15 (Microsoft-maintained; netstandard2.0-compatible package).
 
 Unity 6 documents .NET Standard 2.1 as its cross-platform API compatibility profile. Unity's release guidance recommends LTS for projects locking a production baseline. The current Unity 6 LTS line is 6.3; the Unity release archive should be checked again when creating the actual Unity project.
 
 ## Current implementation
 
+- Episode descriptor and manifest models.
+- Verified unpacked-package loader with manifest inventory, file-size and SHA-256 checks.
+- Safe relative-path checks, symlink/reparse-point rejection, unlisted-file rejection, and package/JSON size limits.
+- Indexed character profiles, conversations, posts, calls, minigames, events, assets, and localization dictionaries.
+- Cross-reference checks for characters, messages, choices, calls, minigames, assets, and event actions.
+- Episode/runtime compatibility and default/supported locale checks.
 - Episode runtime identity and known-reference index.
 - Story event and action domain models.
 - Player-owned progress state kept separate from immutable episode content.
@@ -24,9 +30,9 @@ Unity 6 documents .NET Standard 2.1 as its cross-platform API compatibility prof
 
 ## Boundaries
 
-This is a pure C# runtime core. It does not load JSON, access files, render Unity UI, play media, download packages, or implement cloud saves yet. Those responsibilities will be added in separate adapters/modules.
+The package loader verifies an already-unpacked episode directory and exposes cloned JSON documents plus a typed story-event runtime definition. It does not extract archives, download packages, authenticate publisher signatures, render Unity UI, play media, or implement cloud saves. Archive extraction and signed release verification remain installer responsibilities.
 
-The episode loader must map validated package JSON into these domain models. The Unity presentation layer must consume typed runtime commands and must never execute arbitrary episode-provided code.
+The loader performs package-integrity and cross-reference checks but is not a full JSON Schema Draft 2020-12 evaluator. Release validation must still run the package validator/schema layer before installation. The Unity presentation layer must consume typed runtime commands and must never execute arbitrary episode-provided code.
 
 ## Runtime tests
 
@@ -42,5 +48,20 @@ It covers episode-start execution, one-shot idempotency, atomic rejection of inv
 
 - [Unity 6 release support](https://unity.com/releases/unity-6/support) — Unity identifies 6.3 LTS as its current LTS baseline and recommends LTS when locking a production version.
 - [Unity .NET profile guidance](https://docs.unity3d.com/Manual/overview-of-dot-net-in-unity.html) — Unity recommends the .NET Standard API compatibility profile for new cross-platform projects.
+- [System.Text.Json 10.0.15 on NuGet](https://www.nuget.org/packages/System.Text.Json/10.0.15) — Microsoft-maintained JSON parser package; NuGet lists .NET Standard 2.0 compatibility.
 
 The repository's core project targets netstandard2.1 to match Unity's documented profile. The actual Unity Editor installation and Android build compatibility still need to be verified when the Unity project is created.
+
+## Package loader
+
+The loader entry point is:
+
+```csharp
+var package = new EpisodePackageLoader().Load(episodeDirectory);
+var openingEvent = package.RuntimeDefinition.EntryEventId;
+var openingConversation = package.RuntimeDefinition.ConversationIds;
+```
+
+The loader currently consumes the unpacked directory layout. It verifies every manifest-listed file before parsing content, then rejects unlisted files and unresolved cross-file references. It enforces configurable defaults of 512 MiB total package size and 8 MiB per JSON file. These limits can be changed through `EpisodePackageLoaderOptions`.
+
+The loader does not authenticate who published a package. A future installer must verify a signed release index before treating downloaded content as trusted.
