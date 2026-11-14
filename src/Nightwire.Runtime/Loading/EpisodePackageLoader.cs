@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -36,7 +35,6 @@ namespace Nightwire.Runtime.Loading
                 throw Fail("unsafe_root", "Episode root cannot be a symbolic link or reparse point.");
 
             JsonDocument descriptorDocument = ReadJson(Path.Combine(root, "episode.json"), _options.MaximumJsonFileBytes);
-            JsonDocument manifestDocument;
             try
             {
                 var descriptor = ParseDescriptor(descriptorDocument.RootElement);
@@ -46,7 +44,8 @@ namespace Nightwire.Runtime.Loading
                     throw Fail("invalid_manifest_name", "Format 0.1 requires the manifest file to be named manifest.json.");
                 EnsureRuntimeCompatible(descriptor.MinimumRuntimeVersion, _options.RuntimeVersion);
 
-                using JsonDocument manifestDocument = ReadJson(Path.Combine(root, descriptor.Manifest), _options.MaximumJsonFileBytes);
+                using (JsonDocument manifestDocument = ReadJson(Path.Combine(root, descriptor.Manifest), _options.MaximumJsonFileBytes);
+                {
                 var manifest = ParseManifest(manifestDocument.RootElement);
                 if (!string.Equals(manifest.SchemaVersion, descriptor.SchemaVersion, StringComparison.Ordinal))
                     throw Fail("schema_mismatch", "Episode descriptor and manifest schema versions differ.");
@@ -71,6 +70,7 @@ namespace Nightwire.Runtime.Loading
                 LoadDocuments(package);
                 ValidateReferences(package);
                 return package;
+                }
             }
             finally
             {
