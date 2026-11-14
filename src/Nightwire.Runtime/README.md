@@ -79,4 +79,4 @@ The loader does not authenticate who published a package. A future installer mus
 - A bounded advancement pass yields safely on long branch cycles and preserves elapsed time for the next host tick.
 - The runtime does not implement free-form player replies, live networking, or presentation/typing animations. UI code can render typing indicators using the same authored delay information without changing story state.
 
-The host should serialize the player progress object using a versioned save format. Save serialization and migration are not yet implemented in this library.
+The host should use the versioned `SaveStore` described below. Unity lifecycle integration and cloud synchronization are not yet implemented.
