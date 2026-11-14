@@ -64,6 +64,7 @@ internal static class Program
         Run("episode installer rejects ZIP special files", EpisodeInstallerRejectsArchiveSpecialFiles, ref failures);
         Run("episode installer rejects ZIP file-directory path collisions", EpisodeInstallerRejectsPathTypeConflicts, ref failures);
         Run("episode downloader verifies a trusted archive hash", EpisodeDownloaderChecksTrustedHash, ref failures);
+        Run("episode download and catalogue transports reject followed redirects", TransportsRejectFollowedRedirects, ref failures);
         Run("episode downloader rejects a linked destination ancestor", EpisodeDownloaderRejectsLinkedDestinationAncestor, ref failures);
         Run("signed release catalogue verifies signatures, rejects rollback, duplicate JSON keys, and malformed runtime versions", ReleaseCatalogueVerifiesSignatureAndSequence, ref failures);
         Run("installer startup recovery restores interrupted update backup", InstallerRecoveryRestoresPreviousInstall, ref failures);
@@ -1044,6 +1045,38 @@ internal static class Program
         }
     }
 
+    private static void TransportsRejectFollowedRedirects()
+    {
+        var redirectedUri = new Uri("https://redirected.example.test/payload");
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-redirect-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            using (var client = new HttpClient(new RedirectedResponseHandler(redirectedUri)))
+            using (var downloader = new EpisodePackageDownloader(client: client))
+            {
+                var result = downloader.DownloadAsync(new Uri("https://cdn.example.test/episode.zip"),
+                    Path.Combine(root, "episode.zip")).GetAwaiter().GetResult();
+                Assert(!result.Success && result.ErrorCode == "redirect_not_allowed",
+                    "Episode downloader accepted an automatically followed redirect.");
+            }
+
+            using (var client = new HttpClient(new RedirectedResponseHandler(redirectedUri)))
+            using (var transport = new HttpReleaseCatalogueTransport(client))
+            {
+                bool rejected = false;
+                try
+                {
+                    transport.FetchAsync(new Uri("https://catalogue.example.test/releases.json"),
+                        CancellationToken.None).GetAwaiter().GetResult();
+                }
+                catch (InvalidOperationException) { rejected = true; }
+                Assert(rejected, "Catalogue transport accepted an automatically followed redirect.");
+            }
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
     private static void EpisodeDownloaderChecksTrustedHash()
     {
         byte[] payload = System.Text.Encoding.UTF8.GetBytes("episode archive bytes");
@@ -1118,6 +1151,20 @@ internal static class Program
             return true;
         }
         private sealed class TestLease : IDisposable { public void Dispose() { } }
+    }
+
+    private sealed class RedirectedResponseHandler : HttpMessageHandler
+    {
+        private readonly Uri _redirectedUri;
+        public RedirectedResponseHandler(Uri redirectedUri) { _redirectedUri = redirectedUri; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes("redirected")),
+                RequestMessage = new HttpRequestMessage(HttpMethod.Get, _redirectedUri)
+            });
+        }
     }
 
     private sealed class StubHttpHandler : HttpMessageHandler
