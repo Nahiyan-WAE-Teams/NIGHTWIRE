@@ -523,3 +523,12 @@ The portable runtime session coordinator is the host-facing orchestration bounda
 - Successful conversation operations and host-reported call/minigame completion are persisted. The host receives stable message IDs and allowlisted typed commands for presentation.
 - The coordinator supports one active episode per instance. The host serializes calls and invokes explicit lifecycle saves; Unity UI, media playback, downloads, archive extraction, background timers, and cloud synchronization remain adapter/service responsibilities.
 - A save-write failure closes the in-memory session so gameplay cannot continue from state that may not have been committed. The player can resume from the last committed save or its backup.
+
+
+## Call and minigame runtime behavior
+
+The portable runtime interprets prerecorded call cue/subtitle timelines and evaluates all three minigame types declared in schema 0.1. Episode content provides media references, participant/timing metadata, subtitle localization keys, visual cue allowlist values, puzzle configuration, attempt limits, and time limits. It never supplies executable scripts.
+
+The host is responsible for actual audio/video playback and Unity presentation. It advances the call runtime from the media player's elapsed clock, renders returned cue/subtitle entries, and persists session results. Call completion is accepted only after the authored duration has elapsed. Minigame completion events are emitted only after the configured answer is solved; a timeout or exhausted attempts does not count as success.
+
+Call and minigame in-progress state is player-owned and saved separately from episode content. Save data includes timeline cursor and fired-entry IDs for calls, plus elapsed time, attempts, input sequence, matched evidence pairs, and solved status for minigames.
