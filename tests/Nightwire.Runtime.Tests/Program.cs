@@ -7,6 +7,7 @@ using Nightwire.Runtime.Domain;
 using Nightwire.Runtime.Progression;
 using Nightwire.Runtime.Conversations;
 using Nightwire.Runtime.Saves;
+using Nightwire.Runtime.Sessions;
 
 internal static class Program
 {
@@ -29,6 +30,9 @@ internal static class Program
         Run("save store rejects a different episode identity", SaveStoreRejectsEpisodeMismatch, ref failures);
         Run("save store detects episode-version metadata tampering", SaveStoreRejectsMetadataTampering, ref failures);
         Run("save store applies an explicit episode migration", SaveStoreMigratesEpisodeVersion, ref failures);
+        Run("session coordinator starts an episode and persists its entry event", SessionStartsAndPersists, ref failures);
+        Run("session coordinator resumes conversation progress", SessionResumesConversation, ref failures);
+        Run("session coordinator prevents accidental new-game overwrite", SessionPreventsOverwrite, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -408,6 +412,71 @@ internal static class Program
             Assert(loaded.State.StoryFlags.ContainsKey("migration_applied"), "Migration did not update player state.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+
+    private static void SessionStartsAndPersists()
+    {
+        string root = FindRepositoryRoot();
+        string saves = Path.Combine(Path.GetTempPath(), "nightwire-session-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new SaveStore(saves);
+            var coordinator = new RuntimeSessionCoordinator(store);
+            var result = coordinator.StartNewSession(Path.Combine(root, "examples", "Episode_001"));
+            Assert(result.Success, result.Error ?? "Session did not start.");
+            Assert(coordinator.Progress != null && coordinator.Progress.EpisodeId == "nightwire.ep001",
+                "Session did not create episode progress.");
+            Assert(coordinator.Progress!.CompletedEventIds.Contains("episode_start"),
+                "Entry event was not processed.");
+            Assert(result.Commands.Count > 0, "Entry event commands were not returned to the host.");
+            Assert(File.Exists(store.GetSavePath("nightwire.ep001")), "New session was not saved.");
+        }
+        finally { if (Directory.Exists(saves)) Directory.Delete(saves, true); }
+    }
+
+    private static void SessionResumesConversation()
+    {
+        string root = FindRepositoryRoot();
+        string saves = Path.Combine(Path.GetTempPath(), "nightwire-session-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            string episode = Path.Combine(root, "examples", "Episode_001");
+            var store = new SaveStore(saves);
+            var first = new RuntimeSessionCoordinator(store);
+            Assert(first.StartNewSession(episode).Success, "New session did not start.");
+            Assert(first.BeginConversation("anisha.day01").Success, "Conversation did not begin.");
+            var advanced = first.AdvanceConversation(1.2);
+            Assert(advanced.Success && advanced.NewlyDeliveredMessageIds.Count > 0,
+                "Conversation did not advance.");
+            first.CloseSession();
+
+            var resumed = new RuntimeSessionCoordinator(store);
+            var result = resumed.ResumeSession(episode);
+            Assert(result.Success, result.Error ?? "Session did not resume.");
+            Assert(resumed.Progress!.ConversationProgress.ContainsKey("anisha.day01"),
+                "Conversation progress was not restored.");
+            Assert(resumed.Progress.ConversationProgress["anisha.day01"].DeliveredMessageIds.Count > 0,
+                "Delivered messages were not restored.");
+        }
+        finally { if (Directory.Exists(saves)) Directory.Delete(saves, true); }
+    }
+
+    private static void SessionPreventsOverwrite()
+    {
+        string root = FindRepositoryRoot();
+        string saves = Path.Combine(Path.GetTempPath(), "nightwire-session-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            string episode = Path.Combine(root, "examples", "Episode_001");
+            var coordinator = new RuntimeSessionCoordinator(new SaveStore(saves));
+            Assert(coordinator.StartNewSession(episode).Success, "Initial session did not start.");
+            coordinator.CloseSession();
+            var second = coordinator.StartNewSession(episode);
+            Assert(!second.Success && second.ErrorCode == "save_exists",
+                "Starting a new game overwrote an existing save.");
+        }
+        finally { if (Directory.Exists(saves)) Directory.Delete(saves, true); }
     }
 
     private sealed class TestEpisodeMigration : IEpisodeProgressMigration
