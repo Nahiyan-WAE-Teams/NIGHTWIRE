@@ -16,9 +16,12 @@ UI Toolkit is selected for this archive screen because it is a multi-resolution,
 
 ## Files added
 
-- `unity/Assets/Nightwire/UI/EpisodeLibraryView.uxml` — screen hierarchy and named controls.
+- `unity/Assets/Nightwire/UI/EpisodeLibraryView.uxml` — archive hierarchy and named controls.
+- `unity/Assets/Nightwire/UI/MessengerScreen.uxml` — messenger hierarchy, message list, choice dock, and archive navigation.
 - `unity/Assets/Nightwire/UI/EpisodeLibraryView.uss` — dark archive styling and responsive flex layout.
-- `unity/Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` — UI Toolkit view controller.
+- `unity/Assets/Nightwire/UI/MessengerScreen.uss` — incoming/outgoing bubbles, message attachments, and branching choice styles.
+- `unity/Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` — archive view controller.
+- `unity/Assets/Nightwire/Scripts/MessengerScreenController.cs` — episode-driven messenger view controller.
 - `unity/Assets/Nightwire/Scripts/NightwireApplicationRoot.cs` — application composition root for release, save, library, and session services.
 - `unity/Assets/Nightwire/Scripts/EpisodeSessionHost.cs` — resume/new-session selection and lease lifetime.
 - `unity/Assets/Nightwire/Scripts/INightwirePlatformServices.cs` — platform provider contract.
@@ -37,8 +40,10 @@ The visual direction uses near-black navy surfaces, restrained violet accents, c
 3. Create a Panel Settings asset and a GameObject with a `UIDocument` component. Assign the UXML as its Source Asset and the Panel Settings asset.
 4. Add `EpisodeLibraryViewController` to the same GameObject.
 5. In the game's composition root, create the trusted-key verifier, protected catalogue sequence store, acceptance service, HTTPS transport, install manager, and presentation model. Call `EpisodeLibraryViewController.Bind(presentation)` on the Unity main thread.
-6. Subscribe to `PlayEpisodeRequested`. The host should load the installed directory using `RuntimeSessionCoordinator`, resume the player's save when one exists, or start a new session only when no save exists. The UI deliberately does not overwrite or reset player progress.
-7. Call `EpisodeReleaseManager.RecoverAtStartup()` before opening any episode session or beginning any install.
+6. Create a second `UIDocument` GameObject for `MessengerScreen.uxml`, assign `MessengerScreen.uss`, and attach `MessengerScreenController`.
+7. Assign both view controllers to `NightwireApplicationRoot`. The root keeps the messenger hidden until a session opens. On archive Play, it opens/resumes the episode session, binds the messenger to `EpisodeSessionHost`, hides the archive, and shows the conversation screen.
+8. The messenger reads localized text and choices directly from the verified package, displays only messages delivered by the conversation runtime, marks them read, and previews unlocked manifest-verified image assets. The back-to-archive button saves/closes the session before releasing the access lease.
+9. Call `EpisodeReleaseManager.RecoverAtStartup()` before opening any episode session or beginning any install.
 
 The repository contains bootstrap/session-host integration source and an Android StrongBox provider implementation, but does not yet contain a complete Unity project, scene, Panel Settings asset, Android Player Settings, a built AAR, or a verified Unity import of the runtime assembly. These files are integration source/assets, not a claim that an Editor scene has already been run.
 
@@ -69,7 +74,16 @@ Use one shared `EpisodeAccessCoordinator` instance for both the library manager 
 
 This makes the session-start versus install-start decision atomic inside the process. Multi-process coordination is not implemented; the mobile game host should be a single process and serialize lifecycle calls on its main thread.
 
-## UI behavior
+## Messenger screen behavior
+
+- `MessengerScreenController` binds to the active `RuntimeSessionCoordinator` through `EpisodeSessionHost`; it does not own story state.
+- It begins the active authored conversation when needed and advances its deterministic clock from Unity frame time. The runtime persists only at message-delivery boundaries, avoiding a save-file write on every rendered frame; partial delay is checkpointed on application pause/close.
+- Only delivered messages are rendered. Marking a message read routes the `message_completed` trigger through the runtime.
+- Choice buttons are created from the current message's authored `options` array and call `SelectChoice`; no dialogue or choice text is hardcoded in the screen.
+- Text/system/choice messages are localized using the episode's default locale. Unlocked image assets are opened through `EpisodeAssetResolver` and checked against their manifest before inline preview. Audio/video attachments and call invitations currently render as identified placeholders; playback and dedicated call UI are not implemented.
+- The back action saves and closes the session, releases the session lease, and returns to the archive.
+
+## Archive UI behavior
 
 - Refresh requests a signed catalogue refresh; a failed refresh leaves the last accepted catalogue visible.
 - Episode rows distinguish downloadable, installed/offline, update available, installed-but-unlisted, and invalid local packages.
