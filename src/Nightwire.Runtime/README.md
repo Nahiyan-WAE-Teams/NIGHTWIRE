@@ -42,7 +42,7 @@ A dependency-free console test harness is available:
 dotnet run --project tests/Nightwire.Runtime.Tests
 ```
 
-It covers episode-start execution, one-shot idempotency, atomic rejection of invalid action batches, and typed asset/call commands. It has not been executed in this environment.
+It covers episode-start execution, one-shot idempotency, atomic rejection of invalid action batches, typed asset/call commands, sample package loading, tamper/unlisted-file rejection, and minimum-runtime compatibility. It has not been executed in this environment.
 
 ## Official compatibility references
 
