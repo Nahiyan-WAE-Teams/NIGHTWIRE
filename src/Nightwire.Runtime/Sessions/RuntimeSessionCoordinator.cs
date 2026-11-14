@@ -283,10 +283,25 @@ namespace Nightwire.Runtime.Sessions
             return Persist(Success());
         }
 
+        /// <summary>Raised after the runtime has cleared its active package and progress.</summary>
+        public event Action? SessionClosed;
+
         public void CloseSession()
         {
+            bool wasActive = IsActive;
             Package = null;
             Progress = null;
+            if (!wasActive) return;
+
+            // A host may own an exclusive episode-installation lease for this session.
+            // One faulty observer must not prevent the runtime from completing shutdown.
+            var handlers = SessionClosed;
+            if (handlers == null) return;
+            foreach (Action handler in handlers.GetInvocationList())
+            {
+                try { handler(); }
+                catch { /* Session state is already closed; observers cannot reverse it. */ }
+            }
         }
 
         private RuntimeSessionResult ProcessAndPersist(LoadedEpisodePackage package, EpisodeProgressState state, StoryTrigger trigger)
