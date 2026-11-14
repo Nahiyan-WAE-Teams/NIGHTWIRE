@@ -915,30 +915,32 @@ internal static class Program
         Assert(!rollback.Success && rollback.ErrorCode == "catalogue_rollback", "Old catalogue sequence was accepted.");
 
         string duplicateEnvelope = envelopeText.Replace(
-            "\\"key_id\\":\\"release-2026\\"",
-            "\\"key_id\\":\\"release-2026\\",\\"key_id\\":\\"release-2026\\"");
+            @"""key_id"":""release-2026""",
+            @"""key_id"":""release-2026"",""key_id"":""release-2026""");
         var duplicateEnvelopeResult = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(duplicateEnvelope), DateTime.UtcNow);
         Assert(!duplicateEnvelopeResult.Success, "Duplicate envelope properties were accepted.");
 
-        string duplicatePayloadText = payloadText.Replace("\\"sequence\\":7", "\\"sequence\\":7,\\"sequence\\":7");
+        string duplicatePayloadText = payloadText.Replace(@"""sequence"":7", @"""sequence"":7,""sequence"":7");
         byte[] duplicatePayload = System.Text.Encoding.UTF8.GetBytes(duplicatePayloadText);
         byte[] duplicateSignature = key.SignData(duplicatePayload, HashAlgorithmName.SHA256,
             DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
-        string duplicatePayloadEnvelope = "{\\"key_id\\":\\"release-2026\\",\\"algorithm\\":\\"ECDSA-P256-SHA256\\",\\"payload\\":\\"" +
-            Convert.ToBase64String(duplicatePayload) + "\\",\\"signature\\":\\"" +
-            Convert.ToBase64String(duplicateSignature) + "\\"}";
+        string duplicatePayloadEnvelope = string.Concat(
+            "{\"key_id\":\"release-2026\",\"algorithm\":\"ECDSA-P256-SHA256\",\"payload\":\"",
+            Convert.ToBase64String(duplicatePayload), "\",\"signature\":\"",
+            Convert.ToBase64String(duplicateSignature), "\"}");
         var duplicatePayloadResult = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(duplicatePayloadEnvelope), DateTime.UtcNow);
         Assert(!duplicatePayloadResult.Success, "Duplicate signed-payload properties were accepted.");
 
         string invalidRuntimePayloadText = payloadText.Replace(
-            "\\"minimum_runtime_version\\":\\"1.0.0\\"",
-            "\\"minimum_runtime_version\\":\\"1.0\\"");
+            @"""minimum_runtime_version"":""1.0.0""",
+            @"""minimum_runtime_version"":""1.0""");
         byte[] invalidRuntimePayload = System.Text.Encoding.UTF8.GetBytes(invalidRuntimePayloadText);
         byte[] invalidRuntimeSignature = key.SignData(invalidRuntimePayload, HashAlgorithmName.SHA256,
             DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
-        string invalidRuntimeEnvelope = "{\\"key_id\\":\\"release-2026\\",\\"algorithm\\":\\"ECDSA-P256-SHA256\\",\\"payload\\":\\"" +
-            Convert.ToBase64String(invalidRuntimePayload) + "\\",\\"signature\\":\\"" +
-            Convert.ToBase64String(invalidRuntimeSignature) + "\\"}";
+        string invalidRuntimeEnvelope = string.Concat(
+            "{\"key_id\":\"release-2026\",\"algorithm\":\"ECDSA-P256-SHA256\",\"payload\":\"",
+            Convert.ToBase64String(invalidRuntimePayload), "\",\"signature\":\"",
+            Convert.ToBase64String(invalidRuntimeSignature), "\"}");
         var invalidRuntimeResult = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(invalidRuntimeEnvelope), DateTime.UtcNow);
         Assert(!invalidRuntimeResult.Success && invalidRuntimeResult.ErrorCode == "runtime_version_invalid",
             "Malformed minimum runtime version was accepted.");
