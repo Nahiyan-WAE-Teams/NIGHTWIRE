@@ -1,0 +1,19 @@
+# .NET build output
+**/bin/
+**/obj/
+.vs/
+TestResults/
+
+# Python test/runtime output
+__pycache__/
+*.py[cod]
+.venv/
+
+# Unity-generated folders (when the Unity project is added)
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
