@@ -42,7 +42,7 @@ A dependency-free console test harness is available:
 dotnet run --project tests/Nightwire.Runtime.Tests
 ```
 
-The harness currently registers 35 test cases covering story events, package loading, conversations, saves/migrations, prerecorded call timelines, minigames, unlocked asset access, staged ZIP installation/update, ZIP traversal rejection, HTTPS download hash verification, signed release signature/sequence verification, interrupted-install startup recovery, signed release identity mismatch protection, and signed catalogue-to-offline-install orchestration. Test/build execution remains deferred; no passing result is claimed.
+The harness currently registers 36 test cases covering story events, package loading, conversations, saves/migrations, prerecorded call timelines, minigames, unlocked asset access, staged ZIP installation/update, ZIP traversal rejection, HTTPS download hash verification, signed release signature/sequence verification, interrupted-install startup recovery, signed release identity mismatch protection, and signed catalogue-to-offline-install orchestration, and per-episode session/install exclusion. Test/build execution remains deferred; no passing result is claimed.
 
 ## Official compatibility references
 
@@ -180,3 +180,12 @@ Call `EpisodePackageInstaller.RecoverInterruptedInstalls` once at app startup, b
 - `RecoverAtStartup` must run before sessions and installs are opened.
 
 The host must implement `IEpisodeInstallLeaseProvider` so lease acquisition is atomic with session start/close; a simple check of `RuntimeSessionCoordinator.IsActive` is not sufficient to prevent a race. The host also supplies a numeric runtime version, trusted release keys, protected sequence storage, persistent paths, and lifecycle ownership. The manager does not render UI, auto-update in the background, delete player saves, or permit replacing an episode while it is in use. Catalogue state is currently in memory and must be refreshed after app launch; offline play relies on already installed, locally verified packages.
+
+
+## Episode library presentation boundary
+
+`Installation/EpisodeLibraryPresentation.cs` exposes immutable UI snapshots, catalogue state, per-episode status, download byte progress, cancellation, and install/update operations without depending on Unity. Construct it on the Unity main thread so its `Progress<T>` and `Changed` callbacks return to that synchronization context. A UI host should subscribe while enabled and unsubscribe while disabled; it owns the presentation model lifecycle.
+
+`Installation/EpisodeAccessCoordinator.cs` implements the manager's install lease provider and also exposes session leases. The host must acquire a session lease before starting/resuming `RuntimeSessionCoordinator`, hold it until after `CloseSession`, then dispose it. Pass the same coordinator instance to `EpisodeReleaseManager`. This serializes session-open and install-open operations atomically within one process.
+
+Unity UI Toolkit integration source and setup notes are under `unity/Assets/Nightwire` and `docs/architecture/UNITY_EPISODE_LIBRARY_UI.md`. The view raises `PlayEpisodeRequested`; the host remains responsible for starting/resuming gameplay. Unity Editor import, runtime assembly dependency integration, play-mode validation, and Android IL2CPP verification have not been completed.
