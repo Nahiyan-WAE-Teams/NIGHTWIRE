@@ -1,0 +1,37 @@
+{
+  "schema_version": "0.1",
+  "episode_id": "nightwire.ep001",
+  "files": [
+    {
+      "path": "episode.json",
+      "kind": "episode_descriptor",
+      "size_bytes": 345,
+      "sha256": "5702890889e6e1488ce204ff5c4cd310154ab4ebb92756b1d0d937427ff8f16a"
+    },
+    {
+      "path": "Characters/Anisha/profile.json",
+      "kind": "character_profile",
+      "size_bytes": 278,
+      "sha256": "4a66e54c8b82046dd547fe6f1d7f57ebfd4916293dd70e656c40e404cc2cdbc4"
+    },
+    {
+      "path": "Characters/Anisha/Conversations/day01.json",
+      "kind": "conversation",
+      "size_bytes": 1165,
+      "sha256": "aa2499c5f8333208fedc7f32cda9b78e30ddc926688c629081fc16d5ed33c62f"
+    },
+    {
+      "path": "Events/episode_start.json",
+      "kind": "event",
+      "size_bytes": 224,
+      "sha256": "89df68e93672a0338007472242b6f9544b273493dd3c7a1265bcb03a33b860c3"
+    },
+    {
+      "path": "Localization/en.json",
+      "kind": "localization",
+      "size_bytes": 667,
+      "sha256": "3a72e1e5eb7fab7d0699dbfc138b728d8eaebed84176d57c8827a465643f5518"
+    }
+  ],
+  "assets": []
+}
