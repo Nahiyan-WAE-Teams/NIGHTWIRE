@@ -10,6 +10,7 @@ namespace Nightwire.Runtime.Conversations
     public sealed class ConversationRuntimeResult
     {
         public bool Success { get; internal set; }
+        public bool YieldedAtSafetyLimit { get; internal set; }
         public string? Error { get; internal set; }
         public List<string> NewlyDeliveredMessageIds { get; } = new List<string>();
         public List<StoryExecutionResult> StoryResults { get; } = new List<StoryExecutionResult>();
@@ -113,7 +114,12 @@ namespace Nightwire.Runtime.Conversations
                 }
             }
 
-            if (safety <= 0) return Fail(result, "Conversation exceeded the safe message-advance limit.");
+            if (safety <= 0)
+            {
+                result.YieldedAtSafetyLimit = true;
+                result.Success = true;
+                return result;
+            }
             if (progress.NextMessageId == null && progress.WaitingChoiceMessageId == null)
                 progress.IsComplete = true;
 
