@@ -71,6 +71,16 @@ internal static class Program
         using var manifestDoc = await ReadJsonAsync(manifestPath, "manifest.json");
         if (episodeDoc is null || manifestDoc is null) return;
 
+        var schemaDirectory = SchemaContractValidator.FindSchemaDirectory(root, Environment.CurrentDirectory, AppContext.BaseDirectory);
+        if (schemaDirectory is null)
+        {
+            Errors.Add("Could not locate schemas/0.1. Run the validator from the NIGHTWIRE repository or provide the schema directory in the repository checkout.");
+            return;
+        }
+
+        SchemaContractValidator.Validate(schemaDirectory, "episode.schema.json", episodePath, "episode.json", Errors.Add);
+        SchemaContractValidator.Validate(schemaDirectory, "manifest.schema.json", manifestPath, "manifest.json", Errors.Add);
+
         var episode = episodeDoc.RootElement;
         var manifest = manifestDoc.RootElement;
         RequireString(episode, "schema_version", "episode.json", SupportedSchemaVersion);
@@ -117,6 +127,10 @@ internal static class Program
         {
             var fullPath = SafeCombine(root, file.Path);
             if (fullPath is null || !File.Exists(fullPath)) continue;
+
+            string? schemaFile = SchemaContractValidator.SchemaForKind(file.Kind);
+            if (schemaFile != null)
+                SchemaContractValidator.Validate(schemaDirectory, schemaFile, fullPath, file.Path, Errors.Add);
 
             switch (file.Kind)
             {
