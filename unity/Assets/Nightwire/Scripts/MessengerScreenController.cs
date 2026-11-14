@@ -138,6 +138,11 @@ namespace Nightwire.Unity.UI
             RenderConversation();
         }
 
+        public void UnbindForSessionClose()
+        {
+            Unbind();
+        }
+
         private void Unbind()
         {
             if (bound && backButton != null)
