@@ -47,6 +47,7 @@ internal static class Program
         Run("save store detects episode-version metadata tampering", SaveStoreRejectsMetadataTampering, ref failures);
         Run("save store applies an explicit episode migration", SaveStoreMigratesEpisodeVersion, ref failures);
         Run("session coordinator starts an episode and persists its entry event", SessionStartsAndPersists, ref failures);
+        Run("runtime session close notifies hosts once and isolates observer failures", RuntimeSessionCloseNotifiesHosts, ref failures);
         Run("session coordinator resumes conversation progress", SessionResumesConversation, ref failures);
         Run("conversation delay ticks do not write a save every frame", ConversationDelayTicksAvoidSaveWrites, ref failures);
         Run("session coordinator prevents accidental new-game overwrite", SessionPreventsOverwrite, ref failures);
@@ -611,6 +612,31 @@ internal static class Program
             Assert(File.Exists(store.GetSavePath("nightwire.ep001")), "New session was not saved.");
         }
         finally { if (Directory.Exists(saves)) Directory.Delete(saves, true); }
+    }
+
+    private static void RuntimeSessionCloseNotifiesHosts()
+    {
+        string episode = CopySamplePackage();
+        string saves = Path.Combine(Path.GetTempPath(), "nightwire-session-close-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var coordinator = new RuntimeSessionCoordinator(new SaveStore(saves));
+            Assert(coordinator.StartNewSession(episode).Success, "Session did not start.");
+            int notifications = 0;
+            coordinator.SessionClosed += () => throw new InvalidOperationException("Observer failure must be isolated.");
+            coordinator.SessionClosed += () => notifications++;
+
+            coordinator.CloseSession();
+            coordinator.CloseSession();
+
+            Assert(!coordinator.IsActive, "CloseSession retained active runtime state.");
+            Assert(notifications == 1, "SessionClosed must notify observers exactly once for an active session.");
+        }
+        finally
+        {
+            if (Directory.Exists(episode)) Directory.Delete(episode, true);
+            if (Directory.Exists(saves)) Directory.Delete(saves, true);
+        }
     }
 
     private static void SessionResumesConversation()
