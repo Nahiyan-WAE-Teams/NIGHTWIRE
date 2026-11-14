@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Nightwire.Runtime.Domain;
+using Nightwire.Unity;
 using Nightwire.Runtime.Sessions;
 using UnityEngine;
 using UnityEngine.UIElements;
