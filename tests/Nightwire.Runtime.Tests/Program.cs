@@ -497,9 +497,9 @@ internal static class Program
         Assert(runtime.Start(package, state, "call.test").Success, "Call did not start.");
         var first = runtime.Advance(package, state, "call.test", 600, "en");
         Assert(first.Success && first.Cues.Count == 1, "Cue was not emitted.");
-        Assert(first.Subtitles.Count == 0, "Subtitle fired too early.");
+        Assert(first.Subtitles.Count == 1, "Subtitle did not appear at its authored start time.");
         var second = runtime.Advance(package, state, "call.test", 200, "en");
-        Assert(second.Subtitles.Count == 1, "Subtitle was not emitted.");
+        Assert(second.Subtitles.Count == 0, "Subtitle was emitted more than once.");
         var final = runtime.Advance(package, state, "call.test", 1200, "en");
         Assert(final.Completed && final.ElapsedMilliseconds == 2000, "Call did not complete.");
     }
@@ -527,6 +527,7 @@ internal static class Program
             var state = CreateState();
             var call = new CallProgressState { ElapsedMilliseconds = 1250 };
             call.FiredCueIds.Add("cue.one");
+            call.FiredSubtitleIds.Add("en|0|700|call.line");
             state.CallProgress.Add("call.one", call);
             var game = new MinigameProgressState { AttemptsUsed = 2, ElapsedSeconds = 14.5, IsComplete = true };
             game.SequenceInput.AddRange(new[] { "low", "high" });
@@ -535,7 +536,8 @@ internal static class Program
             store.Save(state);
             var loaded = store.Load(state.EpisodeId, state.EpisodeVersion).State;
             Assert(loaded.CallProgress["call.one"].ElapsedMilliseconds == 1250 &&
-                loaded.CallProgress["call.one"].FiredCueIds.Contains("cue.one"), "Call timeline did not round-trip.");
+                loaded.CallProgress["call.one"].FiredCueIds.Contains("cue.one") &&
+                loaded.CallProgress["call.one"].FiredSubtitleIds.Contains("en|0|700|call.line"), "Call timeline did not round-trip.");
             Assert(loaded.MinigameProgress["game.one"].AttemptsUsed == 2 &&
                 loaded.MinigameProgress["game.one"].IsComplete &&
                 loaded.MinigameProgress["game.one"].SequenceInput.SequenceEqual(new[] { "low", "high" }),
