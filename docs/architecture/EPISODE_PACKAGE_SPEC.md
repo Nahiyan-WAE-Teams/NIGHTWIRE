@@ -497,6 +497,7 @@ The initial implementation supports:
 - Ordered message delivery for all currently defined message document types; media rendering remains a presentation-layer responsibility.
 - Pausing at a choice, validating the selected option, and following its explicit branch or authored sequential order.
 - Persisting delivered IDs, read IDs, selected options, current/next message IDs, and partially elapsed delay.
+- Applying authored choice `set_flags` as true-valued story flags and accumulating `relationship_delta` against the choice message's sender.
 - Emitting `message_completed` when a delivered message is marked read and `choice_selected` after a valid choice.
 
-The interpreter does not provide free-form player replies, a Unity typing indicator, wall-clock scheduling, save-file serialization/migration, or UI rendering. Those remain host/runtime integration work. The C# runtime tests have been authored but have not yet been executed in this environment.
+The interpreter does not provide free-form player replies, a Unity typing indicator, wall-clock scheduling, save-file serialization/migration, or UI rendering. Relationship values are accumulated without a global cap because the v0.1 format does not define one. Those remain host/runtime integration work. The C# runtime tests have been authored but have not yet been executed in this environment.
