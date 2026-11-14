@@ -1172,11 +1172,15 @@ internal static class Program
             Path.Combine(Path.GetTempPath(), "nightwire-dispose-download"),
             transport, acceptance, new StubInstallLeaseProvider(), "1.0.0");
         Task<ReleaseCatalogueResult> refresh = manager.RefreshCatalogueAsync(DateTime.UtcNow);
+        Task<ReleaseCatalogueResult> waitingRefresh = manager.RefreshCatalogueAsync(DateTime.UtcNow);
         manager.Dispose();
         transport.Complete(Array.Empty<byte>());
         var result = refresh.GetAwaiter().GetResult();
+        var waitingResult = waitingRefresh.GetAwaiter().GetResult();
         Assert(!result.Success && result.ErrorCode == "catalogue_fetch_cancelled",
             "A transport that completed after shutdown was not cancelled before catalogue acceptance.");
+        Assert(!waitingResult.Success && waitingResult.ErrorCode == "catalogue_fetch_cancelled",
+            "A refresh waiting on the serialization gate did not cancel safely during shutdown.");
         Assert(sequenceStore.LoadHighestAcceptedSequence() == 0,
             "A catalogue sequence was persisted after the release manager had been disposed.");
     }
