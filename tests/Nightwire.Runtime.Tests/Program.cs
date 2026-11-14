@@ -949,10 +949,13 @@ internal static class Program
         byte[] invalidTimestampPayload = System.Text.Encoding.UTF8.GetBytes(invalidTimestampPayloadText);
         byte[] invalidTimestampSignature = key.SignData(invalidTimestampPayload, HashAlgorithmName.SHA256,
             DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
-        string invalidTimestampEnvelope = string.Concat(
-            "{\\"key_id\\":\\"release-2026\\",\\"algorithm\\":\\"ECDSA-P256-SHA256\\",\\"payload\\":\\"",
-            Convert.ToBase64String(invalidTimestampPayload), "\\",\\"signature\\":\\"",
-            Convert.ToBase64String(invalidTimestampSignature), "\\"}");
+        string invalidTimestampEnvelope = JsonSerializer.Serialize(new
+        {
+            key_id = "release-2026",
+            algorithm = "ECDSA-P256-SHA256",
+            payload = Convert.ToBase64String(invalidTimestampPayload),
+            signature = Convert.ToBase64String(invalidTimestampSignature)
+        });
         var invalidTimestampResult = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(invalidTimestampEnvelope), DateTime.UtcNow);
         Assert(!invalidTimestampResult.Success, "A catalogue timestamp without an explicit UTC offset was accepted.");
 
