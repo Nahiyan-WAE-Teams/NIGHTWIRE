@@ -620,17 +620,23 @@ internal static class Program
         string saves = Path.Combine(Path.GetTempPath(), "nightwire-session-close-" + Guid.NewGuid().ToString("N"));
         try
         {
-            var coordinator = new RuntimeSessionCoordinator(new SaveStore(saves));
+            var options = new SaveStoreOptions();
+            var coordinator = new RuntimeSessionCoordinator(new SaveStore(saves, options));
             Assert(coordinator.StartNewSession(episode).Success, "Session did not start.");
             int notifications = 0;
             coordinator.SessionClosed += () => throw new InvalidOperationException("Observer failure must be isolated.");
             coordinator.SessionClosed += () => notifications++;
 
-            coordinator.CloseSession();
-            coordinator.CloseSession();
+            // Force the next persistence operation to fail after the session has become active.
+            options.MaximumSaveBytes = 1;
+            RuntimeSessionResult failedSave = coordinator.SaveNow();
 
-            Assert(!coordinator.IsActive, "CloseSession retained active runtime state.");
-            Assert(notifications == 1, "SessionClosed must notify observers exactly once for an active session.");
+            Assert(!failedSave.Success && failedSave.ErrorCode == "save_too_large",
+                "The controlled save failure was not reported.");
+            Assert(!coordinator.IsActive, "A failed save did not close the runtime session.");
+            Assert(notifications == 1, "A failed save must notify hosts exactly once.");
+            coordinator.CloseSession();
+            Assert(notifications == 1, "Closing an already inactive session emitted another notification.");
         }
         finally
         {
