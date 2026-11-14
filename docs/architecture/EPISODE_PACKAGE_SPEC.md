@@ -5,7 +5,7 @@
 - Last updated: 2026-11-14
 - Scope: authored episode content and its relationship to runtime/player data
 
-This document defines the first proposed package contract. It is deliberately a content format, not executable game code. It must be reviewed and tested with sample packages before the runtime loader is implemented.
+This document defines the first proposed package contract. It is deliberately a content format, not executable game code. The package loader and first conversation interpreter now exist as initial implementations; the format remains draft until full schema validation, runtime tests, and package review are complete.
 
 ## 1. Design goals
 
@@ -213,7 +213,10 @@ Rules:
 - Every sender_id must identify a declared participant or the system.
 - Every asset_id must exist in the manifest.
 - Every next_message_id must resolve, or be explicitly null for an end.
-- Delays are presentation hints, not authoritative real-time timers.
+- Delays are presentation hints, not authoritative real-time timers. The host advances them through deterministic runtime ticks; the game UI owns actual wall-clock scheduling and typing presentation.
+- A choice pauses the conversation. An omitted `next_message_id` continues in authored order; an explicit string jumps to that message; explicit `null` ends the conversation.
+- The runtime stores delivery/read state and selected options in player save data, never in the package.
+- `message_completed` is emitted when a delivered message is marked read. `choice_selected` is emitted after a valid option is chosen.
 - The runtime must not execute arbitrary code from episode data.
 
 ## 7. Events and story progression
@@ -482,3 +485,18 @@ Before exposing the package to the runtime, it currently:
 - Produces a `LoadedEpisodePackage` and typed `EpisodeRuntimeDefinition` only after validation succeeds.
 
 This loader is not a complete JSON Schema Draft 2020-12 evaluator and does not authenticate the publisher. The release pipeline must still run the schema/semantic validator and verify signed release metadata before installation. The package is not considered trusted merely because its internal manifest hashes match.
+
+
+## 18. Conversation runtime implementation boundary
+
+The portable interpreter is in `src/Nightwire.Runtime/Conversations/ConversationRuntime.cs`. It consumes conversations from a verified `LoadedEpisodePackage` and mutates only the separate `EpisodeProgressState`.
+
+The initial implementation supports:
+- Starting or resuming a conversation by stable conversation ID.
+- Deterministic advancement using host-supplied elapsed seconds and authored `delay_seconds`.
+- Ordered message delivery for all currently defined message document types; media rendering remains a presentation-layer responsibility.
+- Pausing at a choice, validating the selected option, and following its explicit branch or authored sequential order.
+- Persisting delivered IDs, read IDs, selected options, current/next message IDs, and partially elapsed delay.
+- Emitting `message_completed` when a delivered message is marked read and `choice_selected` after a valid choice.
+
+The interpreter does not provide free-form player replies, a Unity typing indicator, wall-clock scheduling, save-file serialization/migration, or UI rendering. Those remain host/runtime integration work. The C# runtime tests have been authored but have not yet been executed in this environment.
