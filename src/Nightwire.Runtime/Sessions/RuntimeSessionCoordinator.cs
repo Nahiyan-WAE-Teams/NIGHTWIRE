@@ -237,6 +237,8 @@ namespace Nightwire.Runtime.Sessions
             if (!TryContext(out var package, out var state, out var failure)) return failure!;
             if (!string.Equals(state.PendingCallId, callId, StringComparison.Ordinal))
                 return Fail("call_not_pending", "The requested call is not the active pending call.");
+            if (!state.CallProgress.TryGetValue(callId, out var callProgress) || !callProgress.IsComplete)
+                return Fail("call_not_finished", "The prerecorded call timeline must reach its authored duration before completion.");
             state.PendingCallId = null;
             return ProcessAndPersist(package, state,
                 new StoryTrigger { Type = StoryTriggerType.CallEnded, ReferenceId = callId });
@@ -247,6 +249,8 @@ namespace Nightwire.Runtime.Sessions
             if (!TryContext(out var package, out var state, out var failure)) return failure!;
             if (!string.Equals(state.PendingMinigameId, minigameId, StringComparison.Ordinal))
                 return Fail("minigame_not_pending", "The requested minigame is not the active pending minigame.");
+            if (!state.MinigameProgress.TryGetValue(minigameId, out var minigameProgress) || !minigameProgress.IsComplete)
+                return Fail("minigame_not_solved", "The minigame must be solved through its runtime before completion.");
             state.PendingMinigameId = null;
             return ProcessAndPersist(package, state,
                 new StoryTrigger { Type = StoryTriggerType.MinigameCompleted, ReferenceId = minigameId });
