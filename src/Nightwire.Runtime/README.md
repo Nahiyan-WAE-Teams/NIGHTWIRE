@@ -133,3 +133,12 @@ The runtime test harness now includes session start, entry-event dispatch, resum
 - Attempts, elapsed time, sequence input, matched pairs, and solved state are persisted. Presentation, drag/drop controls, audio feedback, and animation remain Unity responsibilities.
 
 The runtime test harness now includes call cue/subtitle timing, call completion, sequence puzzle evaluation, and activity save round-tripping. These tests are authored but have not been executed.
+
+
+## Episode asset access
+
+`Assets/EpisodeAssetResolver.cs` resolves stable asset IDs from a loaded episode package for the Unity presentation layer. It distinguishes package presence from player access: an asset must be declared in the manifest and present in `EpisodeProgressState.UnlockedAssetIds` before it can be opened. Story `unlock_asset` actions populate that player-owned set.
+
+The resolver returns an `EpisodeAssetHandle` containing the stable ID, media type, MIME type, relative package path, byte length, and a read-only stream. It rechecks the canonical path, rejects symbolic links/reparse points and path traversal, enforces a configurable per-asset size limit, and recomputes the manifest SHA-256 before returning the stream. The original package file is never rewritten. The host must dispose each handle after media decoding or document viewing.
+
+This resolver does not download assets, extract archives, decode media, render UI, or choose implicit default unlocks. In schema 0.1, assets remain locked until an authored event explicitly unlocks them; future public/default asset policies should be explicit package metadata rather than inferred from folder names.
