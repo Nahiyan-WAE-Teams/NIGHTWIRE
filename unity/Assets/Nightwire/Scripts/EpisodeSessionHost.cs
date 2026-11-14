@@ -103,6 +103,26 @@ namespace Nightwire.Unity
             return new EpisodeSessionOpenResult { Success = true, SessionResult = result };
         }
 
+        public RuntimeSessionResult? SaveCheckpoint()
+        {
+            if (_session == null) return null;
+            RuntimeSessionResult result;
+            try
+            {
+                result = _session.SaveNow();
+            }
+            catch
+            {
+                ReleaseSession();
+                throw;
+            }
+
+            // The runtime closes itself when persistence fails. Do not retain a stale lease.
+            if (!result.Success && !_session.IsActive)
+                ReleaseSession();
+            return result;
+        }
+
         public EpisodeSessionCloseResult SaveAndClose()
         {
             if (_session == null)
@@ -120,10 +140,7 @@ namespace Nightwire.Unity
             }
             finally
             {
-                _session.CloseSession();
-                _session = null;
-                _sessionLease?.Dispose();
-                _sessionLease = null;
+                ReleaseSession();
             }
             return new EpisodeSessionCloseResult
             {
@@ -131,6 +148,14 @@ namespace Nightwire.Unity
                 ErrorCode = result.ErrorCode,
                 Error = result.Error
             };
+        }
+
+        private void ReleaseSession()
+        {
+            _session?.CloseSession();
+            _session = null;
+            _sessionLease?.Dispose();
+            _sessionLease = null;
         }
 
         private static EpisodeSessionOpenResult Failure(string code, string message) =>
