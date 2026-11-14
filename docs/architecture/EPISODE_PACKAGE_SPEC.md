@@ -557,3 +557,23 @@ The runtime provides a transport downloader and a local ZIP installer, independe
 The archive contract is ZIP with `episode.json`, `manifest.json`, and exactly the manifest-listed files. The manifest lists and hashes `episode.json`, but never lists itself. Directory entries are optional and ignored; all actual file entries must be declared.
 
 The installer does not perform release discovery, publisher authentication, save migration, or cloud synchronization. An archive's own manifest is not an authenticity mechanism because an attacker who can replace the archive can replace its manifest too. Production releases therefore require a separately trusted/signed catalogue containing the archive digest, episode identity/version, and signing-key policy. The app must coordinate installation with active sessions so it never swaps files currently in use. Updates do not automatically migrate saves; existing explicit `IEpisodeProgressMigration` rules remain responsible for content-version changes.
+
+
+## 22. Authenticated release catalogue
+
+The app obtains a release catalogue envelope from a release endpoint. The envelope has four fields: `key_id`, `algorithm` (fixed to `ECDSA-P256-SHA256`), Base64 `payload`, and Base64 `signature`. The signature is computed over the exact payload bytes using ECDSA P-256 with SHA-256 and IEEE-P1363 fixed-width signature encoding. The client verifies against a public key already trusted by the app; the envelope cannot introduce its own trusted key.
+
+Payload schema version 1 contains:
+- `sequence`: monotonically increasing catalogue revision
+- `issued_utc` and `expires_utc`: UTC validity window
+- `releases[]`: `episode_id`, `episode_version`, `archive_url`, `archive_size_bytes`, `archive_sha256`, and `minimum_runtime_version`
+
+The verifier rejects unknown keys/algorithms, invalid signatures, expired/future-issued catalogues, stale sequence numbers, duplicate release identities, unsafe IDs, non-HTTPS URLs, invalid archive sizes, and malformed digests. The host persists the highest accepted sequence and supplies it as the verifier's `minimumSequence` to prevent rollback across app restarts. The downloader's `DownloadReleaseAsync` method consumes only a verified release entry and enforces its signed archive size and SHA-256 before publishing the archive.
+
+The signing private key is release-infrastructure-only. The app ships trusted public keys. Key rotation is performed by an app update or a future root-signed keyset protocol; a catalogue must never be allowed to introduce a new trust root by itself.
+
+## 23. Interrupted-install startup recovery
+
+Before any episode session is opened or a new install begins, the host calls `RecoverInterruptedInstalls(installRoot)`. The recovery pass removes abandoned `.install-*` staging directories and inspects retained `.backup-{episodeId}-{guid}` directories. If the episode destination is missing, the newest backup is restored. If the destination already exists, the new validated installation is considered published and obsolete backups can be removed. Unsafe destinations and cleanup failures produce warnings and leave the backup intact.
+
+The operation is idempotent and repairs the known interruption window between moving the old install aside and moving the new staging directory into place. It is not a general filesystem transaction or protection against storage-device failure. The host must call it at startup under an install lock, before runtime sessions can access episode files.
