@@ -47,6 +47,11 @@ namespace Nightwire.Runtime.Installation
 
             using var request = new HttpRequestMessage(HttpMethod.Get, catalogueUri);
             using var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            Uri? responseUri = response.RequestMessage?.RequestUri;
+            if (responseUri == null || !responseUri.IsAbsoluteUri ||
+                responseUri.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(responseUri.UserInfo) ||
+                !Uri.Equals(responseUri, catalogueUri))
+                throw new InvalidOperationException("Release catalogue redirects are not allowed.");
             int status = (int)response.StatusCode;
             if (status >= 300 && status <= 399)
                 throw new InvalidOperationException("Release catalogue redirects are not allowed.");
