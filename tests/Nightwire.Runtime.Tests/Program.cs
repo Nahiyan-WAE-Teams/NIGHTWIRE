@@ -39,6 +39,7 @@ internal static class Program
         Run("choice effects update story flags and relationship scores", ConversationChoiceEffectsPersist, ref failures);
         Run("save store round-trips player progress", SaveStoreRoundTripsProgress, ref failures);
         Run("save store rejects a symlinked episode directory", SaveStoreRejectsSymlinkedEpisodeDirectory, ref failures);
+        Run("save store rejects a symlinked ancestor of its root", SaveStoreRejectsSymlinkedRootAncestor, ref failures);
         Run("save store recovers from a corrupt primary using backup", SaveStoreRecoversBackup, ref failures);
         Run("save store rejects a different episode identity", SaveStoreRejectsEpisodeMismatch, ref failures);
         Run("save store detects episode-version metadata tampering", SaveStoreRejectsMetadataTampering, ref failures);
@@ -61,6 +62,7 @@ internal static class Program
         Run("episode downloader verifies a trusted archive hash", EpisodeDownloaderChecksTrustedHash, ref failures);
         Run("signed release catalogue verifies signatures, rejects rollback, duplicate JSON keys, and malformed runtime versions", ReleaseCatalogueVerifiesSignatureAndSequence, ref failures);
         Run("installer startup recovery restores interrupted update backup", InstallerRecoveryRestoresPreviousInstall, ref failures);
+        Run("installer rejects a symlinked ancestor of its install root", InstallerRejectsSymlinkedRootAncestor, ref failures);
         Run("installer rejects signed release identity mismatch before replacing existing content", InstallerRejectsReleaseIdentityMismatch, ref failures);
         Run("release manager refreshes signed catalogue and installs offline episode", ReleaseManagerInstallsOfflineEpisode, ref failures);
         Run("episode access gate excludes session and installer ownership", EpisodeAccessGateExcludesSessionAndInstall, ref failures);
@@ -413,6 +415,32 @@ internal static class Program
             if (Directory.Exists(episodeDirectory)) Directory.Delete(episodeDirectory);
             if (Directory.Exists(outside)) Directory.Delete(outside, true);
             if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    private static void SaveStoreRejectsSymlinkedRootAncestor()
+    {
+        string parent = Path.Combine(Path.GetTempPath(), "nightwire-save-parent-" + Guid.NewGuid().ToString("N"));
+        string outside = Path.Combine(Path.GetTempPath(), "nightwire-save-outside-" + Guid.NewGuid().ToString("N"));
+        string linked = Path.Combine(parent, "linked");
+        string saveRoot = Path.Combine(linked, "saves");
+        Directory.CreateDirectory(parent);
+        Directory.CreateDirectory(outside);
+        try
+        {
+            Directory.CreateSymbolicLink(linked, outside);
+            bool rejected = false;
+            try { _ = new SaveStore(saveRoot); }
+            catch (SaveStoreException exception) { rejected = exception.ErrorCode == "save_path_unsafe"; }
+            Assert(rejected, "Save store accepted a linked ancestor directory.");
+            Assert(!Directory.Exists(Path.Combine(outside, "saves")),
+                "Save store created its root through a linked ancestor.");
+        }
+        finally
+        {
+            if (Directory.Exists(linked)) Directory.Delete(linked);
+            if (Directory.Exists(outside)) Directory.Delete(outside, true);
+            if (Directory.Exists(parent)) Directory.Delete(parent, true);
         }
     }
 
@@ -1102,6 +1130,32 @@ internal static class Program
                 "Rejected release replaced the previously installed episode.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void InstallerRejectsSymlinkedRootAncestor()
+    {
+        string parent = Path.Combine(Path.GetTempPath(), "nightwire-install-parent-" + Guid.NewGuid().ToString("N"));
+        string outside = Path.Combine(Path.GetTempPath(), "nightwire-install-outside-" + Guid.NewGuid().ToString("N"));
+        string linked = Path.Combine(parent, "linked");
+        string installRoot = Path.Combine(linked, "episodes");
+        Directory.CreateDirectory(parent);
+        Directory.CreateDirectory(outside);
+        try
+        {
+            Directory.CreateSymbolicLink(linked, outside);
+            bool rejected = false;
+            try { new EpisodePackageInstaller().RecoverInterruptedInstalls(installRoot); }
+            catch (IOException) { rejected = true; }
+            Assert(rejected, "Installer accepted a linked ancestor directory.");
+            Assert(!Directory.Exists(Path.Combine(outside, "episodes")),
+                "Installer created its root through a linked ancestor.");
+        }
+        finally
+        {
+            if (Directory.Exists(linked)) Directory.Delete(linked);
+            if (Directory.Exists(outside)) Directory.Delete(outside, true);
+            if (Directory.Exists(parent)) Directory.Delete(parent, true);
+        }
     }
 
     private static void InstallerRecoveryRestoresPreviousInstall()
