@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nightwire.game/episode/0.1/story-event.schema.json",
+  "title": "Story event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "trigger",
+    "actions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trigger": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "const": "episode_started"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "message_id"
+          ],
+          "properties": {
+            "type": {
+              "const": "message_completed"
+            },
+            "message_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "option_id"
+          ],
+          "properties": {
+            "type": {
+              "const": "choice_selected"
+            },
+            "option_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "call_id"
+          ],
+          "properties": {
+            "type": {
+              "const": "call_ended"
+            },
+            "call_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "minigame_id"
+          ],
+          "properties": {
+            "type": {
+              "const": "minigame_completed"
+            },
+            "minigame_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "conversation_id"
+            ],
+            "properties": {
+              "type": {
+                "const": "open_conversation"
+              },
+              "conversation_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "title_key",
+              "body_key"
+            ],
+            "properties": {
+              "type": {
+                "const": "show_notification"
+              },
+              "title_key": {
+                "type": "string"
+              },
+              "body_key": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "asset_id"
+            ],
+            "properties": {
+              "type": {
+                "const": "unlock_asset"
+              },
+              "asset_id": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "flag",
+              "value"
+            ],
+            "properties": {
+              "type": {
+                "const": "set_story_flag"
+              },
+              "flag": {
+                "type": "string"
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "call_id"
+            ],
+            "properties": {
+              "type": {
+                "const": "start_call"
+              },
+              "call_id": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "minigame_id"
+            ],
+            "properties": {
+              "type": {
+                "const": "start_minigame"
+              },
+              "minigame_id": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
