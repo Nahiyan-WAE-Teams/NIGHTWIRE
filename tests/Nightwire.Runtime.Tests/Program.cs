@@ -59,6 +59,20 @@ internal static class Program
     private static void InvalidBatchIsAtomic()
     {
         var episode = CreateEpisode();
+        var validSibling = new StoryEventDefinition
+        {
+            EventId = "event.valid_sibling",
+            TriggerType = StoryTriggerType.MessageCompleted,
+            TriggerReferenceId = "message.missing"
+        };
+        validSibling.Actions.Add(new StoryActionDefinition
+        {
+            Type = StoryActionType.SetStoryFlag,
+            Flag = "must_not_be_written",
+            Value = true
+        });
+        episode.Events.Add(validSibling);
+
         var invalidEvent = new StoryEventDefinition
         {
             EventId = "event.invalid",
