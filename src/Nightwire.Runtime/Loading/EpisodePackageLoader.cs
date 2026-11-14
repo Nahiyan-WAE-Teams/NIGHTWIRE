@@ -46,7 +46,7 @@ namespace Nightwire.Runtime.Loading
                     throw Fail("invalid_manifest_name", "Format 0.1 requires the manifest file to be named manifest.json.");
                 EnsureRuntimeCompatible(descriptor.MinimumRuntimeVersion, _options.RuntimeVersion);
 
-                manifestDocument = ReadJson(Path.Combine(root, descriptor.Manifest), _options.MaximumJsonFileBytes);
+                using JsonDocument manifestDocument = ReadJson(Path.Combine(root, descriptor.Manifest), _options.MaximumJsonFileBytes);
                 var manifest = ParseManifest(manifestDocument.RootElement);
                 if (!string.Equals(manifest.SchemaVersion, descriptor.SchemaVersion, StringComparison.Ordinal))
                     throw Fail("schema_mismatch", "Episode descriptor and manifest schema versions differ.");
@@ -365,6 +365,32 @@ namespace Nightwire.Runtime.Loading
                     throw Fail("event_call_missing", $"Event '{storyEvent.EventId}' references an unknown call.");
                 if (storyEvent.TriggerType == StoryTriggerType.MinigameCompleted && !runtime.MinigameIds.Contains(storyEvent.TriggerReferenceId ?? string.Empty))
                     throw Fail("event_minigame_missing", $"Event '{storyEvent.EventId}' references an unknown minigame.");
+            }
+
+            foreach (var storyEvent in runtime.Events)
+            {
+                foreach (var action in storyEvent.Actions)
+                {
+                    switch (action.Type)
+                    {
+                        case StoryActionType.OpenConversation:
+                            if (!runtime.ConversationIds.Contains(action.TargetId ?? string.Empty))
+                                throw Fail("event_conversation_missing", $"Event '{storyEvent.EventId}' opens an unknown conversation.");
+                            break;
+                        case StoryActionType.UnlockAsset:
+                            if (!runtime.AssetIds.Contains(action.TargetId ?? string.Empty))
+                                throw Fail("event_asset_missing", $"Event '{storyEvent.EventId}' unlocks an unknown asset.");
+                            break;
+                        case StoryActionType.StartCall:
+                            if (!runtime.CallIds.Contains(action.TargetId ?? string.Empty))
+                                throw Fail("event_call_missing", $"Event '{storyEvent.EventId}' starts an unknown call.");
+                            break;
+                        case StoryActionType.StartMinigame:
+                            if (!runtime.MinigameIds.Contains(action.TargetId ?? string.Empty))
+                                throw Fail("event_minigame_missing", $"Event '{storyEvent.EventId}' starts an unknown minigame.");
+                            break;
+                    }
+                }
             }
 
             ValidateLocalizationCoverage(package);
