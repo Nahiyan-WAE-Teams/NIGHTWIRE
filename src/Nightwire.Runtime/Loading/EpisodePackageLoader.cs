@@ -82,6 +82,9 @@ namespace Nightwire.Runtime.Loading
         {
             var listed = new Dictionary<string, EpisodeManifestFile>(StringComparer.OrdinalIgnoreCase);
             long totalBytes = 0;
+            // Reject linked directories before opening any manifest-listed file. A symlinked
+            // parent directory can otherwise make a lexically safe path resolve outside root.
+            var discovered = EnumerateFilesWithoutLinks(root);
             foreach (var entry in manifest.Files)
             {
                 ValidateRelativePath(entry.Path);
@@ -92,6 +95,7 @@ namespace Nightwire.Runtime.Loading
                 if (entry.SizeBytes < 0 || !IsSha256(entry.Sha256))
                     throw Fail("invalid_manifest_entry", $"Invalid size or SHA-256 for '{entry.Path}'.");
 
+                EnsureNoLinkComponents(root, entry.Path);
                 string fullPath = ResolveSafePath(root, entry.Path);
                 if (!File.Exists(fullPath))
                     throw Fail("missing_file", $"Manifest file is missing: '{entry.Path}'.");
@@ -115,7 +119,6 @@ namespace Nightwire.Runtime.Loading
                 }
             }
 
-            var discovered = EnumerateFilesWithoutLinks(root);
             foreach (string relative in discovered)
             {
                 if (string.Equals(relative, "manifest.json", StringComparison.OrdinalIgnoreCase)) continue;
@@ -131,6 +134,19 @@ namespace Nightwire.Runtime.Loading
             if (!listed.TryGetValue("episode.json", out var descriptorEntry) ||
                 !string.Equals(descriptorEntry.Kind, "episode_descriptor", StringComparison.Ordinal))
                 throw Fail("descriptor_not_manifested", "episode.json must be listed as episode_descriptor.");
+        }
+
+        private static void EnsureNoLinkComponents(string root, string relativePath)
+        {
+            string current = root;
+            foreach (string segment in relativePath.Split('/'))
+            {
+                current = Path.Combine(current, segment);
+                if (!File.Exists(current) && !Directory.Exists(current))
+                    return;
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                    throw Fail("unsafe_link", $"Symbolic links and reparse points are not allowed in path '{relativePath}'.");
+            }
         }
 
         private List<string> EnumerateFilesWithoutLinks(string root)
