@@ -80,6 +80,8 @@ namespace Nightwire.Runtime.Installation
                 string destination = Path.Combine(root, episodeId);
                 EnsureSafeEpisodeId(episodeId);
                 bool updated = Directory.Exists(destination);
+                if (updated && (File.GetAttributes(destination) & FileAttributes.ReparsePoint) != 0)
+                    throw Fail("unsafe_install_destination", "Existing episode destination cannot be a symbolic link or reparse point.");
                 if (File.Exists(destination))
                     throw Fail("install_destination_conflict", "Episode destination exists as a file.");
 
@@ -122,6 +124,7 @@ namespace Nightwire.Runtime.Installation
             catch (JsonException exception) { return Error("invalid_package_json", exception.Message); }
             catch (UnauthorizedAccessException exception) { return Error("install_access_denied", exception.Message); }
             catch (IOException exception) { return Error("install_io_failed", exception.Message); }
+            catch (Exception exception) { return Error("install_failed", exception.Message); }
             finally
             {
                 if (staging != null && Directory.Exists(staging))
