@@ -8,6 +8,8 @@ using Nightwire.Runtime.Progression;
 using Nightwire.Runtime.Conversations;
 using Nightwire.Runtime.Saves;
 using Nightwire.Runtime.Sessions;
+using Nightwire.Runtime.Calls;
+using Nightwire.Runtime.Minigames;
 
 internal static class Program
 {
@@ -33,6 +35,9 @@ internal static class Program
         Run("session coordinator starts an episode and persists its entry event", SessionStartsAndPersists, ref failures);
         Run("session coordinator resumes conversation progress", SessionResumesConversation, ref failures);
         Run("session coordinator prevents accidental new-game overwrite", SessionPreventsOverwrite, ref failures);
+        Run("prerecorded call timeline emits cues and completes", CallRuntimeAdvancesTimeline, ref failures);
+        Run("sequence minigame validates and solves authored input", MinigameRuntimeSolvesSequence, ref failures);
+        Run("save store round-trips call and minigame progress", SaveStoreRoundTripsActivities, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -477,6 +482,66 @@ internal static class Program
                 "Starting a new game overwrote an existing save.");
         }
         finally { if (Directory.Exists(saves)) Directory.Delete(saves, true); }
+    }
+
+
+    private static void CallRuntimeAdvancesTimeline()
+    {
+        string root = FindRepositoryRoot();
+        var package = new EpisodePackageLoader().Load(Path.Combine(root, "examples", "Episode_001"));
+        using var doc = JsonDocument.Parse("{""call_id"":""call.test"",""duration_ms"":2000,""cues"":[{""cue_id"":""cue.glitch"",""at_ms"":500,""type"":""visual_effect"",""effect"":""signal_glitch""}],""subtitle_tracks"":[{""locale"":""en"",""entries"":[{""start_ms"":0,""end_ms"":700,""text_key"":""call.line""}]}]}");
+        package.Calls["call.test"] = doc.RootElement.Clone();
+        var state = CreateState();
+        state.PendingCallId = "call.test";
+        var runtime = new CallRuntime();
+        Assert(runtime.Start(package, state, "call.test").Success, "Call did not start.");
+        var first = runtime.Advance(package, state, "call.test", 600, "en");
+        Assert(first.Success && first.Cues.Count == 1, "Cue was not emitted.");
+        Assert(first.Subtitles.Count == 0, "Subtitle fired too early.");
+        var second = runtime.Advance(package, state, "call.test", 200, "en");
+        Assert(second.Subtitles.Count == 1, "Subtitle was not emitted.");
+        var final = runtime.Advance(package, state, "call.test", 1200, "en");
+        Assert(final.Completed && final.ElapsedMilliseconds == 2000, "Call did not complete.");
+    }
+
+    private static void MinigameRuntimeSolvesSequence()
+    {
+        string root = FindRepositoryRoot();
+        var package = new EpisodePackageLoader().Load(Path.Combine(root, "examples", "Episode_001"));
+        var state = CreateState();
+        state.PendingMinigameId = "minigame.signal_sequence";
+        var runtime = new MinigameRuntime();
+        Assert(runtime.Start(package, state, "minigame.signal_sequence").Success, "Minigame did not start.");
+        var wrong = runtime.SubmitSequence(package, state, "minigame.signal_sequence", new[] { "high", "low", "low" });
+        Assert(wrong.Success && !wrong.Solved && wrong.AttemptsRemaining == 2, "Wrong sequence was not counted.");
+        var solved = runtime.SubmitSequence(package, state, "minigame.signal_sequence", new[] { "low", "high", "low" });
+        Assert(solved.Success && solved.Solved && state.MinigameProgress["minigame.signal_sequence"].IsComplete,
+            "Correct sequence did not solve the minigame.");
+    }
+
+    private static void SaveStoreRoundTripsActivities()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-save-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var state = CreateState();
+            var call = new CallProgressState { ElapsedMilliseconds = 1250 };
+            call.FiredCueIds.Add("cue.one");
+            state.CallProgress.Add("call.one", call);
+            var game = new MinigameProgressState { AttemptsUsed = 2, ElapsedSeconds = 14.5, IsComplete = true };
+            game.SequenceInput.AddRange(new[] { "low", "high" });
+            state.MinigameProgress.Add("game.one", game);
+            var store = new SaveStore(root);
+            store.Save(state);
+            var loaded = store.Load(state.EpisodeId, state.EpisodeVersion).State;
+            Assert(loaded.CallProgress["call.one"].ElapsedMilliseconds == 1250 &&
+                loaded.CallProgress["call.one"].FiredCueIds.Contains("cue.one"), "Call timeline did not round-trip.");
+            Assert(loaded.MinigameProgress["game.one"].AttemptsUsed == 2 &&
+                loaded.MinigameProgress["game.one"].IsComplete &&
+                loaded.MinigameProgress["game.one"].SequenceInput.SequenceEqual(new[] { "low", "high" }),
+                "Minigame progress did not round-trip.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
 
     private sealed class TestEpisodeMigration : IEpisodeProgressMigration
