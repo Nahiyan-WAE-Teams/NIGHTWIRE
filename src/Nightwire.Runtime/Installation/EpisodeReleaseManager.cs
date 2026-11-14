@@ -212,18 +212,19 @@ namespace Nightwire.Runtime.Installation
                     return CatalogueFailure("catalogue_fetch_failed", exception.Message);
                 }
 
-                // A transport may complete despite cancellation. Never advance the
-                // durable catalogue sequence after this manager has been shut down.
-                operationToken.ThrowIfCancellationRequested();
-                var accepted = _acceptance.Accept(envelope, utcNow);
-                if (accepted.Success && accepted.Catalogue != null)
+                // Linearize catalogue acceptance against manager disposal. Checking
+                // cancellation and persisting the accepted sequence must be one critical
+                // section, otherwise Dispose could race between the check and persistence.
+                lock (_gate)
                 {
-                    lock (_gate)
-                    {
-                        if (!_disposed) _catalogue = accepted.Catalogue;
-                    }
+                    if (_disposed || operationToken.IsCancellationRequested)
+                        return CatalogueFailure("catalogue_fetch_cancelled",
+                            "Release catalogue refresh was cancelled.");
+                    var accepted = _acceptance.Accept(envelope, utcNow);
+                    if (accepted.Success && accepted.Catalogue != null)
+                        _catalogue = accepted.Catalogue;
+                    return accepted;
                 }
-                return accepted;
             }
             catch (OperationCanceledException)
             {
