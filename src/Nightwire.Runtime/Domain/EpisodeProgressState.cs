@@ -14,6 +14,8 @@ namespace Nightwire.Runtime.Domain
         public string? PendingCallId { get; set; }
         public string? PendingMinigameId { get; set; }
 
+        public Dictionary<string, ConversationProgressState> ConversationProgress { get; } = new Dictionary<string, ConversationProgressState>(StringComparer.Ordinal);
+
         public HashSet<string> CompletedEventIds { get; } = new HashSet<string>(StringComparer.Ordinal);
         public HashSet<string> UnlockedAssetIds { get; } = new HashSet<string>(StringComparer.Ordinal);
         public Dictionary<string, StoryFlagValue> StoryFlags { get; } = new Dictionary<string, StoryFlagValue>(StringComparer.Ordinal);
