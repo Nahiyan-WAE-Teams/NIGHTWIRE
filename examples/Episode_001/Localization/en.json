@@ -1,0 +1,13 @@
+{
+  "episode.title": "The First Signal",
+  "episode.description": "A sample episode package for validating the NIGHTWIRE content format.",
+  "character.anisha.name": "Anisha",
+  "character.anisha.bio": "A sample character profile. Replace this text during story production.",
+  "character.anisha.status": "Online",
+  "chat.anisha.day01.001": "Are you awake?",
+  "choice.anisha.day01.002.prompt": "Can I tell you something?",
+  "choice.anisha.day01.002.ask": "Tell me what happened.",
+  "choice.anisha.day01.002.quiet": "Give me a moment.",
+  "chat.anisha.day01.003": "I found something strange near the railway line.",
+  "chat.anisha.day01.004": "Okay. I'll wait."
+}
