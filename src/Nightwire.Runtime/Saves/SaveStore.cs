@@ -57,8 +57,9 @@ namespace Nightwire.Runtime.Saves
             _options = options ?? new SaveStoreOptions();
             if (_options.MaximumSaveBytes <= 0 || _options.MaximumNotifications < 0 || _options.MaximumCollectionEntries <= 0)
                 throw new ArgumentOutOfRangeException(nameof(options), "Save limits must be positive.");
+            EnsureNotLink(_root, "save root or one of its parent directories");
             Directory.CreateDirectory(_root);
-            EnsureNotLink(_root, "save root");
+            EnsureNotLink(_root, "save root or one of its parent directories");
         }
 
         public void RegisterMigration(IEpisodeProgressMigration migration)
@@ -327,14 +328,23 @@ namespace Nightwire.Runtime.Saves
         private static string MigrationKey(string episodeId, string fromVersion) => episodeId + "\n" + fromVersion;
         private static void EnsureNotLink(string path, string description)
         {
-            try
+            string current = Path.GetFullPath(path);
+            while (!string.IsNullOrEmpty(current))
             {
-                if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-                    throw new SaveStoreException("save_path_unsafe",
-                        "Symbolic links and reparse points are not allowed for " + description + ".");
+                try
+                {
+                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                        throw new SaveStoreException("save_path_unsafe",
+                            "Symbolic links and reparse points are not allowed in " + description + ".");
+                }
+                catch (FileNotFoundException) { }
+                catch (DirectoryNotFoundException) { }
+
+                string? parent = Path.GetDirectoryName(current);
+                if (string.IsNullOrEmpty(parent) || string.Equals(parent, current, StringComparison.Ordinal))
+                    break;
+                current = parent;
             }
-            catch (FileNotFoundException) { }
-            catch (DirectoryNotFoundException) { }
         }
 
         private static string SafeEpisodeDirectory(string episodeId)
