@@ -9,11 +9,23 @@ This Android library implements `IReleaseCatalogueSequenceStore` through the Jav
 - Encrypts the accepted sequence with AES-GCM and binds ciphertext to the app namespace and key alias using authenticated additional data.
 - Serializes load and update operations at the Java class boundary so concurrent callers cannot race sequence reads, key rotation, and preference commits.
 - Validates the stored key alias against the generated UUID format before accessing AndroidKeyStore.
-- Treats an empty preference record as a first launch only when no NIGHTWIRE sequence key exists in AndroidKeyStore. If preferences are cleared or restored independently while a key remains, loading fails closed instead of resetting the sequence to zero. This implementation reserves one sequence namespace per app installation; a different configured namespace will also fail closed when an older NIGHTWIRE key remains.
+- Uses the fixed SharedPreferences file `nightwire_catalogue_sequence_v1.xml`. A fixed filename allows exact Android backup exclusions; Android backup rules do not support wildcard paths. The namespace remains authenticated in AES-GCM AAD, so changing it makes an existing record unreadable.
+- Treats an empty preference record as a first launch only when no NIGHTWIRE sequence key exists in AndroidKeyStore. If preferences are cleared or restored independently while a key remains, loading fails closed instead of resetting the sequence to zero.
 - Rotates the key for every accepted sequence. It deletes the previous hardware key before committing the new preference record. Replaying an old preferences snapshot then points to a key that has been deleted.
 - If StrongBox is unavailable, a key is missing, a record is corrupt, or persistence fails, the provider throws. It never silently falls back to plaintext or software-backed keys.
 
 This protects the sequence against ordinary app-data preference edits/restores, subject to the Android StrongBox implementation and device security state. It is not a substitute for a server-side monotonic release sequence or platform attestation against a fully compromised/rooted device. Catalogue signatures remain mandatory. A failed read must block accepting a new catalogue; do not reset the sequence to zero as a recovery shortcut.
+
+## Android backup integration
+
+The library manifest contributes both legacy `fullBackupContent` rules and Android 12+ `dataExtractionRules`. Both exclude the exact sequence preference file from cloud backup and device-to-device transfer. Android's backup documentation confirms that SharedPreferences are backed up by default, that these two rule sets cover the relevant OS/target-SDK combinations, and that path wildcards are unsupported.
+
+The final merged application manifest must retain these attributes:
+
+- `android:fullBackupContent="@xml/nightwire_backup_rules"`
+- `android:dataExtractionRules="@xml/nightwire_data_extraction_rules"`
+
+If the Unity host app already defines either attribute, merge its existing rules with the NIGHTWIRE exclusion rather than replacing the NIGHTWIRE exclusion. Verify the merged manifest and perform a real backup/restore test. AAR manifest merging and device-transfer behavior have not yet been verified in a Unity build.
 
 ## Build
 
@@ -30,7 +42,7 @@ The output AAR is under `build/outputs/aar/`. Import the AAR into the Unity proj
 - `com.nightwire.securestore.NightwireSequenceStore.loadSequence(Context, String): long`
 - `com.nightwire.securestore.NightwireSequenceStore.saveSequence(Context, String, long): void`
 
-The application manifest must not back up this preference file to another device. Even if an old encrypted preference snapshot is restored, the StrongBox key should be unavailable on a different device and the provider will fail closed. Do not add a backup exclusion that causes the sequence to be silently reset; inability to read the sequence must require an explicit recovery/reprovisioning path.
+The C# bridge intentionally does not catch and suppress `AndroidJavaException`; Java-side failures must propagate and block catalogue acceptance.
 
 ## Device verification still required
 
