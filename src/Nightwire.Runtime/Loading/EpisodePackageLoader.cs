@@ -191,6 +191,11 @@ namespace Nightwire.Runtime.Loading
                 using (JsonDocument document = ReadJson(fullPath, _options.MaximumJsonFileBytes))
                 {
                     JsonElement root = document.RootElement.Clone();
+                    if (file.Kind != "localization" &&
+                        (!root.TryGetProperty("schema_version", out var schemaVersion) ||
+                         schemaVersion.ValueKind != JsonValueKind.String ||
+                         !string.Equals(schemaVersion.GetString(), "0.1", StringComparison.Ordinal)))
+                        throw Fail("document_schema_mismatch", $"'{file.Path}' must declare schema_version 0.1.");
                     switch (file.Kind)
                     {
                         case "character_profile":
