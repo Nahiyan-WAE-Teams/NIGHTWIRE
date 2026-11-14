@@ -5,6 +5,7 @@
 - Runtime language: C#
 - Episode contract: v0.1 (draft; evolves with validator)
 - Purpose: define reusable client systems before implementing individual screens.
+- Initial code foundation: [portable C# runtime core](../../src/Nightwire.Runtime/README.md).
 
 ## 1. Runtime boundaries
 
