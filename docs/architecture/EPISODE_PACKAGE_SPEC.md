@@ -360,3 +360,20 @@ These decisions remain intentionally unresolved:
 - Whether episode updates can migrate existing save data automatically.
 
 Do not implement assumptions for these open decisions without recording and reviewing the decision first.
+
+
+## 15. Reference JSON Schemas and sample package
+
+Draft JSON Schema files for format 0.1 are stored in `schemas/0.1/`:
+- `episode.schema.json`
+- `manifest.schema.json`
+- `character-profile.schema.json`
+- `conversation.schema.json`
+- `event.schema.json`
+- `localization.schema.json`
+
+A small linked example package is stored in `examples/Episode_001/`. Its manifest includes the byte sizes and SHA-256 digests of each listed file; the manifest does not hash itself. The example intentionally has no media assets yet, so its asset list is empty.
+
+These schemas validate individual document shapes. They do not replace package-level semantic validation. A future validator must additionally check cross-file references, unique IDs across the episode, localization key coverage, manifest completeness, asset-to-file correspondence, and the event/message graph.
+
+See [JSON Schema Guide](JSON_SCHEMA_GUIDE.md) for the schema mapping and current validation boundary.
