@@ -80,3 +80,18 @@ The loader does not authenticate who published a package. A future installer mus
 - The runtime does not implement free-form player replies, live networking, or presentation/typing animations. UI code can render typing indicators using the same authored delay information without changing story state.
 
 The host should use the versioned `SaveStore` described below. Unity lifecycle integration and cloud synchronization are not yet implemented.
+
+
+## Versioned save store
+
+`Saves/SaveStore` persists player progress outside the episode package. Construct it with the game's persistent save root, then call `Save(state)` and `Load(episodeId, installedEpisodeVersion)`.
+
+- Save format version 1 uses a typed payload and SHA-256 integrity checksum over the exact serialized payload bytes.
+- Conversation delivery/read state, selected options, partial delays, story flags, relationships, unlocked assets, completed events, notifications, and pending actions are persisted.
+- A completed temporary file is flushed and atomically moved into place. The previous committed save is retained as `save.json.bak`.
+- If the primary save is invalid, loading attempts the last-known-good backup, restores it to the primary path, and reports `RecoveredFromBackup`.
+- Reads and writes enforce configurable file and collection limits; episode IDs are restricted before being used as directory names.
+- Episode content version mismatches are rejected unless explicit `IEpisodeProgressMigration` steps are registered. Migrations run in order and may not change episode identity.
+- Unknown save-format versions are rejected rather than guessed or silently rewritten.
+
+The checksum detects accidental corruption; it is not an authenticity signature and does not protect against a hostile device owner modifying local files. The store is synchronous and expects the host to serialize concurrent access to a given episode save. Cloud sync, encryption/key management, cross-device conflict resolution, and save-format migrations remain future work.
