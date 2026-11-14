@@ -222,8 +222,6 @@ namespace Nightwire.Runtime.Installation
                     throw new FormatException("Unknown catalogue property '" + property.Name + "' is not allowed.");
         }
 
-        private static bool IsAsciiLetterOrDigit(char c) =>
-            (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
         private static bool SafeId(string value) => value.Length >= 3 && value.Length <= 64 &&
             ((value[0] >= 'a' && value[0] <= 'z') || (value[0] >= '0' && value[0] <= '9')) &&
             value.All(c => (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-');
