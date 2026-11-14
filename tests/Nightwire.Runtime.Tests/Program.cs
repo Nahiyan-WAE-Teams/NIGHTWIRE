@@ -488,6 +488,7 @@ internal static class Program
             store.Save(state);
 
             File.WriteAllText(store.GetSavePath("nightwire.ep001"), "{corrupt");
+            File.WriteAllText(store.GetSavePath("nightwire.ep001") + ".restore.tmp", "stale interrupted restore");
             var loaded = store.Load("nightwire.ep001", "1.0.0");
             Assert(loaded.RecoveredFromBackup, "Load did not report backup recovery.");
             Assert(loaded.State.RelationshipScores["anisha"] == 1, "Backup did not restore the last known-good save.");
