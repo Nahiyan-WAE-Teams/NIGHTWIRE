@@ -541,3 +541,19 @@ The portable asset access layer is `src/Nightwire.Runtime/Assets/EpisodeAssetRes
 An opened asset is returned as a disposable handle with its ID, media type, MIME type, relative path, size, and read-only stream. Before returning content, the resolver rechecks the path under the canonical episode root, rejects path traversal and symbolic links/reparse points, applies a configurable per-asset size limit, and rechecks the manifest file size and SHA-256. It does not modify the original file.
 
 The resolver is a content-access boundary, not a media player or downloader. Unity adapters remain responsible for image/audio/video decoding, rendering, caching policy, and handle lifetime. Schema 0.1 has no implicit public/default asset flag: assets are locked until explicitly unlocked by story progression. If profile avatars or other assets should be visible from the beginning, the package format should gain an explicit, validated visibility policy rather than treating all packaged media as public.
+
+
+## 21. Download and installation lifecycle
+
+The runtime provides a transport downloader and a local ZIP installer, independent of Unity UI.
+
+1. The release catalogue supplies an HTTPS archive URL and, for production, a trusted SHA-256 digest (or signed release metadata).
+2. `EpisodePackageDownloader` streams the response to a temporary file, enforces a maximum download size, computes SHA-256 while writing, checks the optional trusted digest, and only then moves the completed archive to its destination. The built-in handler disables redirects. Injected HTTP clients must also disable automatic redirects.
+3. `EpisodePackageInstaller` opens the ZIP and validates entry names before writing anything. It rejects traversal, duplicate/case-colliding names, symbolic links, unlisted entries, missing manifest files, excessive entry counts, expanded-size excess, and configured compression-ratio excess.
+4. The installer reads the descriptor and manifest with bounded sizes, requires `episode.json` to be listed in the manifest, extracts each listed file to a fresh staging directory, and verifies the declared byte size and SHA-256 while streaming.
+5. The normal `EpisodePackageLoader` performs the full runtime compatibility and cross-reference validation against the staged package.
+6. A new package is published by moving staging into the episode-ID directory. An update first moves the previous complete directory to a temporary backup, then publishes the new validated directory; if publishing fails, it attempts to restore the previous install.
+
+The archive contract is ZIP with `episode.json`, `manifest.json`, and exactly the manifest-listed files. The manifest lists and hashes `episode.json`, but never lists itself. Directory entries are optional and ignored; all actual file entries must be declared.
+
+The installer does not perform release discovery, publisher authentication, save migration, or cloud synchronization. An archive's own manifest is not an authenticity mechanism because an attacker who can replace the archive can replace its manifest too. Production releases therefore require a separately trusted/signed catalogue containing the archive digest, episode identity/version, and signing-key policy. The app must coordinate installation with active sessions so it never swaps files currently in use. Updates do not automatically migrate saves; existing explicit `IEpisodeProgressMigration` rules remain responsible for content-version changes.
