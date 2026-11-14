@@ -132,7 +132,7 @@ namespace Nightwire.Runtime.Installation
             };
         }
 
-        public EpisodeInstallResult InstallArchive(string archivePath, string installRoot)
+        public EpisodeInstallResult InstallArchive(string archivePath, string installRoot, string? expectedEpisodeId = null, string? expectedEpisodeVersion = null)
         {
             string? staging = null;
             string? backup = null;
@@ -162,6 +162,10 @@ namespace Nightwire.Runtime.Installation
 
                 episodeId = loaded.Descriptor.EpisodeId;
                 episodeVersion = loaded.Descriptor.EpisodeVersion;
+                if (expectedEpisodeId != null && !string.Equals(episodeId, expectedEpisodeId, StringComparison.Ordinal))
+                    throw Fail("release_episode_identity_mismatch", "Package episode ID does not match the signed release entry.");
+                if (expectedEpisodeVersion != null && !string.Equals(episodeVersion, expectedEpisodeVersion, StringComparison.Ordinal))
+                    throw Fail("release_episode_version_mismatch", "Package episode version does not match the signed release entry.");
                 string destination = Path.Combine(root, episodeId);
                 EnsureSafeEpisodeId(episodeId);
                 bool updated = Directory.Exists(destination);
