@@ -47,6 +47,81 @@ namespace Nightwire.Runtime.Installation
                 throw new ArgumentOutOfRangeException(nameof(options), "Installer limits must be positive.");
         }
 
+        /// <summary>
+        /// Run once during startup, before opening episode sessions or starting another install.
+        /// Restores the newest backup when an update was interrupted after moving the old install.
+        /// </summary>
+        public EpisodeInstallRecoveryResult RecoverInterruptedInstalls(string installRoot)
+        {
+            var restored = new List<string>();
+            var warnings = new List<string>();
+            int removedStaging = 0;
+            int removedBackups = 0;
+            string root = Path.GetFullPath(installRoot);
+            Directory.CreateDirectory(root);
+            if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
+                throw new IOException("Install root cannot be a symbolic link or reparse point.");
+
+            foreach (string staging in Directory.GetDirectories(root, ".install-*", SearchOption.TopDirectoryOnly))
+            {
+                try
+                {
+                    if ((File.GetAttributes(staging) & FileAttributes.ReparsePoint) != 0) continue;
+                    Directory.Delete(staging, true);
+                    removedStaging++;
+                }
+                catch (Exception exception) { warnings.Add("Could not remove staging directory: " + exception.Message); }
+            }
+
+            var backupsByEpisode = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (string backup in Directory.GetDirectories(root, ".backup-*", SearchOption.TopDirectoryOnly))
+            {
+                string name = Path.GetFileName(backup);
+                if (name.Length <= 40 || !name.StartsWith(".backup-", StringComparison.Ordinal)) continue;
+                string suffix = name.Substring(name.Length - 33);
+                if (suffix[0] != '-' || !Guid.TryParseExact(suffix.Substring(1), "N", out _)) continue;
+                string episodeId = name.Substring(8, name.Length - 8 - 33);
+                try { EnsureSafeEpisodeId(episodeId); }
+                catch { continue; }
+                if ((File.GetAttributes(backup) & FileAttributes.ReparsePoint) != 0) continue;
+                if (!backupsByEpisode.TryGetValue(episodeId, out var list))
+                    backupsByEpisode.Add(episodeId, list = new List<string>());
+                list.Add(backup);
+            }
+
+            foreach (var pair in backupsByEpisode)
+            {
+                string destination = Path.Combine(root, pair.Key);
+                var backups = pair.Value.OrderByDescending(Directory.GetLastWriteTimeUtc).ToList();
+                try
+                {
+                    if (!Directory.Exists(destination))
+                    {
+                        Directory.Move(backups[0], destination);
+                        restored.Add(pair.Key);
+                        backups.RemoveAt(0);
+                    }
+                    foreach (string obsolete in backups)
+                    {
+                        try { Directory.Delete(obsolete, true); removedBackups++; }
+                        catch (Exception exception) { warnings.Add("Could not remove obsolete backup: " + exception.Message); }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    warnings.Add("Could not recover episode '" + pair.Key + "': " + exception.Message);
+                }
+            }
+
+            return new EpisodeInstallRecoveryResult
+            {
+                RestoredEpisodeIds = restored.AsReadOnly(),
+                RemovedStagingDirectories = removedStaging,
+                RemovedObsoleteBackups = removedBackups,
+                Warnings = warnings.AsReadOnly()
+            };
+        }
+
         public EpisodeInstallResult InstallArchive(string archivePath, string installRoot)
         {
             string? staging = null;
