@@ -40,9 +40,9 @@ namespace Nightwire.Unity
         {
             if (initialized) return true;
             if (libraryView == null) libraryView = FindObjectOfType<EpisodeLibraryViewController>();
-            if (libraryView == null || platformServices == null)
+            if (libraryView == null || messengerView == null || platformServices == null)
             {
-                Debug.LogError("NIGHTWIRE bootstrap requires an EpisodeLibraryViewController and a platform services provider.", this);
+                Debug.LogError("NIGHTWIRE bootstrap requires episode library and messenger view controllers plus a platform services provider.", this);
                 return false;
             }
             if (!Version.TryParse(runtimeVersion, out _))
@@ -127,12 +127,6 @@ namespace Nightwire.Unity
             if (!result.Success)
             {
                 Debug.LogWarning("NIGHTWIRE could not open episode: " + result.Error, this);
-                return;
-            }
-
-            if (messengerView == null)
-            {
-                Debug.LogWarning("NIGHTWIRE episode opened, but no MessengerScreenController is assigned.", this);
                 return;
             }
 
