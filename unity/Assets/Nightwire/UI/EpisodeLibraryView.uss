@@ -43,3 +43,17 @@
 .footer { flex-direction: row; align-items: center; justify-content: space-between; padding-top: 15px; border-top-width: 1px; border-top-color: rgb(35, 42, 61); margin-top: 12px; }
 .footer-copy { color: rgb(101, 114, 142); font-size: 8px; letter-spacing: 1px; }
 .footer-indicator { width: 6px; height: 6px; border-radius: 50%; background-color: rgb(143, 93, 233); }
+
+/* Restrained interaction motion: short color/scale transitions, no looping animation. */
+.button, .episode-action {
+    transition-property: background-color, scale, opacity;
+    transition-duration: 140ms;
+    transition-timing-function: ease-out;
+}
+.episode-action:hover {
+    background-color: rgb(52, 58, 86);
+    scale: 1.015 1.015;
+}
+.button-quiet:hover {
+    background-color: rgb(34, 41, 62);
+}
