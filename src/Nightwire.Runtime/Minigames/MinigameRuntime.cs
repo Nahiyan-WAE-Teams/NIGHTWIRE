@@ -48,6 +48,8 @@ namespace Nightwire.Runtime.Minigames
             progress.SequenceInput.AddRange(sequence);
             bool solved = expected.GetArrayLength() == sequence.Count;
             for (int i = 0; solved && i < sequence.Count; i++) solved = string.Equals(expected[i].GetString(), sequence[i], StringComparison.Ordinal);
+            if (solved) progress.IsComplete = true;
+            if (solved) progress.IsComplete = true;
             var result = Snapshot(definition, progress);
             result.Solved = solved;
             result.AttemptsExhausted = !solved && result.AttemptsRemaining == 0;
@@ -70,6 +72,7 @@ namespace Nightwire.Runtime.Minigames
             progress.AttemptsUsed++;
             var result = Snapshot(definition, progress);
             result.Solved = Math.Abs(frequency - target) <= tolerance;
+            if (result.Solved) progress.IsComplete = true;
             result.AttemptsExhausted = !result.Solved && result.AttemptsRemaining == 0;
             return result;
         }
@@ -78,6 +81,7 @@ namespace Nightwire.Runtime.Minigames
         {
             if (!TryGet(package, state, minigameId, out var definition, out var progress, out var error)) return Fail(error!);
             if (RequiredString(definition, "type") != "evidence_matching") return Fail("This minigame does not accept evidence matches.");
+            if (progress.AttemptsUsed >= AttemptLimit(definition)) return Fail("No attempts remain.");
             var config = definition.GetProperty("configuration");
             var items = config.GetProperty("items");
             bool leftExists = false, rightExists = false;
