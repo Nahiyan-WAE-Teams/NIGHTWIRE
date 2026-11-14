@@ -288,7 +288,7 @@ namespace Nightwire.Runtime.Saves
             if (payload.Conversations == null || payload.Calls == null || payload.Minigames == null || payload.CompletedEventIds == null || payload.UnlockedAssetIds == null ||
                 payload.StoryFlags == null || payload.RelationshipScores == null || payload.Notifications == null)
                 throw new SaveStoreException("save_payload_invalid", "Save payload collections cannot be null.");
-            int total = payload.Conversations.Count + payload.CompletedEventIds.Count + payload.UnlockedAssetIds.Count +
+            int total = payload.Conversations.Count + payload.Calls.Count + payload.Minigames.Count + payload.CompletedEventIds.Count + payload.UnlockedAssetIds.Count +
                 payload.StoryFlags.Count + payload.RelationshipScores.Count;
             if (total > _options.MaximumCollectionEntries || payload.Notifications.Count > _options.MaximumNotifications)
                 throw new SaveStoreException("save_payload_limit", "Save payload exceeds configured collection limits.");
@@ -435,18 +435,19 @@ namespace Nightwire.Runtime.Saves
         {
             public string MinigameId { get; set; } = string.Empty;
             public int AttemptsUsed { get; set; }
+            public bool IsComplete { get; set; }
             public double ElapsedSeconds { get; set; }
             public List<string> SequenceInput { get; set; } = new List<string>();
             public List<string> MatchedItemIds { get; set; } = new List<string>();
             public static MinigamePayload From(string id, MinigameProgressState state) => new MinigamePayload
             {
-                MinigameId = id, AttemptsUsed = state.AttemptsUsed, ElapsedSeconds = state.ElapsedSeconds,
+                MinigameId = id, AttemptsUsed = state.AttemptsUsed, IsComplete = state.IsComplete, ElapsedSeconds = state.ElapsedSeconds,
                 SequenceInput = new List<string>(state.SequenceInput),
                 MatchedItemIds = state.MatchedItemIds.OrderBy(x => x, StringComparer.Ordinal).ToList()
             };
             public MinigameProgressState ToState()
             {
-                var state = new MinigameProgressState { AttemptsUsed = AttemptsUsed, ElapsedSeconds = ElapsedSeconds };
+                var state = new MinigameProgressState { AttemptsUsed = AttemptsUsed, IsComplete = IsComplete, ElapsedSeconds = ElapsedSeconds };
                 state.SequenceInput.AddRange(SequenceInput);
                 foreach (string id in MatchedItemIds) state.MatchedItemIds.Add(id);
                 return state;
