@@ -53,6 +53,7 @@ namespace Nightwire.Runtime.Domain
     public sealed class MinigameProgressState
     {
         public int AttemptsUsed { get; set; }
+        public bool IsComplete { get; set; }
         public double ElapsedSeconds { get; set; }
         public List<string> SequenceInput { get; } = new List<string>();
         public HashSet<string> MatchedItemIds { get; } = new HashSet<string>(StringComparer.Ordinal);
