@@ -128,6 +128,7 @@ namespace Nightwire.Runtime.Installation
         private bool _downloaderDisposed;
         private int _activeRefreshes;
         private bool _lifetimeResourcesDisposed;
+        private bool _shutdownSignalCompleted;
 
         public VerifiedReleaseCatalogue? CurrentCatalogue
         {
@@ -362,8 +363,20 @@ namespace Nightwire.Runtime.Installation
                 if (_disposed) return;
                 _disposed = true;
             }
-            _lifetimeCancellation.Cancel();
-            DisposeDownloaderIfReady();
+            try
+            {
+                _lifetimeCancellation.Cancel();
+            }
+            catch (AggregateException)
+            {
+                // Cancellation callbacks belong to transports/consumers; they must not
+                // prevent deterministic release-manager teardown.
+            }
+            finally
+            {
+                lock (_gate) _shutdownSignalCompleted = true;
+                DisposeResourcesIfReady();
+            }
             // Resource disposal is deferred until all refreshes and installs have unwound.
         }
 
@@ -410,7 +423,8 @@ namespace Nightwire.Runtime.Installation
                     _downloaderDisposed = true;
                     disposeDownloader = true;
                 }
-                if (!_lifetimeResourcesDisposed && _operations.Count == 0 && _activeRefreshes == 0)
+                if (!_lifetimeResourcesDisposed && _shutdownSignalCompleted &&
+                    _operations.Count == 0 && _activeRefreshes == 0)
                 {
                     _lifetimeResourcesDisposed = true;
                     disposeLifetimeResources = true;
