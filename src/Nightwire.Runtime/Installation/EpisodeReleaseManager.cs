@@ -109,6 +109,7 @@ namespace Nightwire.Runtime.Installation
     public sealed class EpisodeReleaseManager
     {
         private readonly Uri _catalogueUri;
+        private readonly Version _runtimeVersion;
         private readonly string _installRoot;
         private readonly string _downloadRoot;
         private readonly IReleaseCatalogueTransport _transport;
@@ -128,12 +129,15 @@ namespace Nightwire.Runtime.Installation
 
         public EpisodeReleaseManager(Uri catalogueUri, string installRoot, string downloadRoot,
             IReleaseCatalogueTransport transport, ReleaseCatalogueAcceptanceService acceptance,
-            IEpisodeInstallLeaseProvider leaseProvider, EpisodePackageDownloader? downloader = null,
+            IEpisodeInstallLeaseProvider leaseProvider, string runtimeVersion, EpisodePackageDownloader? downloader = null,
             EpisodePackageInstaller? installer = null, EpisodePackageLoader? loader = null)
         {
             if (catalogueUri == null || !catalogueUri.IsAbsoluteUri ||
                 catalogueUri.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(catalogueUri.UserInfo))
                 throw new ArgumentException("Catalogue URI must be absolute HTTPS without credentials.", nameof(catalogueUri));
+            if (!Version.TryParse(runtimeVersion, out var parsedRuntimeVersion))
+                throw new ArgumentException("Runtime version must use a numeric version format such as 1.2.3.", nameof(runtimeVersion));
+            _runtimeVersion = parsedRuntimeVersion;
             _catalogueUri = catalogueUri;
             _installRoot = Path.GetFullPath(installRoot ?? throw new ArgumentNullException(nameof(installRoot)));
             _downloadRoot = Path.GetFullPath(downloadRoot ?? throw new ArgumentNullException(nameof(downloadRoot)));
@@ -246,6 +250,9 @@ namespace Nightwire.Runtime.Installation
             {
                 if (!_leaseProvider.TryAcquireInstallLease(episodeId, out lease) || lease == null)
                     return Failure("episode_session_active", "Episode cannot be updated while a gameplay session is active.", episodeId);
+                if (!Version.TryParse(release.MinimumRuntimeVersion, out var minimumRuntimeVersion) ||
+                    _runtimeVersion < minimumRuntimeVersion)
+                    return Failure("runtime_version_incompatible", "This episode requires a newer or unsupported runtime version.", episodeId);
 
                 Directory.CreateDirectory(_downloadRoot);
                 Directory.CreateDirectory(_installRoot);
@@ -259,18 +266,13 @@ namespace Nightwire.Runtime.Installation
                         ErrorCode = download.ErrorCode, Error = download.Error, Download = download
                     };
 
-                var install = _installer.InstallArchive(archivePath, _installRoot);
+                var install = _installer.InstallArchive(archivePath, _installRoot, release.EpisodeId, release.EpisodeVersion);
                 if (!install.Success)
                     return new EpisodeManagerOperationResult
                     {
                         Success = false, EpisodeId = episodeId, EpisodeVersion = release.EpisodeVersion,
                         ErrorCode = install.ErrorCode, Error = install.Error, Download = download, Install = install
                     };
-                if (!string.Equals(install.EpisodeId, release.EpisodeId, StringComparison.Ordinal) ||
-                    !string.Equals(install.EpisodeVersion, release.EpisodeVersion, StringComparison.Ordinal))
-                    return Failure("installed_release_identity_mismatch",
-                        "Verified archive identity does not match the signed release entry; installation must be treated as invalid.", episodeId);
-
                 return new EpisodeManagerOperationResult
                 {
                     Success = true, EpisodeId = episodeId, EpisodeVersion = release.EpisodeVersion,
