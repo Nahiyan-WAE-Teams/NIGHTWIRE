@@ -4,7 +4,7 @@ These are required device tests; they have not been executed.
 
 1. First load with no record and no NIGHTWIRE sequence key returns sequence 0.
 2. After saving a sequence, clear or delete the SharedPreferences record while leaving AndroidKeyStore intact; load must fail closed because an orphaned NIGHTWIRE key remains.
-3. A missing record with a sequence key created under a different configured namespace must also fail closed rather than treating the namespace as a fresh installation.
+3. Change the configured namespace while a record exists; AES-GCM AAD validation must fail closed rather than treating the new namespace as a fresh installation.
 4. Save sequence 1, recreate the provider, and load 1.
 5. Save sequence 2; confirm sequence 1's key alias no longer exists.
 6. Restore a captured copy of the old SharedPreferences record after saving sequence 2; loading must fail because the old StrongBox key was deleted.
@@ -14,4 +14,4 @@ These are required device tests; they have not been executed.
 10. Run on a device without StrongBox; key creation must fail and must not create a software-backed fallback.
 11. Run the C# bridge under Unity Mono and Android IL2CPP; verify Java method names/signatures and exception propagation.
 12. Invoke concurrent load/save operations from multiple provider instances; updates must serialize and the highest accepted sequence must never decrease.
-13. Verify backup/restore and app update behavior. No failed load may be treated as an empty store or silently reset to zero.
+13. Verify the final merged manifest contains both backup-rule attributes, the exact sequence preference file is excluded from cloud backup and device-to-device transfer, and real backup/restore cannot restore the sequence pointer. Also test app update behavior. No failed load may be treated as an empty store or silently reset to zero.
