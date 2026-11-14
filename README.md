@@ -15,9 +15,9 @@ NIGHTWIRE is designed around a reusable game runtime and independently downloada
 
 ## Current development stage
 
-The episode package contract, schemas, sample package, semantic validator, portable C# runtime core, verified loader, conversation/call/minigame interpreters, save system, asset resolver, HTTPS downloader, staged ZIP installer, signed release-catalogue verifier, interrupted-install recovery, and the portable episode release manager are implemented as draft runtime foundations. Unity presentation and app integration remain future work.
+The episode package contract, schemas, sample package, semantic validator, portable C# runtime core, verified loader, conversation/call/minigame interpreters, save system, asset resolver, HTTPS downloader, staged ZIP installer, signed release-catalogue verifier, interrupted-install recovery, the portable episode release manager, a UI-neutral episode library presentation adapter, an atomic per-episode session/install gate, and initial Unity UI Toolkit archive-screen assets are implemented as draft foundations. Unity presentation and app integration remain future work.
 
-See the [episode package specification](docs/architecture/EPISODE_PACKAGE_SPEC.md), [JSON Schema guide](docs/architecture/JSON_SCHEMA_GUIDE.md), [client runtime blueprint](docs/architecture/CLIENT_RUNTIME_BLUEPRINT.md), [public Moonvale reference research](docs/research/MOONVALE_PUBLIC_REFERENCE.md), [runtime core](src/Nightwire.Runtime/README.md), and [sample Episode 001](examples/Episode_001/episode.json). The v0.1 contracts include character posts, prerecorded calls, and declarative minigames.
+See the [Unity episode library UI integration guide](docs/architecture/UNITY_EPISODE_LIBRARY_UI.md), [episode package specification](docs/architecture/EPISODE_PACKAGE_SPEC.md), [JSON Schema guide](docs/architecture/JSON_SCHEMA_GUIDE.md), [client runtime blueprint](docs/architecture/CLIENT_RUNTIME_BLUEPRINT.md), [public Moonvale reference research](docs/research/MOONVALE_PUBLIC_REFERENCE.md), [runtime core](src/Nightwire.Runtime/README.md), and [sample Episode 001](examples/Episode_001/episode.json). The v0.1 contracts include character posts, prerecorded calls, and declarative minigames.
 
 ## Planned technology
 
@@ -30,7 +30,7 @@ Current baseline: Unity 6.3 LTS (to be verified at editor setup), .NET Standard 
 
 ## Development status
 
-A Unity scene-based playable game is not implemented yet. The portable C# runtime includes domain/progress models, allowlisted story/call/minigame interpreters, a verified episode loader, deterministic conversation runtime, versioned saves, unlocked asset access, HTTPS archive downloading, staged ZIP installation, ECDSA P-256 signed release-catalogue verification, startup recovery for interrupted installs, and the episode release manager for signed catalogue refresh, verified downloads, offline library discovery, and session-safe updates. Unity presentation, app-side trusted-key provisioning and protected sequence storage, production signing infrastructure, cloud synchronization, encryption, save-format migrations, and actual test execution remain pending. The runtime test harness registers 35 cases; none are claimed as passing because execution remains deferred.
+A Unity scene-based playable game is not implemented yet. The portable C# runtime includes domain/progress models, allowlisted story/call/minigame interpreters, a verified episode loader, deterministic conversation runtime, versioned saves, unlocked asset access, HTTPS archive downloading, staged ZIP installation, ECDSA P-256 signed release-catalogue verification, startup recovery for interrupted installs, and the episode release manager for signed catalogue refresh, verified downloads, offline library discovery, and session-safe updates. Unity presentation, app-side trusted-key provisioning and protected sequence storage, production signing infrastructure, cloud synchronization, encryption, save-format migrations, and actual test execution remain pending. The runtime test harness registers 36 cases; none are claimed as passing because execution remains deferred.
 
 
 ## Validate an episode package
@@ -56,3 +56,6 @@ See [tests/README.md](tests/README.md). GitHub Actions remains intentionally def
 
 
 The release manager requires host-provided trusted signing keys, protected catalogue sequence storage, a numeric runtime version, and an atomic session/install lease adapter. The actual Unity UI and Android platform adapters are not present yet. Build, runtime tests, validator tests, and CI remain deferred and have not been run.
+
+
+The initial Unity episode archive screen source is under `unity/Assets/Nightwire`. It is not yet a complete Unity project: scene assets, runtime assembly import, System.Text.Json dependency packaging, Editor validation, and Android IL2CPP verification remain pending.
