@@ -24,6 +24,9 @@ namespace Nightwire.Unity.UI
         private Button cancelButton;
         private bool bound;
 
+        /// <summary>The game host handles opening/resuming a verified installed episode.</summary>
+        public event Action<string> PlayEpisodeRequested;
+
         public void Bind(EpisodeLibraryPresentation model)
         {
             if (model == null) throw new ArgumentNullException(nameof(model));
@@ -112,8 +115,13 @@ namespace Nightwire.Unity.UI
             presentation?.CancelCurrentOperation();
         }
 
-        private async void InstallClicked(string episodeId, Button button)
+        private async void ActionClicked(string episodeId, Button button, EpisodeLibraryRow episode)
         {
+            if (CanPlay(episode))
+            {
+                PlayEpisodeRequested?.Invoke(episodeId);
+                return;
+            }
             if (presentation == null) return;
             button.SetEnabled(false);
             try
@@ -183,9 +191,9 @@ namespace Nightwire.Unity.UI
             actions.AddToClassList("episode-actions");
             var action = new Button { text = ActionText(episode) };
             action.AddToClassList("episode-action");
-            action.SetEnabled(!episode.IsBusy && CanInstall(episode));
+            action.SetEnabled(!episode.IsBusy && (CanInstall(episode) || CanPlay(episode)));
             string id = episode.EpisodeId;
-            action.clicked += () => InstallClicked(id, action);
+            action.clicked += () => ActionClicked(id, action, episode);
             actions.Add(action);
 
             if (episode.IsBusy || episode.BytesReceived > 0)
@@ -201,6 +209,12 @@ namespace Nightwire.Unity.UI
             }
             card.Add(actions);
             return card;
+        }
+
+        private static bool CanPlay(EpisodeLibraryRow episode)
+        {
+            return episode.Status == EpisodeLibraryStatus.InstalledOffline ||
+                   episode.Status == EpisodeLibraryStatus.InstalledButNotInCatalogue;
         }
 
         private static bool CanInstall(EpisodeLibraryRow episode)
