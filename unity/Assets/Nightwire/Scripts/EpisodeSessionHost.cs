@@ -15,6 +15,13 @@ namespace Nightwire.Unity
         public RuntimeSessionResult SessionResult { get; internal set; }
     }
 
+    public sealed class EpisodeSessionCloseResult
+    {
+        public bool Success { get; internal set; }
+        public string ErrorCode { get; internal set; }
+        public string Error { get; internal set; }
+    }
+
     /// <summary>
     /// Owns one gameplay session and its exclusive per-episode access lease.
     /// The lease remains held until progress has been saved and the coordinator closed.
@@ -68,7 +75,13 @@ namespace Nightwire.Unity
                 {
                     coordinator.CloseSession();
                     lease.Dispose();
-                    return new EpisodeSessionOpenResult { Success = true, SessionResult = result };
+                    return new EpisodeSessionOpenResult
+                    {
+                        Success = false,
+                        ErrorCode = result.ErrorCode,
+                        Error = result.Error,
+                        SessionResult = result
+                    };
                 }
 
                 if (!string.Equals(coordinator.Package?.Descriptor.EpisodeId, episodeId, StringComparison.Ordinal))
@@ -90,10 +103,15 @@ namespace Nightwire.Unity
             }
         }
 
-        public RuntimeSessionResult SaveAndClose()
+        public EpisodeSessionCloseResult SaveAndClose()
         {
             if (_session == null)
-                return Failure("session_not_active", "There is no active episode session.");
+                return new EpisodeSessionCloseResult
+                {
+                    Success = false,
+                    ErrorCode = "session_not_active",
+                    Error = "There is no active episode session."
+                };
 
             RuntimeSessionResult result;
             try
@@ -107,16 +125,12 @@ namespace Nightwire.Unity
                 _sessionLease?.Dispose();
                 _sessionLease = null;
             }
-            return result;
-        }
-
-        public void CloseAfterFailedOpen()
-        {
-            if (_session == null) return;
-            _session.CloseSession();
-            _session = null;
-            _sessionLease?.Dispose();
-            _sessionLease = null;
+            return new EpisodeSessionCloseResult
+            {
+                Success = result.Success,
+                ErrorCode = result.ErrorCode,
+                Error = result.Error
+            };
         }
 
         private static EpisodeSessionOpenResult Failure(string code, string message) =>
