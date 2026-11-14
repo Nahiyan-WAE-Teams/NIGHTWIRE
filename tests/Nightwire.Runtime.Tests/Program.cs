@@ -32,6 +32,7 @@ internal static class Program
         Run("episode loader verifies and indexes the sample package", EpisodeLoaderLoadsSample, ref failures);
         Run("episode loader rejects modified manifest content", EpisodeLoaderRejectsTampering, ref failures);
         Run("episode loader rejects unlisted files", EpisodeLoaderRejectsUnlistedFiles, ref failures);
+        Run("episode loader rejects linked parent directories before reading package files", EpisodeLoaderRejectsLinkedParentDirectory, ref failures);
         Run("episode loader rejects an older runtime", EpisodeLoaderRejectsOldRuntime, ref failures);
         Run("conversation runtime advances by authored delay and persists read state", ConversationRuntimePersistsProgress, ref failures);
         Run("conversation choices select the authored branch", ConversationRuntimeBranchesOnChoice, ref failures);
@@ -233,6 +234,30 @@ internal static class Program
         finally { Directory.Delete(copy, true); }
     }
 
+
+    private static void EpisodeLoaderRejectsLinkedParentDirectory()
+    {
+        string copy = CopySamplePackage();
+        string outside = Path.Combine(Path.GetTempPath(), "nightwire-linked-" + Guid.NewGuid().ToString("N"));
+        string linkedDirectory = Path.Combine(copy, "Characters", "Anisha");
+        try
+        {
+            Directory.Move(linkedDirectory, outside);
+            File.AppendAllText(Path.Combine(outside, "profile.json"), "tampered");
+            Directory.CreateSymbolicLink(linkedDirectory, outside);
+
+            bool rejectedBeforeReading = false;
+            try { new EpisodePackageLoader().Load(copy); }
+            catch (EpisodePackageLoadException exception) { rejectedBeforeReading = exception.ErrorCode == "unsafe_link"; }
+            Assert(rejectedBeforeReading, "Loader read through a linked parent directory before rejecting the package.");
+        }
+        finally
+        {
+            if (Directory.Exists(linkedDirectory)) Directory.Delete(linkedDirectory);
+            if (Directory.Exists(outside)) Directory.Delete(outside, true);
+            if (Directory.Exists(copy)) Directory.Delete(copy, true);
+        }
+    }
 
     private static void EpisodeLoaderRejectsOldRuntime()
     {
