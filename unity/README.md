@@ -1,14 +1,17 @@
 # NIGHTWIRE Unity presentation integration
 
-Status: first UI Toolkit episode archive assets and controller are present; this directory is **not yet a complete Unity project**.
+Status: the episode archive and first episode-driven messenger screen have UI Toolkit source and controllers; this directory is **not yet a complete Unity project**.
 
 ## Canonical episode archive screen
 
 Use these files as the single UI implementation:
 
-- `Assets/Nightwire/UI/EpisodeLibraryView.uxml` — named screen hierarchy and controls.
-- `Assets/Nightwire/UI/EpisodeLibraryView.uss` — responsive dark archive styling, button states, and restrained transitions.
-- `Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` — binds the visual tree to the presentation model.
+- `Assets/Nightwire/UI/EpisodeLibraryView.uxml` — episode archive hierarchy and controls.
+- `Assets/Nightwire/UI/MessengerScreen.uxml` — conversation screen hierarchy.
+- `Assets/Nightwire/UI/EpisodeLibraryView.uss` — responsive dark archive styling.
+- `Assets/Nightwire/UI/MessengerScreen.uss` — message bubbles, incoming/outgoing alignment, media preview, and choice styling.
+- `Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` — binds the archive visual tree to the presentation model.
+- `Assets/Nightwire/Scripts/MessengerScreenController.cs` — renders package-driven conversations, localized text, choices, and verified inline image assets.
 - `Assets/Nightwire/Scripts/NightwireApplicationRoot.cs` — composes release services, storage paths, library presentation, startup recovery, and session lifecycle.
 - `Assets/Nightwire/Scripts/EpisodeSessionHost.cs` — owns resume/new-session selection and the per-episode session lease.
 - `Assets/Nightwire/Scripts/INightwirePlatformServices.cs` — platform provider contract.
@@ -17,7 +20,7 @@ Use these files as the single UI implementation:
 
 The view is backed by the UI-neutral `EpisodeLibraryPresentation` adapter in `src/Nightwire.Runtime/Installation/EpisodeLibraryPresentation.cs`. The same file contains `EpisodeAccessCoordinator`, the atomic per-episode gate shared by session starts and installs.
 
-The screen supports signed catalogue refresh, installed/offline and downloadable states, update availability, download progress, cancellation, and a `PlayEpisodeRequested` event. The composition root owns the runtime services and the presentation model; the view does not own keys, network transport, storage, or saves.
+The archive screen supports signed catalogue refresh, installed/offline and downloadable states, update availability, download progress, cancellation, and a `PlayEpisodeRequested` event. The messenger screen advances the portable conversation runtime, displays only delivered messages, marks them read, renders localized story choices, and previews unlocked manifest-verified images. The back-to-archive action saves and closes the session before releasing its lease. The composition root owns the runtime services and the presentation model; the view does not own keys, network transport, storage, or saves.
 
 ## Importing the portable runtime
 
@@ -31,7 +34,8 @@ The runtime core currently lives at `../src/Nightwire.Runtime` and targets .NET 
 6. Attach `EpisodeLibraryViewController` to the same GameObject.
 7. Attach `AndroidNightwirePlatformServices` for Android. Configure the HTTPS catalogue URL and trusted ECDSA P-256 public-key entries in the Inspector. Build `unity/Android/NightwireSecureStore` as an AAR and import it under `Assets/Plugins/Android/`. This provider requires Android API 28+ and StrongBox; unsupported devices fail closed. There is deliberately no plaintext/software-key fallback.
 8. Attach `NightwireApplicationRoot`, assign the library view and platform provider, and set the runtime version. The root creates the release verifier/manager, save store, shared access coordinator, session host, and presentation model. It calls `RecoverAtStartup()` before refreshing the catalogue or allowing episode sessions.
-9. The root binds `EpisodeLibraryViewController` and handles `PlayEpisodeRequested`. `EpisodeSessionHost` acquires the shared session lease, resumes an existing save (including backup-only saves), or starts a new session only when no save exists. The lease is held until `SaveAndClose()` completes.
+9. Add a second `UIDocument` GameObject for `MessengerScreen.uxml`, assign `MessengerScreen.uss`, and attach `MessengerScreenController`. Assign it to `NightwireApplicationRoot` alongside the archive view. The root hides the messenger until an episode opens.
+10. The root binds `EpisodeLibraryViewController` and handles `PlayEpisodeRequested`. `EpisodeSessionHost` acquires the shared session lease, resumes an existing save (including backup-only saves), or starts a new session only when no save exists. On success the root shows the messenger and hides the archive. The messenger back action saves/closes the session, releases the lease, and returns to the archive.
 
 The host should resume an existing save or start a new session only when no save exists. The UI deliberately does not overwrite or reset player progress.
 
