@@ -182,6 +182,22 @@ namespace Nightwire.Runtime.Conversations
 
             progress.SelectedOptions[progress.WaitingChoiceMessageId] = optionId;
             progress.ReadMessageIds.Add(progress.WaitingChoiceMessageId);
+
+            if (selected.TryGetProperty("set_flags", out var flags) && flags.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var flag in flags.EnumerateArray())
+                    if (flag.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(flag.GetString()))
+                        state.StoryFlags[flag.GetString()!] = StoryFlagValue.FromBoolean(true);
+            }
+
+            if (selected.TryGetProperty("relationship_delta", out var delta) &&
+                delta.ValueKind == JsonValueKind.Number && delta.TryGetInt32(out int relationshipDelta))
+            {
+                string senderId = RequiredString(choice, "sender_id");
+                state.RelationshipScores.TryGetValue(senderId, out long currentScore);
+                state.RelationshipScores[senderId] = currentScore + relationshipDelta;
+            }
+
             if (selected.TryGetProperty("next_message_id", out var next))
                 progress.NextMessageId = next.ValueKind == JsonValueKind.Null ? null : next.GetString();
             // If next_message_id is omitted, continue to the next message in authored order.
