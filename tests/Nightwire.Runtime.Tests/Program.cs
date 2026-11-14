@@ -61,6 +61,7 @@ internal static class Program
         Run("episode installer installs and updates a verified package", EpisodeInstallerInstallsAndUpdates, ref failures);
         Run("episode installer rejects ZIP path traversal", EpisodeInstallerRejectsTraversal, ref failures);
         Run("episode installer rejects ZIP symbolic links and reparse points", EpisodeInstallerRejectsArchiveLinks, ref failures);
+        Run("episode installer rejects ZIP special files", EpisodeInstallerRejectsArchiveSpecialFiles, ref failures);
         Run("episode downloader verifies a trusted archive hash", EpisodeDownloaderChecksTrustedHash, ref failures);
         Run("episode downloader rejects a linked destination ancestor", EpisodeDownloaderRejectsLinkedDestinationAncestor, ref failures);
         Run("signed release catalogue verifies signatures, rejects rollback, duplicate JSON keys, and malformed runtime versions", ReleaseCatalogueVerifiesSignatureAndSequence, ref failures);
@@ -927,6 +928,28 @@ internal static class Program
                 Assert(!result.Success && result.ErrorCode == "archive_symlink_rejected",
                     "ZIP link entry was not rejected for attributes 0x" + linkAttributes[index].ToString("X8") + ".");
             }
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void EpisodeInstallerRejectsArchiveSpecialFiles()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-install-special-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string archive = Path.Combine(root, "special.zip");
+            using (var file = new FileStream(archive, FileMode.CreateNew))
+            using (var zip = new ZipArchive(file, ZipArchiveMode.Create))
+            {
+                var fifo = zip.CreateEntry("named-pipe");
+                fifo.ExternalAttributes = unchecked((int)0x11A40000);
+                using (var writer = new StreamWriter(fifo.Open())) writer.Write("not a regular file");
+            }
+
+            var result = new EpisodePackageInstaller().InstallArchive(archive, Path.Combine(root, "installed"));
+            Assert(!result.Success && result.ErrorCode == "archive_special_file_rejected",
+                "A ZIP FIFO/special-file entry was not rejected.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
