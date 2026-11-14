@@ -489,7 +489,7 @@ internal static class Program
     {
         string root = FindRepositoryRoot();
         var package = new EpisodePackageLoader().Load(Path.Combine(root, "examples", "Episode_001"));
-        using var doc = JsonDocument.Parse("{""call_id"":""call.test"",""duration_ms"":2000,""cues"":[{""cue_id"":""cue.glitch"",""at_ms"":500,""type"":""visual_effect"",""effect"":""signal_glitch""}],""subtitle_tracks"":[{""locale"":""en"",""entries"":[{""start_ms"":0,""end_ms"":700,""text_key"":""call.line""}]}]}");
+        using var doc = JsonDocument.Parse(@"{""call_id"":""call.test"",""duration_ms"":2000,""cues"":[{""cue_id"":""cue.glitch"",""at_ms"":500,""type"":""visual_effect"",""effect"":""signal_glitch""}],""subtitle_tracks"":[{""locale"":""en"",""entries"":[{""start_ms"":0,""end_ms"":700,""text_key"":""call.line""}]}]}");
         package.Calls["call.test"] = doc.RootElement.Clone();
         var state = CreateState();
         state.PendingCallId = "call.test";
