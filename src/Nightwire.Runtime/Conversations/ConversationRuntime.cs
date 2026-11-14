@@ -116,6 +116,7 @@ namespace Nightwire.Runtime.Conversations
 
             if (safety <= 0)
             {
+                progress.ElapsedDelaySeconds += remaining;
                 result.YieldedAtSafetyLimit = true;
                 result.Success = true;
                 return result;
