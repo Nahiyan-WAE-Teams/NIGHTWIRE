@@ -11,4 +11,5 @@ These are required device tests; they have not been executed.
 7. Simulate process termination after old-key deletion and before the new preference commit; next load must fail closed, not return the older sequence.
 8. Run on a device without StrongBox; key creation must fail and must not create a software-backed fallback.
 9. Run the C# bridge under Unity Mono and Android IL2CPP; verify Java method names/signatures and exception propagation.
-10. Verify backup/restore and app update behavior. No failed load may be treated as an empty store or silently reset to zero.
+10. Invoke concurrent load/save operations from multiple provider instances; updates must serialize and the highest accepted sequence must never decrease.
+11. Verify backup/restore and app update behavior. No failed load may be treated as an empty store or silently reset to zero.
