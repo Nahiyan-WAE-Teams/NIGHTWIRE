@@ -239,20 +239,28 @@ namespace Nightwire.Runtime.Installation
                 foreach (var entry in zip.Entries)
                 {
                     string name = entry.FullName;
-                    if (name.EndsWith("/", StringComparison.Ordinal))
+                    bool isDirectory = name.EndsWith("/", StringComparison.Ordinal);
+                    int unixMode = (entry.ExternalAttributes >> 16) & 0xF000;
+                    bool windowsReparsePoint = (entry.ExternalAttributes & 0x400) != 0;
+
+                    // Inspect metadata before skipping directory records. A ZIP symlink can
+                    // carry a trailing slash and must not bypass the link/special-file checks.
+                    if (unixMode == 0xA000 || windowsReparsePoint)
+                        throw Fail("archive_symlink_rejected", "Symbolic links and reparse points are not permitted in episode archives.");
+                    if (isDirectory)
                     {
+                        if (unixMode != 0 && unixMode != 0x4000)
+                            throw Fail("archive_special_file_rejected", "Directory entries must have directory metadata.");
+                        if (entry.Length != 0)
+                            throw Fail("archive_directory_payload_rejected", "Directory entries cannot contain file data.");
                         ValidateArchivePath(name.Substring(0, name.Length - 1));
                         continue;
                     }
+                    if (unixMode != 0 && unixMode != 0x8000)
+                        throw Fail("archive_special_file_rejected", "Only regular files and directories are permitted in episode archives.");
                     ValidateArchivePath(name);
                     if (!entries.TryAdd(name, entry))
                         throw Fail("duplicate_archive_path", "Archive contains duplicate or case-colliding paths.");
-                    int unixMode = (entry.ExternalAttributes >> 16) & 0xF000;
-                    bool windowsReparsePoint = (entry.ExternalAttributes & 0x400) != 0;
-                    if (unixMode == 0xA000 || windowsReparsePoint)
-                        throw Fail("archive_symlink_rejected", "Symbolic links and reparse points are not permitted in episode archives.");
-                    if (unixMode != 0 && unixMode != 0x8000)
-                        throw Fail("archive_special_file_rejected", "Only regular files and directories are permitted in episode archives.");
                 }
 
                 if (!entries.TryGetValue("episode.json", out var descriptorEntry) ||
