@@ -60,6 +60,7 @@ internal static class Program
         Run("asset resolver rejects content modified after package load", AssetResolverRejectsPostLoadTampering, ref failures);
         Run("episode installer installs and updates a verified package", EpisodeInstallerInstallsAndUpdates, ref failures);
         Run("episode installer rejects ZIP path traversal", EpisodeInstallerRejectsTraversal, ref failures);
+        Run("episode installer rejects ZIP symbolic links and reparse points", EpisodeInstallerRejectsArchiveLinks, ref failures);
         Run("episode downloader verifies a trusted archive hash", EpisodeDownloaderChecksTrustedHash, ref failures);
         Run("episode downloader rejects a linked destination ancestor", EpisodeDownloaderRejectsLinkedDestinationAncestor, ref failures);
         Run("signed release catalogue verifies signatures, rejects rollback, duplicate JSON keys, and malformed runtime versions", ReleaseCatalogueVerifiesSignatureAndSequence, ref failures);
@@ -890,6 +891,32 @@ internal static class Program
             Assert(second.Success && second.UpdatedExisting, second.Error ?? "Update failed.");
             Assert(new EpisodePackageLoader().Load(second.InstallDirectory!).Descriptor.EpisodeVersion == "1.0.0",
                 "Updated package failed runtime loading.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void EpisodeInstallerRejectsArchiveLinks()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-install-link-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string archive = Path.Combine(root, "linked.zip");
+            using (var file = new FileStream(archive, FileMode.CreateNew))
+            using (var zip = new ZipArchive(file, ZipArchiveMode.Create))
+            {
+                var unixLink = zip.CreateEntry("unix-link");
+                unixLink.ExternalAttributes = unchecked((int)0xA1FF0000);
+                using (var writer = new StreamWriter(unixLink.Open())) writer.Write("target");
+
+                var windowsLink = zip.CreateEntry("windows-link");
+                windowsLink.ExternalAttributes = 0x400;
+                using (var writer = new StreamWriter(windowsLink.Open())) writer.Write("target");
+            }
+
+            var result = new EpisodePackageInstaller().InstallArchive(archive, Path.Combine(root, "installed"));
+            Assert(!result.Success && result.ErrorCode == "archive_symlink_rejected",
+                "ZIP symbolic links or Windows reparse points were not rejected.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
