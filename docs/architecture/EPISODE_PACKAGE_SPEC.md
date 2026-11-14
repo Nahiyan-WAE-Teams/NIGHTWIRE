@@ -377,3 +377,10 @@ A small linked example package is stored in `examples/Episode_001/`. Its manifes
 These schemas validate individual document shapes. They do not replace package-level semantic validation. A future validator must additionally check cross-file references, unique IDs across the episode, localization key coverage, manifest completeness, asset-to-file correspondence, and the event/message graph.
 
 See [JSON Schema Guide](JSON_SCHEMA_GUIDE.md) for the schema mapping and current validation boundary.
+
+
+## 16. Initial package validator
+
+A dependency-free .NET 10 command-line validator is provided in `tools/Nightwire.EpisodeValidator`. It currently checks the unpacked package's manifest integrity, path safety, inventory completeness, asset references, character and conversation references, message sender/choice references, event entry and message triggers, supported event actions, and localization coverage.
+
+It does not yet execute the complete JSON Schema Draft 2020-12 schemas. It is an initial semantic/package-integrity validator, not yet the final release validator. Archive extraction safety, signed release metadata, call/minigame definition contracts, and automated tests remain future work.
