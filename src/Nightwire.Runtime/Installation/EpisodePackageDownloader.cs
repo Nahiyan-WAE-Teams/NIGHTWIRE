@@ -55,7 +55,7 @@ namespace Nightwire.Runtime.Installation
 
         public async Task<EpisodeDownloadResult> DownloadAsync(Uri source, string destinationPath,
             string? expectedSha256 = null, IProgress<EpisodeDownloadProgress>? progress = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default, long? expectedSizeBytes = null)
         {
             string? temporary = null;
             try
@@ -65,6 +65,8 @@ namespace Nightwire.Runtime.Installation
                     return Error("https_required", "Episode downloads require an absolute HTTPS URL without embedded credentials.");
                 if (!string.IsNullOrEmpty(expectedSha256) && !IsSha256(expectedSha256))
                     return Error("invalid_expected_hash", "Expected SHA-256 must contain 64 hexadecimal characters.");
+                if (expectedSizeBytes.HasValue && (expectedSizeBytes.Value <= 0 || expectedSizeBytes.Value > _options.MaximumDownloadBytes))
+                    return Error("expected_size_invalid", "Trusted release archive size is outside the configured download limit.");
                 if (string.IsNullOrWhiteSpace(destinationPath))
                     return Error("destination_required", "A download destination is required.");
 
@@ -84,6 +86,9 @@ namespace Nightwire.Runtime.Installation
                 if (response.Content.Headers.ContentLength.HasValue &&
                     response.Content.Headers.ContentLength.Value > _options.MaximumDownloadBytes)
                     return Error("download_too_large", "Episode archive exceeds the configured download limit.");
+                if (expectedSizeBytes.HasValue && response.Content.Headers.ContentLength.HasValue &&
+                    response.Content.Headers.ContentLength.Value != expectedSizeBytes.Value)
+                    return Error("download_size_mismatch", "Server content length differs from the signed release catalogue.");
 
                 long? total = response.Content.Headers.ContentLength;
                 long received = 0;
@@ -108,6 +113,8 @@ namespace Nightwire.Runtime.Installation
                 string digest = ToHex(sha.Hash!);
                 if (total.HasValue && received != total.Value)
                     return Error("download_truncated", "Downloaded byte count did not match the server's content length.");
+                if (expectedSizeBytes.HasValue && received != expectedSizeBytes.Value)
+                    return Error("download_size_mismatch", "Downloaded byte count differs from the signed release catalogue.");
                 if (!string.IsNullOrEmpty(expectedSha256) &&
                     !string.Equals(digest, expectedSha256, StringComparison.OrdinalIgnoreCase))
                     return Error("download_hash_mismatch", "Downloaded archive does not match the trusted release SHA-256.");
@@ -133,6 +140,14 @@ namespace Nightwire.Runtime.Installation
                     try { File.Delete(temporary); } catch { }
                 }
             }
+        }
+
+        public Task<EpisodeDownloadResult> DownloadReleaseAsync(EpisodeReleaseEntry release, string destinationPath,
+            IProgress<EpisodeDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
+        {
+            if (release == null) throw new ArgumentNullException(nameof(release));
+            return DownloadAsync(release.ArchiveUrl, destinationPath, release.ArchiveSha256,
+                progress, cancellationToken, release.ArchiveSizeBytes);
         }
 
         private static bool IsSha256(string value)
