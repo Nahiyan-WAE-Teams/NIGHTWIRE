@@ -115,46 +115,93 @@
     "cues": {
       "type": "array",
       "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "cue_id",
-          "at_ms",
-          "type"
-        ],
-        "properties": {
-          "cue_id": {
-            "type": "string",
-            "minLength": 1
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cue_id",
+              "at_ms",
+              "type",
+              "effect"
+            ],
+            "properties": {
+              "cue_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "at_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "type": {
+                "const": "visual_effect"
+              },
+              "effect": {
+                "enum": [
+                  "signal_glitch",
+                  "screen_flicker",
+                  "static_burst",
+                  "audio_distortion"
+                ]
+              }
+            }
           },
-          "at_ms": {
-            "type": "integer",
-            "minimum": 0
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cue_id",
+              "at_ms",
+              "type",
+              "speaker_id"
+            ],
+            "properties": {
+              "cue_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "at_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "type": {
+                "const": "speaker_focus"
+              },
+              "speaker_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           },
-          "type": {
-            "enum": [
-              "visual_effect",
-              "speaker_focus",
-              "overlay_text"
-            ]
-          },
-          "effect": {
-            "enum": [
-              "signal_glitch",
-              "screen_flicker",
-              "static_burst",
-              "audio_distortion"
-            ]
-          },
-          "speaker_id": {
-            "type": "string",
-            "minLength": 1
-          },
-          "text_key": {
-            "type": "string",
-            "minLength": 1
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cue_id",
+              "at_ms",
+              "type",
+              "text_key"
+            ],
+            "properties": {
+              "cue_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "at_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "type": {
+                "const": "overlay_text"
+              },
+              "text_key": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           }
-        }
+        ]
       }
     },
     "completion_event_id": {
