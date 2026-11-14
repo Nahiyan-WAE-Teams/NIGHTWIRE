@@ -146,6 +146,8 @@ namespace Nightwire.Runtime.Installation
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _acceptance = acceptance ?? throw new ArgumentNullException(nameof(acceptance));
             _leaseProvider = leaseProvider ?? throw new ArgumentNullException(nameof(leaseProvider));
+            if (installer != null && loader == null)
+                throw new ArgumentException("A custom installer must be paired with the package loader configured for this runtime version.", nameof(loader));
             _ownsDownloader = downloader == null;
             _downloader = downloader ?? new EpisodePackageDownloader();
             _loader = loader ?? new EpisodePackageLoader(
