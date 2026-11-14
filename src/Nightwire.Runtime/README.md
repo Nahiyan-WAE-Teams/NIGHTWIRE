@@ -42,7 +42,7 @@ A dependency-free console test harness is available:
 dotnet run --project tests/Nightwire.Runtime.Tests
 ```
 
-The harness currently registers 36 test cases covering story events, package loading, conversations, saves/migrations, prerecorded call timelines, minigames, unlocked asset access, staged ZIP installation/update, ZIP traversal rejection, HTTPS download hash verification, signed release signature/sequence verification, interrupted-install startup recovery, signed release identity mismatch protection, and signed catalogue-to-offline-install orchestration, and per-episode session/install exclusion. Test/build execution remains deferred; no passing result is claimed.
+The harness currently registers 37 test cases covering story events, package loading, conversations, saves/migrations, prerecorded call timelines, minigames, unlocked asset access, staged ZIP installation/update, ZIP traversal rejection, HTTPS download hash verification, signed release signature/sequence verification, interrupted-install startup recovery, signed release identity mismatch protection, and signed catalogue-to-offline-install orchestration, and per-episode session/install exclusion. Test/build execution remains deferred; no passing result is claimed.
 
 ## Official compatibility references
 
@@ -77,6 +77,7 @@ The loader does not authenticate who published a package. A future installer mus
 - Delivery, read state, selected options, the current/next message, and partially elapsed delay are stored in `EpisodeProgressState.ConversationProgress`, not in episode files.
 - Marking a delivered message read emits the `message_completed` story trigger; selecting an option emits `choice_selected`.
 - A bounded advancement pass yields safely on long branch cycles and preserves elapsed time for the next host tick.
+- Session-level conversation ticks update partial delay in memory and write a save only when a message delivery boundary is crossed; the host calls `SaveNow` on lifecycle checkpoints to persist partial delay. This avoids disk writes every rendered frame.
 - The runtime does not implement free-form player replies, live networking, or presentation/typing animations. UI code can render typing indicators using the same authored delay information without changing story state.
 
 The host should use the versioned `SaveStore` described below. Unity lifecycle integration and cloud synchronization are not yet implemented.
