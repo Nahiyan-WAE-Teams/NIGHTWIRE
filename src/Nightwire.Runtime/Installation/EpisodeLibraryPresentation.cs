@@ -84,15 +84,6 @@ namespace Nightwire.Runtime.Installation
         }
     }
 
-    public enum EpisodeLibraryOperation
-    {
-        Idle,
-        RefreshingCatalogue,
-        Downloading,
-        Installing,
-        Failed
-    }
-
     public sealed class EpisodeLibraryRow
     {
         public string EpisodeId { get; internal set; } = string.Empty;
@@ -140,6 +131,7 @@ namespace Nightwire.Runtime.Installation
         public EpisodeLibraryPresentation(EpisodeReleaseManager manager)
         {
             _manager = manager ?? throw new ArgumentNullException(nameof(manager));
+            _catalogueAvailable = manager.CurrentCatalogue != null;
             RebuildRows();
         }
 
@@ -172,7 +164,7 @@ namespace Nightwire.Runtime.Installation
             ReleaseCatalogueResult result;
             try
             {
-                result = await _manager.RefreshCatalogueAsync(utcNow, cancellationToken).ConfigureAwait(false);
+                result = await _manager.RefreshCatalogueAsync(utcNow, cancellationToken);
                 lock (_gate)
                 {
                     _refreshing = false;
@@ -233,7 +225,7 @@ namespace Nightwire.Runtime.Installation
             EpisodeManagerOperationResult result;
             try
             {
-                result = await _manager.InstallOrUpdateAsync(episodeId, progress, operationToken).ConfigureAwait(false);
+                result = await _manager.InstallOrUpdateAsync(episodeId, progress, operationToken);
                 lock (_gate)
                 {
                     if (_rows.TryGetValue(episodeId, out var row))
@@ -301,9 +293,14 @@ namespace Nightwire.Runtime.Installation
 
         private void Publish()
         {
-            var handler = Changed;
-            if (handler == null) return;
-            handler(Snapshot);
+            var handlers = Changed;
+            if (handlers == null) return;
+            var snapshot = Snapshot;
+            foreach (Action<EpisodeLibrarySnapshot> handler in handlers.GetInvocationList())
+            {
+                try { handler(snapshot); }
+                catch { /* Presentation subscribers must not interrupt download or install work. */ }
+            }
         }
 
         private static EpisodeLibraryRow CloneRow(EpisodeLibraryRow row) => new EpisodeLibraryRow
