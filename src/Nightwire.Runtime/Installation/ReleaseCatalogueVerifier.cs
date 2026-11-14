@@ -119,10 +119,8 @@ namespace Nightwire.Runtime.Installation
                 if (sequence < 1 || sequence < minimumSequence)
                     return Error("catalogue_rollback", "Release catalogue sequence is older than the minimum accepted sequence.");
 
-                DateTime issued = DateTime.Parse(String(data, "issued_utc"), CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
-                DateTime expires = DateTime.Parse(String(data, "expires_utc"), CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
+                DateTime issued = ParseUtcTimestamp(String(data, "issued_utc"));
+                DateTime expires = ParseUtcTimestamp(String(data, "expires_utc"));
                 if (expires <= issued || issued > utcNow.AddMinutes(10) || expires <= utcNow)
                     return Error("catalogue_expired_or_invalid", "Release catalogue is expired or has an invalid validity window.");
 
@@ -192,6 +190,17 @@ namespace Nightwire.Runtime.Installation
         }
 
         private static int Integer(JsonElement element, string name) => checked((int)Long(element, name));
+
+        private static DateTime ParseUtcTimestamp(string value)
+        {
+            bool hasExplicitOffset = System.Text.RegularExpressions.Regex.IsMatch(value,
+                "(Z|[+-][0-9]{2}:[0-9]{2})$", System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+                System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+            if (!hasExplicitOffset || !DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var parsed))
+                throw new FormatException("Catalogue timestamps must be valid RFC 3339 date-time values with an explicit UTC offset.");
+            return parsed.UtcDateTime;
+        }
 
         private static void EnsureNoDuplicateProperties(JsonElement element)
         {
