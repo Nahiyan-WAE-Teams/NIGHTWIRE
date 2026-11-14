@@ -7,6 +7,8 @@ The current production baseline remains **Unity 6.3 LTS (6000.3)**. For Android 
 Official references:
 - Unity 6.3 LTS support and recommendation: https://unity.com/releases/unity-6/support
 - Unity 6.3 runtime UI setup: https://docs.unity.com/en-us/engine/6000.3/manual/uitoolkits/uielements/uie-support-for-runtime-ui/uie-get-started-with-runtime-ui
+- Unity 6.3 Android Gradle/AGP compatibility: https://docs.unity.com/en-us/engine/6000.3/manual/platform-specific/android/introducing/gradle-overview/version-compatibility
+- Android StrongBox AES key generation: https://developer.android.com/reference/android/security/keystore/KeyGenParameterSpec
 - UI Document lifecycle and source asset: https://docs.unity.com/en-us/engine/6000.3/manual/uitoolkits/uielements/uie-support-for-runtime-ui/uie-render-runtime-ui/uie-create-ui-document-component
 - UI Toolkit versus uGUI feature comparison: https://docs.unity.com/en-us/engine/6000.3/manual/uitoolkits/ui-system-compare
 
@@ -24,8 +26,7 @@ UI Toolkit is selected for this archive screen because it is a multi-resolution,
 - `unity/Android/NightwireSecureStore/` — StrongBox-backed encrypted sequence store Android library.
 - `tools/prepare-unity-runtime.sh` and `tools/Prepare-UnityRuntime.ps1` — dependency staging scripts.
 - `unity/Assets/Nightwire/Scripts/Nightwire.Unity.asmdef` — presentation assembly boundary referencing `Nightwire.Runtime`.
-- `src/Nightwire.Runtime/Installation/EpisodeLibraryPresentation.cs` — UI-neutral snapshot/progress adapter.
-- `src/Nightwire.Runtime/Installation/EpisodeLibraryPresentation.cs` — atomic per-episode session/install lease gate.
+- `src/Nightwire.Runtime/Installation/EpisodeLibraryPresentation.cs` — UI-neutral snapshot/progress adapter and atomic per-episode session/install lease gate.
 
 The visual direction uses near-black navy surfaces, restrained violet accents, compact archive metadata, progress feedback, and explicit offline-ready status. No episode-specific assets are hardcoded into the UI. Buttons use short 140 ms color/scale transitions; there are no looping effects or mandatory motion.
 
@@ -39,7 +40,7 @@ The visual direction uses near-black navy surfaces, restrained violet accents, c
 6. Subscribe to `PlayEpisodeRequested`. The host should load the installed directory using `RuntimeSessionCoordinator`, resume the player's save when one exists, or start a new session only when no save exists. The UI deliberately does not overwrite or reset player progress.
 7. Call `EpisodeReleaseManager.RecoverAtStartup()` before opening any episode session or beginning any install.
 
-The repository contains bootstrap/session-host integration source but does not yet contain a complete Unity project, scene, Panel Settings asset, Android Player Settings, a concrete Android secure-storage provider, or a verified Unity import of the runtime assembly. These files are integration source/assets, not a claim that an Editor scene has already been run.
+The repository contains bootstrap/session-host integration source and an Android StrongBox provider implementation, but does not yet contain a complete Unity project, scene, Panel Settings asset, Android Player Settings, a built AAR, or a verified Unity import of the runtime assembly. These files are integration source/assets, not a claim that an Editor scene has already been run.
 
 ## Application composition and platform boundary
 
