@@ -31,7 +31,7 @@ Exit codes:
 - Character, post, conversation, call, and minigame ID uniqueness and references.
 - Conversation participants, senders, message IDs, supported message types, choice destinations, call invitations, and media references.
 - Character post authors, comment authors, and media references.
-- Call participants, required media types, subtitle locales/timing, cue timing, and matching completion events.
+- Call participants, prerecorded mode, required media types, subtitle locales/timing, allowlisted cue types/effects, cue timing, and matching completion events.
 - Minigame configuration invariants, evidence references, and matching completion events.
 - Episode entry event and supported event action references.
 - Localization files for every declared locale and referenced localization-key coverage.
