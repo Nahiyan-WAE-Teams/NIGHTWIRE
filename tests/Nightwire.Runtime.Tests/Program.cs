@@ -814,6 +814,13 @@ internal static class Program
         }
     }
 
+    private sealed class MemoryReleaseSequenceStore : IReleaseCatalogueSequenceStore
+    {
+        public long Sequence { get; private set; }
+        public long LoadHighestAcceptedSequence() => Sequence;
+        public void SaveHighestAcceptedSequence(long sequence) { Sequence = sequence; }
+    }
+
     private sealed class StubHttpHandler : HttpMessageHandler
     {
         private readonly byte[] _payload;
@@ -849,6 +856,10 @@ internal static class Program
         var verified = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow, 7);
         Assert(verified.Success && verified.Catalogue!.Releases.Count == 1 &&
             verified.Catalogue.Releases[0].EpisodeId == "nightwire.ep001", verified.Error ?? "Valid signed catalogue rejected.");
+        var sequenceStore = new MemoryReleaseSequenceStore();
+        var acceptance = new ReleaseCatalogueAcceptanceService(verifier, sequenceStore);
+        var accepted = acceptance.Accept(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow);
+        Assert(accepted.Success && sequenceStore.Sequence == 7, accepted.Error ?? "Accepted catalogue sequence was not persisted.");
         var rollback = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow, 8);
         Assert(!rollback.Success && rollback.ErrorCode == "catalogue_rollback", "Old catalogue sequence was accepted.");
 
