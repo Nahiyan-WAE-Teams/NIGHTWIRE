@@ -110,3 +110,26 @@ The checksum detects accidental corruption; it is not an authenticity signature 
 - The coordinator is single-session and synchronous. The Unity host should serialize calls on its game thread, invoke `SaveNow` at appropriate lifecycle boundaries, and render returned commands. Downloading, archive extraction, media playback, UI, background scheduling, and cloud synchronization remain outside this assembly.
 
 The runtime test harness now includes session start, entry-event dispatch, resume of conversation progress, and overwrite protection cases. These tests are authored but have not been executed in this environment.
+
+
+## Prerecorded call runtime
+
+`Calls/CallRuntime` interprets a call as a deterministic timeline while the Unity presentation adapter owns actual audio/video decoding and playback.
+
+- The host starts the call only after the story engine has queued the matching pending call.
+- The host advances elapsed milliseconds from its media clock. The runtime emits each authored visual/speaker/overlay cue once, and subtitle entries at their authored start timestamps for the selected locale.
+- Call duration is authoritative. Reaching it marks the call complete; the session coordinator then dispatches the matching `call_ended` trigger and persists completion.
+- Elapsed time, fired cue IDs, fired subtitle IDs, and completion status are saved so resuming does not replay timeline events.
+- The runtime does not decode media, synchronize an actual player clock, implement live calls, or render effects. The Unity adapter must keep the media player and runtime clock aligned and call `AdvanceCallPlayback` from that clock.
+
+## Minigame runtime
+
+`Minigames/MinigameRuntime` evaluates the three schema 0.1 game types without episode-authored executable code:
+
+- `sequence_reconstruction`: validates the submitted ordered symbol sequence against the authored answer.
+- `frequency_tuning`: validates a finite input against authored min/max, target, and tolerance.
+- `evidence_matching`: validates item IDs and tracks correctly matched authored pairs.
+- Attempt limits and optional time limits are enforced by the runtime. Successful solutions dispatch the matching `minigame_completed` story trigger; exhausted or timed-out games do not dispatch success.
+- Attempts, elapsed time, sequence input, matched pairs, and solved state are persisted. Presentation, drag/drop controls, audio feedback, and animation remain Unity responsibilities.
+
+The runtime test harness now includes call cue/subtitle timing, call completion, sequence puzzle evaluation, and activity save round-tripping. These tests are authored but have not been executed.
