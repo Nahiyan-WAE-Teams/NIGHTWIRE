@@ -513,8 +513,8 @@ internal static class Program
                 "A non-delivery frame unexpectedly rewrote the save file.");
 
             Assert(coordinator.SaveNow().Success, "Explicit checkpoint did not save.");
-            byte[] afterCheckpoint = File.ReadAllBytes(savePath);
-            Assert(!beforeTick.SequenceEqual(afterCheckpoint),
+            var checkpoint = store.Load("nightwire.ep001", coordinator.Progress!.EpisodeVersion);
+            Assert(checkpoint.State.ConversationProgress["anisha.day01"].ElapsedDelaySeconds >= 0.2,
                 "Explicit checkpoint did not persist the elapsed delay.");
         }
         finally { if (Directory.Exists(saves)) Directory.Delete(saves, true); }
