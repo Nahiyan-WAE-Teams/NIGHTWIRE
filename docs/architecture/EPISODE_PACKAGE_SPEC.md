@@ -507,7 +507,7 @@ The interpreter does not provide free-form player replies, a Unity typing indica
 
 The initial implementation is `src/Nightwire.Runtime/Saves/SaveStore.cs`. Save format version 1 persists the complete current `EpisodeProgressState` through a dedicated DTO rather than serializing domain objects directly. It includes conversation progress, completed events, unlocked assets, typed story flags, relationship scores, notifications, active conversation, and pending call/minigame IDs.
 
-The store writes a flushed temporary file, retains the previous committed save as a backup, and replaces the primary file with a same-directory move. Loading verifies the payload checksum and can recover from the backup if the primary file is invalid. The store enforces configurable file/collection limits and restricts episode IDs used as path components.
+The store writes a flushed temporary file, retains the previous committed save as a backup, and replaces the primary file with a same-directory move. Loading verifies the envelope checksum and can recover from the backup if the primary file is invalid. The store enforces configurable file/collection limits and restricts episode IDs used as path components.
 
 Episode-content migrations are explicit implementations of `IEpisodeProgressMigration`, registered by episode ID and source version. The store follows a complete chain to the installed episode version and rejects missing chains. Save-format versions other than the current version are rejected; no historical format migration is claimed yet.
 
