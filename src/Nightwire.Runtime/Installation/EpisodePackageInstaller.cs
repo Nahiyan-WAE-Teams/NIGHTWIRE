@@ -248,8 +248,11 @@ namespace Nightwire.Runtime.Installation
                     if (!entries.TryAdd(name, entry))
                         throw Fail("duplicate_archive_path", "Archive contains duplicate or case-colliding paths.");
                     int unixMode = (entry.ExternalAttributes >> 16) & 0xF000;
-                    if (unixMode == 0xA000)
-                        throw Fail("archive_symlink_rejected", "Symbolic links are not permitted in episode archives.");
+                    bool windowsReparsePoint = (entry.ExternalAttributes & 0x400) != 0;
+                    if (unixMode == 0xA000 || windowsReparsePoint)
+                        throw Fail("archive_symlink_rejected", "Symbolic links and reparse points are not permitted in episode archives.");
+                    if (unixMode != 0 && unixMode != 0x8000)
+                        throw Fail("archive_special_file_rejected", "Only regular files and directories are permitted in episode archives.");
                 }
 
                 if (!entries.TryGetValue("episode.json", out var descriptorEntry) ||
