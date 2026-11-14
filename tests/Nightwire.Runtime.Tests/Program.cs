@@ -43,6 +43,7 @@ internal static class Program
         Run("save store applies an explicit episode migration", SaveStoreMigratesEpisodeVersion, ref failures);
         Run("session coordinator starts an episode and persists its entry event", SessionStartsAndPersists, ref failures);
         Run("session coordinator resumes conversation progress", SessionResumesConversation, ref failures);
+        Run("conversation delay ticks do not write a save every frame", ConversationDelayTicksAvoidSaveWrites, ref failures);
         Run("session coordinator prevents accidental new-game overwrite", SessionPreventsOverwrite, ref failures);
         Run("prerecorded call timeline emits cues and completes", CallRuntimeAdvancesTimeline, ref failures);
         Run("session coordinator dispatches call completion event", SessionDispatchesCallCompletion, ref failures);
@@ -486,6 +487,35 @@ internal static class Program
                 "Conversation progress was not restored.");
             Assert(resumed.Progress.ConversationProgress["anisha.day01"].DeliveredMessageIds.Count > 0,
                 "Delivered messages were not restored.");
+        }
+        finally { if (Directory.Exists(saves)) Directory.Delete(saves, true); }
+    }
+
+    private static void ConversationDelayTicksAvoidSaveWrites()
+    {
+        string root = FindRepositoryRoot();
+        string saves = Path.Combine(Path.GetTempPath(), "nightwire-session-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            string episode = Path.Combine(root, "examples", "Episode_001");
+            var store = new SaveStore(saves);
+            var coordinator = new RuntimeSessionCoordinator(store);
+            Assert(coordinator.StartNewSession(episode).Success, "New session did not start.");
+            Assert(coordinator.BeginConversation("anisha.day01").Success, "Conversation did not begin.");
+
+            string savePath = store.GetSavePath("nightwire.ep001");
+            byte[] beforeTick = File.ReadAllBytes(savePath);
+            var tick = coordinator.AdvanceConversation(0.2);
+            Assert(tick.Success && tick.NewlyDeliveredMessageIds.Count == 0,
+                "Short delay tick should not deliver the first message.");
+            byte[] afterTick = File.ReadAllBytes(savePath);
+            Assert(beforeTick.SequenceEqual(afterTick),
+                "A non-delivery frame unexpectedly rewrote the save file.");
+
+            Assert(coordinator.SaveNow().Success, "Explicit checkpoint did not save.");
+            byte[] afterCheckpoint = File.ReadAllBytes(savePath);
+            Assert(!beforeTick.SequenceEqual(afterCheckpoint),
+                "Explicit checkpoint did not persist the elapsed delay.");
         }
         finally { if (Directory.Exists(saves)) Directory.Delete(saves, true); }
     }
