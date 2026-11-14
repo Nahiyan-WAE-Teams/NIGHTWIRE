@@ -11,8 +11,8 @@
     {
       "path": "Characters/Anisha/profile.json",
       "kind": "character_profile",
-      "size_bytes": 278,
-      "sha256": "4a66e54c8b82046dd547fe6f1d7f57ebfd4916293dd70e656c40e404cc2cdbc4"
+      "size_bytes": 301,
+      "sha256": "4cdbb902013ba9881926d644a94a6c248f2924d0df1dd214e5759b528219f1b6"
     },
     {
       "path": "Characters/Anisha/Conversations/day01.json",
@@ -21,16 +21,34 @@
       "sha256": "aa2499c5f8333208fedc7f32cda9b78e30ddc926688c629081fc16d5ed33c62f"
     },
     {
+      "path": "Characters/Anisha/Posts/post01.json",
+      "kind": "character_post",
+      "size_bytes": 257,
+      "sha256": "0d11cbd56d64f05a3e8b9fc8b658ed6937bde3a1b230851744cc99bc9d0ea1ea"
+    },
+    {
       "path": "Events/episode_start.json",
       "kind": "event",
       "size_bytes": 224,
       "sha256": "89df68e93672a0338007472242b6f9544b273493dd3c7a1265bcb03a33b860c3"
     },
     {
+      "path": "Events/signal_sequence_complete.json",
+      "kind": "event",
+      "size_bytes": 302,
+      "sha256": "affc66ab8627b71ddc05528563e4d324a39488f585f19775eb65d4fa3c40b8e5"
+    },
+    {
+      "path": "Minigames/signal_sequence.json",
+      "kind": "minigame",
+      "size_bytes": 521,
+      "sha256": "7ddab7c4f3b25bc49143bc3c7d7b5c6ec713420ff0d7ea624db3caa1b38522f2"
+    },
+    {
       "path": "Localization/en.json",
       "kind": "localization",
-      "size_bytes": 667,
-      "sha256": "3a72e1e5eb7fab7d0699dbfc138b728d8eaebed84176d57c8827a465643f5518"
+      "size_bytes": 1000,
+      "sha256": "9fa48bcd77c3fabddf01599b4f0e063307ec6488c1e9112d4dc6376d468d8f87"
     }
   ],
   "assets": []
