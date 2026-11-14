@@ -22,9 +22,10 @@ namespace Nightwire.Runtime.Progression
     {
         public StoryActionType Type { get; set; }
         public string? TargetId { get; set; }
-        public string? TextKey { get; set; }
+        public string? TitleKey { get; set; }
+        public string? BodyKey { get; set; }
         public string? Flag { get; set; }
-        public bool Value { get; set; }
+        public StoryFlagValue FlagValue { get; set; } = StoryFlagValue.FromBoolean(true);
     }
 
     /// <summary>
@@ -32,10 +33,7 @@ namespace Nightwire.Runtime.Progression
     /// </summary>
     public sealed class StoryEventEngine
     {
-        public StoryExecutionResult ProcessTrigger(
-            EpisodeRuntimeDefinition episode,
-            EpisodeProgressState state,
-            StoryTrigger trigger)
+        public StoryExecutionResult ProcessTrigger(EpisodeRuntimeDefinition episode, EpisodeProgressState state, StoryTrigger trigger)
         {
             if (episode == null) throw new ArgumentNullException(nameof(episode));
             if (state == null) throw new ArgumentNullException(nameof(state));
@@ -53,14 +51,12 @@ namespace Nightwire.Runtime.Progression
             {
                 if (!Matches(storyEvent, trigger)) continue;
                 if (storyEvent.OneShot && state.CompletedEventIds.Contains(storyEvent.EventId)) continue;
-
                 var validationError = ValidateActions(episode, storyEvent);
                 if (validationError != null)
                 {
                     result.Error = $"Event '{storyEvent.EventId}': {validationError}";
                     return result;
                 }
-
                 matchedEvents.Add(storyEvent);
             }
 
@@ -93,18 +89,16 @@ namespace Nightwire.Runtime.Progression
                             return $"conversation target '{action.TargetId}' does not resolve.";
                         break;
                     case StoryActionType.ShowNotification:
-                        if (string.IsNullOrWhiteSpace(action.TextKey))
-                            return "notification requires a localization text key.";
-                        if (action.TargetId != null && !IsKnownDestination(episode, action.TargetId))
-                            return $"notification destination '{action.TargetId}' does not resolve.";
+                        if (string.IsNullOrWhiteSpace(action.TitleKey) || string.IsNullOrWhiteSpace(action.BodyKey))
+                            return "notification requires title_key and body_key localization keys.";
                         break;
                     case StoryActionType.UnlockAsset:
                         if (string.IsNullOrWhiteSpace(action.TargetId) || !episode.AssetIds.Contains(action.TargetId))
                             return $"asset target '{action.TargetId}' does not resolve.";
                         break;
                     case StoryActionType.SetStoryFlag:
-                        if (string.IsNullOrWhiteSpace(action.Flag))
-                            return "set_story_flag requires a flag name.";
+                        if (string.IsNullOrWhiteSpace(action.Flag) || action.FlagValue == null)
+                            return "set_story_flag requires a flag name and value.";
                         break;
                     case StoryActionType.StartCall:
                         if (string.IsNullOrWhiteSpace(action.TargetId) || !episode.CallIds.Contains(action.TargetId))
@@ -118,32 +112,22 @@ namespace Nightwire.Runtime.Progression
                         return $"unsupported action type '{action.Type}'.";
                 }
             }
-
             return null;
         }
 
-        private static bool IsKnownDestination(EpisodeRuntimeDefinition episode, string destinationId)
-        {
-            return episode.ConversationIds.Contains(destinationId) ||
-                   episode.CallIds.Contains(destinationId) ||
-                   episode.MinigameIds.Contains(destinationId);
-        }
-
-        private static void ApplyActions(
-            StoryEventDefinition storyEvent,
-            EpisodeProgressState state,
-            StoryExecutionResult result)
+        private static void ApplyActions(StoryEventDefinition storyEvent, EpisodeProgressState state, StoryExecutionResult result)
         {
             foreach (var action in storyEvent.Actions)
             {
-                var command = new RuntimeCommand
+                result.Commands.Add(new RuntimeCommand
                 {
                     Type = action.Type,
                     TargetId = action.TargetId,
-                    TextKey = action.TextKey,
+                    TitleKey = action.TitleKey,
+                    BodyKey = action.BodyKey,
                     Flag = action.Flag,
-                    Value = action.Value
-                };
+                    FlagValue = action.FlagValue
+                });
 
                 switch (action.Type)
                 {
@@ -154,15 +138,15 @@ namespace Nightwire.Runtime.Progression
                         state.Notifications.Add(new RuntimeNotification
                         {
                             NotificationId = $"{storyEvent.EventId}.notification.{state.Notifications.Count + 1}",
-                            TextKey = action.TextKey!,
-                            DestinationId = action.TargetId
+                            TitleKey = action.TitleKey!,
+                            BodyKey = action.BodyKey!
                         });
                         break;
                     case StoryActionType.UnlockAsset:
                         state.UnlockedAssetIds.Add(action.TargetId!);
                         break;
                     case StoryActionType.SetStoryFlag:
-                        state.StoryFlags[action.Flag!] = action.Value;
+                        state.StoryFlags[action.Flag!] = action.FlagValue;
                         break;
                     case StoryActionType.StartCall:
                         state.PendingCallId = action.TargetId;
@@ -171,8 +155,6 @@ namespace Nightwire.Runtime.Progression
                         state.PendingMinigameId = action.TargetId;
                         break;
                 }
-
-                result.Commands.Add(command);
             }
         }
     }
