@@ -216,6 +216,7 @@ namespace Nightwire.Runtime.Installation
             var releases = catalogue?.Releases.ToDictionary(x => x.EpisodeId, StringComparer.Ordinal)
                 ?? new Dictionary<string, EpisodeReleaseEntry>(StringComparer.Ordinal);
             var ids = new HashSet<string>(releases.Keys, StringComparer.Ordinal);
+            EnsureNoLinkedAncestors(_installRoot);
             if (Directory.Exists(_installRoot))
             {
                 foreach (string directory in Directory.GetDirectories(_installRoot, "*", SearchOption.TopDirectoryOnly))
@@ -288,8 +289,7 @@ namespace Nightwire.Runtime.Installation
                     _runtimeVersion < minimumRuntimeVersion)
                     return Failure("runtime_version_incompatible", "This episode requires a newer or unsupported runtime version.", episodeId);
 
-                Directory.CreateDirectory(_downloadRoot);
-                Directory.CreateDirectory(_installRoot);
+                // Downloader and installer validate every path ancestor before creating their roots.
                 archivePath = Path.Combine(_downloadRoot, episodeId + "-" + release.EpisodeVersion + ".zip");
                 var download = await _downloader.DownloadReleaseAsync(release, archivePath, progress, operationToken)
                     .ConfigureAwait(false);
@@ -345,6 +345,26 @@ namespace Nightwire.Runtime.Installation
             DisposeDownloaderIfReady();
             // Do not dispose the semaphore here: an in-flight refresh releases it in its
             // finally block after cancellation has propagated.
+        }
+
+        private static void EnsureNoLinkedAncestors(string path)
+        {
+            string current = Path.GetFullPath(path);
+            while (!string.IsNullOrEmpty(current))
+            {
+                try
+                {
+                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                        throw new IOException("Episode library root or one of its parent directories is a symbolic link or reparse point.");
+                }
+                catch (FileNotFoundException) { }
+                catch (DirectoryNotFoundException) { }
+
+                string? parent = Path.GetDirectoryName(current);
+                if (string.IsNullOrEmpty(parent) || string.Equals(parent, current, StringComparison.Ordinal))
+                    break;
+                current = parent;
+            }
         }
 
         private void DisposeDownloaderIfReady()
