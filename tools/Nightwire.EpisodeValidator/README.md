@@ -1,6 +1,6 @@
 # NIGHTWIRE Episode Validator
 
-A dependency-free .NET command-line tool for validating unpacked NIGHTWIRE episode packages.
+A .NET command-line tool for validating unpacked NIGHTWIRE episode packages with JSON Schema and package-wide semantic checks.
 
 ## Requirements
 
