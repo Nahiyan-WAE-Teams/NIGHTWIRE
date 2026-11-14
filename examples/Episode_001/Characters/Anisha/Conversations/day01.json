@@ -1,0 +1,49 @@
+{
+  "schema_version": "0.1",
+  "conversation_id": "anisha.day01",
+  "participants": [
+    "player",
+    "anisha"
+  ],
+  "messages": [
+    {
+      "message_id": "anisha.day01.001",
+      "type": "text",
+      "sender_id": "anisha",
+      "text_key": "chat.anisha.day01.001",
+      "delay_seconds": 1.2
+    },
+    {
+      "message_id": "anisha.day01.002",
+      "type": "choice",
+      "sender_id": "anisha",
+      "prompt_key": "choice.anisha.day01.002.prompt",
+      "options": [
+        {
+          "option_id": "ask_what",
+          "text_key": "choice.anisha.day01.002.ask",
+          "next_message_id": "anisha.day01.003"
+        },
+        {
+          "option_id": "stay_quiet",
+          "text_key": "choice.anisha.day01.002.quiet",
+          "next_message_id": "anisha.day01.004"
+        }
+      ]
+    },
+    {
+      "message_id": "anisha.day01.003",
+      "type": "text",
+      "sender_id": "anisha",
+      "text_key": "chat.anisha.day01.003",
+      "delay_seconds": 0.8
+    },
+    {
+      "message_id": "anisha.day01.004",
+      "type": "text",
+      "sender_id": "anisha",
+      "text_key": "chat.anisha.day01.004",
+      "delay_seconds": 0.8
+    }
+  ]
+}
