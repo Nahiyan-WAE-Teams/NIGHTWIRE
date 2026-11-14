@@ -9,6 +9,7 @@ import android.util.Base64;
 import java.nio.ByteBuffer;
 import java.security.KeyStore;
 import java.util.UUID;
+import java.util.Enumeration;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -39,6 +40,13 @@ public final class NightwireSequenceStore {
         if (alias == null) {
             if (preferences.contains(IV) || preferences.contains(VALUE)) {
                 throw new IllegalStateException("Sequence record is incomplete.");
+            }
+            // A missing preference record is a first launch only when no sequence key
+            // has ever been provisioned for this app. If preferences were cleared or
+            // restored independently, an orphaned StrongBox key proves this is not a
+            // clean installation; fail closed instead of resetting the rollback floor.
+            if (hasAnySequenceKey()) {
+                throw new IllegalStateException("Sequence preferences are missing while a NIGHTWIRE sequence key still exists.");
             }
             return 0L;
         }
@@ -116,6 +124,15 @@ public final class NightwireSequenceStore {
         }
         return context.getApplicationContext().getSharedPreferences(PREFS + "." + namespace,
                 Context.MODE_PRIVATE);
+    }
+
+    private static boolean hasAnySequenceKey() throws Exception {
+        KeyStore keyStore = keyStore();
+        Enumeration<String> aliases = keyStore.aliases();
+        while (aliases.hasMoreElements()) {
+            if (aliases.nextElement().startsWith(ALIAS_PREFIX)) return true;
+        }
+        return false;
     }
 
     private static SecretKey createStrongBoxKey(String alias) throws Exception {
