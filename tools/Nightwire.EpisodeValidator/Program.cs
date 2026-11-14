@@ -104,6 +104,9 @@ internal static class Program
         var characters = new HashSet<string>(StringComparer.Ordinal);
         var conversations = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         var events = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        var calls = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        var minigames = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        var posts = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         var allLocalizationKeys = new HashSet<string>(StringComparer.Ordinal);
         CollectLocalizationKeys(episode, allLocalizationKeys);
 
@@ -149,6 +152,39 @@ internal static class Program
                     }
                     break;
 
+                case "call":
+                    using (var doc = await ReadJsonAsync(fullPath, file.Path))
+                    {
+                        if (doc is null) break;
+                        var id = GetString(doc.RootElement, "call_id");
+                        if (string.IsNullOrWhiteSpace(id)) Errors.Add($"{file.Path}: missing call_id.");
+                        else if (!calls.TryAdd(id, doc.RootElement.Clone())) Errors.Add($"{file.Path}: duplicate call_id '{id}'.");
+                        CollectLocalizationKeys(doc.RootElement, allLocalizationKeys);
+                    }
+                    break;
+
+                case "minigame":
+                    using (var doc = await ReadJsonAsync(fullPath, file.Path))
+                    {
+                        if (doc is null) break;
+                        var id = GetString(doc.RootElement, "minigame_id");
+                        if (string.IsNullOrWhiteSpace(id)) Errors.Add($"{file.Path}: missing minigame_id.");
+                        else if (!minigames.TryAdd(id, doc.RootElement.Clone())) Errors.Add($"{file.Path}: duplicate minigame_id '{id}'.");
+                        CollectLocalizationKeys(doc.RootElement, allLocalizationKeys);
+                    }
+                    break;
+
+                case "character_post":
+                    using (var doc = await ReadJsonAsync(fullPath, file.Path))
+                    {
+                        if (doc is null) break;
+                        var id = GetString(doc.RootElement, "post_id");
+                        if (string.IsNullOrWhiteSpace(id)) Errors.Add($"{file.Path}: missing post_id.");
+                        else if (!posts.TryAdd(id, doc.RootElement.Clone())) Errors.Add($"{file.Path}: duplicate post_id '{id}'.");
+                        CollectLocalizationKeys(doc.RootElement, allLocalizationKeys);
+                    }
+                    break;
+
                 case "localization":
                     using (var doc = await ReadJsonAsync(fullPath, file.Path))
                     {
@@ -170,9 +206,12 @@ internal static class Program
         if (!string.IsNullOrWhiteSpace(entryEvent) && !events.ContainsKey(entryEvent))
             Errors.Add($"episode.json: entry_event '{entryEvent}' does not resolve to an event.");
 
-        ValidateCharactersAndConversations(files, root, characters, conversations);
-        var messageIds = ValidateConversations(conversations, characters, assetById);
-        ValidateEvents(events, conversations, assetById, messageIds);
+        ValidateCharactersAndConversations(files, root, characters, conversations, posts);
+        ValidatePosts(posts, characters, assetById);
+        ValidateCalls(calls, characters, assetById, events, locales);
+        ValidateMinigames(minigames, assetById, events);
+        var messageIds = ValidateConversations(conversations, characters, assetById, calls);
+        ValidateEvents(events, conversations, calls, minigames, assetById, messageIds);
 
         foreach (var locale in locales)
         {
@@ -192,7 +231,7 @@ internal static class Program
         }
 
         Console.WriteLine($"Episode: {episodeId ?? "(unknown)"}");
-        Console.WriteLine($"Manifest files: {files.Count}; assets: {assets.Count}; characters: {characters.Count}; conversations: {conversations.Count}; events: {events.Count}; locales: {locales.Count}");
+        Console.WriteLine($"Manifest files: {files.Count}; assets: {assets.Count}; characters: {characters.Count}; posts: {posts.Count}; conversations: {conversations.Count}; calls: {calls.Count}; minigames: {minigames.Count}; events: {events.Count}; locales: {locales.Count}");
     }
 
     private static async Task<JsonDocument?> ReadJsonAsync(string path, string label)
@@ -325,7 +364,7 @@ internal static class Program
 
     private static void ValidateCharactersAndConversations(
         List<ManifestFile> files, string root, HashSet<string> characters,
-        Dictionary<string, JsonElement> conversations)
+        Dictionary<string, JsonElement> conversations, Dictionary<string, JsonElement> posts)
     {
         foreach (var file in files.Where(f => f.Kind == "character_profile"))
         {
@@ -335,12 +374,15 @@ internal static class Program
             foreach (var conversationId in GetStringArray(doc.RootElement, "conversation_ids", file.Path))
                 if (!conversations.ContainsKey(conversationId))
                     Errors.Add($"{file.Path}: conversation_id '{conversationId}' does not resolve.");
+            foreach (var postId in GetStringArray(doc.RootElement, "post_ids", file.Path))
+                if (!posts.ContainsKey(postId))
+                    Errors.Add($"{file.Path}: post_id '{postId}' does not resolve.");
         }
     }
 
     private static HashSet<string> ValidateConversations(
         Dictionary<string, JsonElement> conversations, HashSet<string> characters,
-        Dictionary<string, Asset> assets)
+        Dictionary<string, Asset> assets, Dictionary<string, JsonElement> calls)
     {
         var allMessageIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var (conversationId, conversation) in conversations)
@@ -382,6 +424,12 @@ internal static class Program
 
                 if (type is "image" or "video" or "audio" or "document")
                     CheckAssetReference(message, conversationId, messageId, assets);
+                if (type == "call_invitation")
+                {
+                    var callId = GetString(message, "call_id");
+                    if (callId is null || !calls.ContainsKey(callId))
+                        Errors.Add($"{conversationId}/{messageId}: call_id '{callId}' does not resolve.");
+                }
 
                 if (type == "choice" && message.TryGetProperty("options", out var options) && options.ValueKind == JsonValueKind.Array)
                 {
@@ -412,15 +460,33 @@ internal static class Program
 
     private static void ValidateEvents(
         Dictionary<string, JsonElement> events, Dictionary<string, JsonElement> conversations,
+        Dictionary<string, JsonElement> calls, Dictionary<string, JsonElement> minigames,
         Dictionary<string, Asset> assets, HashSet<string> messageIds)
     {
         foreach (var (eventId, storyEvent) in events)
         {
-            if (storyEvent.TryGetProperty("trigger", out var trigger) && GetString(trigger, "type") == "message_completed")
+            if (storyEvent.TryGetProperty("trigger", out var trigger))
             {
-                var triggerMessage = GetString(trigger, "message_id");
-                if (triggerMessage is null || !messageIds.Contains(triggerMessage))
-                    Errors.Add($"{eventId}: message_completed trigger references missing message '{triggerMessage}'.");
+                var triggerType = GetString(trigger, "type");
+                var reference = triggerType switch
+                {
+                    "message_completed" => GetString(trigger, "message_id"),
+                    "call_ended" => GetString(trigger, "call_id"),
+                    "minigame_completed" => GetString(trigger, "minigame_id"),
+                    _ => null
+                };
+                if (triggerType == "message_completed" && (reference is null || !messageIds.Contains(reference)))
+                    Errors.Add($"{eventId}: message_completed trigger references missing message '{reference}'.");
+                if (triggerType == "call_ended" && (reference is null || !calls.ContainsKey(reference)))
+                    Errors.Add($"{eventId}: call_ended trigger references missing call '{reference}'.");
+                if (triggerType == "minigame_completed" && (reference is null || !minigames.ContainsKey(reference)))
+                    Errors.Add($"{eventId}: minigame_completed trigger references missing minigame '{reference}'.");
+                if (triggerType == "choice_selected")
+                {
+                    var optionId = GetString(trigger, "option_id");
+                    if (optionId is null || !conversations.Values.Any(c => HasChoiceOption(c, optionId)))
+                        Errors.Add($"{eventId}: choice_selected trigger references missing option '{optionId}'.");
+                }
             }
             if (!storyEvent.TryGetProperty("actions", out var actions) || actions.ValueKind != JsonValueKind.Array)
                 continue;
@@ -439,7 +505,19 @@ internal static class Program
                     if (id is null || !assets.ContainsKey(id))
                         Errors.Add($"{eventId}: unlock_asset references missing asset '{id}'.");
                 }
-                else if (type is not ("show_notification" or "set_story_flag" or "start_call" or "start_minigame"))
+                else if (type == "start_call")
+                {
+                    var id = GetString(action, "call_id");
+                    if (id is null || !calls.ContainsKey(id))
+                        Errors.Add($"{eventId}: start_call references missing call '{id}'.");
+                }
+                else if (type == "start_minigame")
+                {
+                    var id = GetString(action, "minigame_id");
+                    if (id is null || !minigames.ContainsKey(id))
+                        Errors.Add($"{eventId}: start_minigame references missing minigame '{id}'.");
+                }
+                else if (type is not ("show_notification" or "set_story_flag"))
                     Errors.Add($"{eventId}: unsupported event action '{type}'.");
             }
         }
