@@ -302,6 +302,7 @@ namespace Nightwire.Runtime.Installation
             lock (_gate) operation = _operationCancellation;
             try { operation?.Cancel(); }
             catch (AggregateException) { /* Cancellation must not interrupt presentation teardown. */ }
+            catch (ObjectDisposedException) { /* The operation may have completed after the lock was released. */ }
         }
 
         public void ReloadInstalledLibrary()
@@ -399,8 +400,10 @@ namespace Nightwire.Runtime.Installation
             // asynchronous work that needs to acquire this same lock during cleanup.
             try { refresh?.Cancel(); }
             catch (AggregateException) { /* All cancellation callbacks are still attempted. */ }
+            catch (ObjectDisposedException) { /* The refresh may have completed after the lock was released. */ }
             try { operation?.Cancel(); }
             catch (AggregateException) { /* All cancellation callbacks are still attempted. */ }
+            catch (ObjectDisposedException) { /* The operation may have completed after the lock was released. */ }
         }
     }
 }
