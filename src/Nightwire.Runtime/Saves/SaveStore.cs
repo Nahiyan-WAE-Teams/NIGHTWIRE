@@ -58,6 +58,7 @@ namespace Nightwire.Runtime.Saves
             if (_options.MaximumSaveBytes <= 0 || _options.MaximumNotifications < 0 || _options.MaximumCollectionEntries <= 0)
                 throw new ArgumentOutOfRangeException(nameof(options), "Save limits must be positive.");
             Directory.CreateDirectory(_root);
+            EnsureNotLink(_root, "save root");
         }
 
         public void RegisterMigration(IEpisodeProgressMigration migration)
@@ -73,7 +74,13 @@ namespace Nightwire.Runtime.Saves
             _migrations.Add(key, migration);
         }
 
-        public string GetSavePath(string episodeId) => Path.Combine(_root, SafeEpisodeDirectory(episodeId), "save.json");
+        public string GetSavePath(string episodeId)
+        {
+            EnsureNotLink(_root, "save root");
+            string episodeDirectory = Path.Combine(_root, SafeEpisodeDirectory(episodeId));
+            EnsureNotLink(episodeDirectory, "episode save directory");
+            return Path.Combine(episodeDirectory, "save.json");
+        }
 
         public void Save(EpisodeProgressState state)
         {
@@ -81,9 +88,13 @@ namespace Nightwire.Runtime.Saves
             ValidateState(state);
             string directory = Path.GetDirectoryName(GetSavePath(state.EpisodeId))!;
             Directory.CreateDirectory(directory);
+            EnsureNotLink(directory, "episode save directory");
             string path = Path.Combine(directory, "save.json");
             string temp = path + ".tmp";
             string backup = path + ".bak";
+            EnsureNotLink(path, "primary save");
+            EnsureNotLink(temp, "temporary save");
+            EnsureNotLink(backup, "backup save");
 
             var payload = SavePayload.FromState(state);
             byte[] payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOptions);
@@ -126,6 +137,8 @@ namespace Nightwire.Runtime.Saves
                 throw new ArgumentException("Installed episode version is required.", nameof(installedEpisodeVersion));
             string path = GetSavePath(episodeId);
             string backup = path + ".bak";
+            EnsureNotLink(path, "primary save");
+            EnsureNotLink(backup, "backup save");
             if (!File.Exists(path) && !File.Exists(backup))
                 throw new SaveStoreException("save_not_found", $"No save exists for episode '{episodeId}'.");
 
@@ -169,6 +182,7 @@ namespace Nightwire.Runtime.Saves
 
         private SaveEnvelope ReadAndVerify(string path, string expectedEpisodeId)
         {
+            EnsureNotLink(path, "save file");
             var info = new FileInfo(path);
             if (info.Length <= 0 || info.Length > _options.MaximumSaveBytes)
                 throw new SaveStoreException("save_size_invalid", "Save file is empty or exceeds the configured size limit.");
@@ -311,6 +325,14 @@ namespace Nightwire.Runtime.Saves
         }
 
         private static string MigrationKey(string episodeId, string fromVersion) => episodeId + "\n" + fromVersion;
+        private static void EnsureNotLink(string path, string description)
+        {
+            if ((File.Exists(path) || Directory.Exists(path)) &&
+                (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                throw new SaveStoreException("save_path_unsafe",
+                    "Symbolic links and reparse points are not allowed for " + description + ".");
+        }
+
         private static string SafeEpisodeDirectory(string episodeId)
         {
             if (string.IsNullOrWhiteSpace(episodeId) || episodeId.Length > 128 ||
