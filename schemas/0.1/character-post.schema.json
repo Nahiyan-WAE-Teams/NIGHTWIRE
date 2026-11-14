@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nightwire.game/episode/0.1/character-post.schema.json",
+  "title": "Character social post",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "post_id",
+    "author_id",
+    "published_at",
+    "body_key",
+    "media_asset_ids",
+    "comments"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "post_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{1,95}$"
+    },
+    "author_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "body_key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "media_asset_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "comments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "comment_id",
+          "author_id",
+          "body_key"
+        ],
+        "properties": {
+          "comment_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "author_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "body_key": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "reaction_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "visibility": {
+      "enum": [
+        "public",
+        "friends",
+        "private"
+      ]
+    }
+  }
+}
