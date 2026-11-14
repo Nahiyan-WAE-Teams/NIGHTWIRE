@@ -16,6 +16,7 @@
 | `conversation.schema.json` | Participants, message variants, choices, and asset references |
 | `event.schema.json` | Supported event trigger and action shapes |
 | `localization.schema.json` | Locale key/value dictionaries |
+| `release-catalogue.schema.json` | Signed release catalogue payload metadata and archive references |
 
 All schemas use JSON Schema Draft 2020-12. They are draft contracts and may change before the first production episode is authored.
 
@@ -60,4 +61,4 @@ It verifies file inventory, byte sizes, SHA-256 digests, asset references, chara
 
 ## Runtime loading boundary
 
-The runtime loader is implemented in `src/Nightwire.Runtime/Loading/EpisodePackageLoader.cs`. It verifies package inventory, sizes, SHA-256 hashes, path safety, and selected cross-document references before creating runtime indexes. It does not replace full JSON Schema Draft 2020-12 validation; the CLI validator/schema layer remains part of the release validation pipeline. Signed publisher metadata is also still required for authenticity.
+The runtime loader is implemented in `src/Nightwire.Runtime/Loading/EpisodePackageLoader.cs`. It verifies package inventory, sizes, SHA-256 hashes, path safety, and selected cross-document references before creating runtime indexes. It does not replace full JSON Schema Draft 2020-12 validation; the CLI validator/schema layer remains part of the release validation pipeline. Signed release-catalogue verification is implemented in `src/Nightwire.Runtime/Installation/ReleaseCatalogueVerifier.cs`; the app must provision trusted public keys and persist the highest accepted catalogue sequence. Production signing infrastructure and key rotation remain release-engineering responsibilities.
