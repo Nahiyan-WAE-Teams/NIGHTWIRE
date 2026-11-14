@@ -76,11 +76,8 @@ namespace Nightwire.Runtime.Installation
 
                 using var request = new HttpRequestMessage(HttpMethod.Get, source);
                 using var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                if (response.StatusCode == HttpStatusCode.MovedPermanently ||
-                    response.StatusCode == HttpStatusCode.Found ||
-                    response.StatusCode == HttpStatusCode.Redirect ||
-                    response.StatusCode == HttpStatusCode.TemporaryRedirect ||
-                    response.StatusCode == HttpStatusCode.PermanentRedirect)
+                int statusCode = (int)response.StatusCode;
+                if (statusCode >= 300 && statusCode <= 399)
                     return Error("redirect_not_allowed", "Episode download redirects are disabled; use the final HTTPS release URL.");
                 if (!response.IsSuccessStatusCode)
                     return Error("http_error", "Episode server returned HTTP " + (int)response.StatusCode + ".");
