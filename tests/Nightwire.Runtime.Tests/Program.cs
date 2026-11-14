@@ -4,6 +4,7 @@ using System.Linq;
 using Nightwire.Runtime.Loading;
 using Nightwire.Runtime.Domain;
 using Nightwire.Runtime.Progression;
+using Nightwire.Runtime.Conversations;
 
 internal static class Program
 {
@@ -18,6 +19,8 @@ internal static class Program
         Run("episode loader rejects modified manifest content", EpisodeLoaderRejectsTampering, ref failures);
         Run("episode loader rejects unlisted files", EpisodeLoaderRejectsUnlistedFiles, ref failures);
         Run("episode loader rejects an older runtime", EpisodeLoaderRejectsOldRuntime, ref failures);
+        Run("conversation runtime advances by authored delay and persists read state", ConversationRuntimePersistsProgress, ref failures);
+        Run("conversation choices select the authored branch", ConversationRuntimeBranchesOnChoice, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -198,6 +201,56 @@ internal static class Program
         try { loader.Load(Path.Combine(root, "examples", "Episode_001")); }
         catch (EpisodePackageLoadException exception) { rejected = exception.ErrorCode == "runtime_too_old"; }
         Assert(rejected, "Episode requiring a newer runtime was not rejected.");
+    }
+
+
+    private static void ConversationRuntimePersistsProgress()
+    {
+        string root = FindRepositoryRoot();
+        var package = new EpisodePackageLoader().Load(Path.Combine(root, "examples", "Episode_001"));
+        var state = CreateState();
+        var runtime = new ConversationRuntime();
+
+        var begun = runtime.BeginConversation(package, state, "anisha.day01");
+        Assert(begun.Success, begun.Error ?? "Conversation did not begin.");
+
+        var early = runtime.Advance(package, state, 1.1);
+        Assert(early.Success && early.NewlyDeliveredMessageIds.Count == 0, "Message arrived before its authored delay.");
+        var delivered = runtime.Advance(package, state, 0.1);
+        Assert(delivered.Success && delivered.NewlyDeliveredMessageIds.Contains("anisha.day01.001"), "First message was not delivered.");
+
+        var read = runtime.MarkRead(package, state, "anisha.day01.001");
+        Assert(read.Success, read.Error ?? "Message could not be marked read.");
+        Assert(state.ConversationProgress["anisha.day01"].ReadMessageIds.Contains("anisha.day01.001"),
+            "Read state was not persisted in player progress.");
+
+        var choice = runtime.Advance(package, state, 0);
+        Assert(choice.Success && choice.NewlyDeliveredMessageIds.Contains("anisha.day01.002"),
+            "Choice prompt was not delivered after the first message.");
+        Assert(state.ConversationProgress["anisha.day01"].WaitingChoiceMessageId == "anisha.day01.002",
+            "Conversation did not pause for the player's choice.");
+    }
+
+    private static void ConversationRuntimeBranchesOnChoice()
+    {
+        string root = FindRepositoryRoot();
+        var package = new EpisodePackageLoader().Load(Path.Combine(root, "examples", "Episode_001"));
+        var state = CreateState();
+        var runtime = new ConversationRuntime();
+
+        Assert(runtime.BeginConversation(package, state, "anisha.day01").Success, "Conversation did not begin.");
+        runtime.Advance(package, state, 1.2);
+        runtime.Advance(package, state, 0);
+        var selected = runtime.SelectChoice(package, state, "stay_quiet");
+        Assert(selected.Success, selected.Error ?? "Choice selection failed.");
+
+        var progress = state.ConversationProgress["anisha.day01"];
+        Assert(progress.SelectedOptions["anisha.day01.002"] == "stay_quiet", "Selected option was not saved.");
+        var branch = runtime.Advance(package, state, 0.8);
+        Assert(branch.Success && branch.NewlyDeliveredMessageIds.Contains("anisha.day01.004"),
+            "Runtime did not follow the selected choice branch.");
+        Assert(!progress.DeliveredMessageIds.Contains("anisha.day01.003"),
+            "Runtime delivered a message from the unselected branch.");
     }
 
     private static string FindRepositoryRoot()
