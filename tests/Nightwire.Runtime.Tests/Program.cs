@@ -73,6 +73,7 @@ internal static class Program
         Run("installer rejects signed release identity mismatch before replacing existing content", InstallerRejectsReleaseIdentityMismatch, ref failures);
         Run("release manager refreshes signed catalogue and installs offline episode", ReleaseManagerInstallsOfflineEpisode, ref failures);
         Run("release manager cancels active catalogue refresh safely on disposal", ReleaseManagerDisposalCancelsRefresh, ref failures);
+        Run("release manager cancels active install and releases its lease on disposal", ReleaseManagerDisposalCancelsInstall, ref failures);
         Run("episode access gate excludes session and installer ownership", EpisodeAccessGateExcludesSessionAndInstall, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
@@ -1198,6 +1199,45 @@ internal static class Program
         private sealed class TestLease : IDisposable { public void Dispose() { } }
     }
 
+    private sealed class TrackingInstallLeaseProvider : IEpisodeInstallLeaseProvider
+    {
+        public int AcquireCount { get; private set; }
+        public int DisposeCount { get; private set; }
+
+        public bool TryAcquireInstallLease(string episodeId, out IDisposable? lease)
+        {
+            AcquireCount++;
+            lease = new TrackingLease(this);
+            return true;
+        }
+
+        private sealed class TrackingLease : IDisposable
+        {
+            private TrackingInstallLeaseProvider? _owner;
+            public TrackingLease(TrackingInstallLeaseProvider owner) { _owner = owner; }
+            public void Dispose()
+            {
+                var owner = Interlocked.Exchange(ref _owner, null);
+                if (owner != null) owner.DisposeCount++;
+            }
+        }
+    }
+
+    private sealed class CancellationBlockingHttpHandler : HttpMessageHandler
+    {
+        private readonly TaskCompletionSource<bool> _started =
+            new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task Started => _started.Task;
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            _started.TrySetResult(true);
+            await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+            throw new InvalidOperationException("Cancellation-blocking handler unexpectedly resumed.");
+        }
+    }
+
     private sealed class RedirectedResponseHandler : HttpMessageHandler
     {
         private readonly Uri _redirectedUri;
@@ -1374,6 +1414,63 @@ internal static class Program
             "A refresh waiting on the serialization gate did not cancel safely during shutdown.");
         Assert(sequenceStore.LoadHighestAcceptedSequence() == 0,
             "A catalogue sequence was persisted after the release manager had been disposed.");
+    }
+
+    private static void ReleaseManagerDisposalCancelsInstall()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-dispose-install-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            string issued = DateTime.UtcNow.AddMinutes(-1).ToString("o", CultureInfo.InvariantCulture);
+            string expires = DateTime.UtcNow.AddHours(1).ToString("o", CultureInfo.InvariantCulture);
+            string payloadText = "{\"schema_version\":1,\"sequence\":1,\"issued_utc\":\"" + issued +
+                "\",\"expires_utc\":\"" + expires +
+                "\",\"releases\":[{\"episode_id\":\"nightwire.ep001\",\"episode_version\":\"1.0.0\",\"archive_url\":\"https://cdn.example.test/episode.zip\",\"archive_size_bytes\":1,\"archive_sha256\":\"" +
+                new string('a', 64) + "\",\"minimum_runtime_version\":\"1.0.0\"}]}";
+            byte[] payload = System.Text.Encoding.UTF8.GetBytes(payloadText);
+            byte[] signature = key.SignData(payload, HashAlgorithmName.SHA256,
+                DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+            string envelope = "{\"key_id\":\"dispose-install\",\"algorithm\":\"ECDSA-P256-SHA256\",\"payload\":\"" +
+                Convert.ToBase64String(payload) + "\",\"signature\":\"" + Convert.ToBase64String(signature) + "\"}";
+            var verifier = new ReleaseCatalogueVerifier(new[]
+            {
+                new TrustedReleaseKey { KeyId = "dispose-install", SubjectPublicKeyInfo = key.ExportSubjectPublicKeyInfo() }
+            });
+            var acceptance = new ReleaseCatalogueAcceptanceService(verifier, new MemoryReleaseSequenceStore());
+            var leaseProvider = new TrackingInstallLeaseProvider();
+            var handler = new CancellationBlockingHttpHandler();
+            using var httpClient = new HttpClient(handler);
+            using var downloader = new EpisodePackageDownloader(client: httpClient);
+            var manager = new EpisodeReleaseManager(new Uri("https://catalogue.example.test/releases.json"),
+                Path.Combine(root, "installed"), Path.Combine(root, "downloads"),
+                new StubCatalogueTransport(System.Text.Encoding.UTF8.GetBytes(envelope)),
+                acceptance, leaseProvider, "1.0.0", downloader);
+
+            var refreshed = manager.RefreshCatalogueAsync(DateTime.UtcNow).GetAwaiter().GetResult();
+            Assert(refreshed.Success, refreshed.Error ?? "Could not load the signed release fixture.");
+            Task<EpisodeManagerOperationResult> install = manager.InstallOrUpdateAsync("nightwire.ep001");
+            Assert(handler.Started.Wait(TimeSpan.FromSeconds(5)), "Episode download did not enter the HTTP transport.");
+            Assert(leaseProvider.AcquireCount == 1 && leaseProvider.DisposeCount == 0,
+                "Install lease was not held for the active download.");
+
+            manager.Dispose();
+            var result = install.GetAwaiter().GetResult();
+            Assert(!result.Success && result.ErrorCode == "episode_install_cancelled",
+                "Manager shutdown did not cancel the active episode installation.");
+            Assert(leaseProvider.DisposeCount == 1,
+                "Active install lease was not released exactly once after cancellation.");
+            Assert(!Directory.Exists(Path.Combine(root, "installed", "nightwire.ep001")),
+                "Episode installation continued after manager shutdown.");
+            var afterShutdown = manager.InstallOrUpdateAsync("nightwire.ep001").GetAwaiter().GetResult();
+            Assert(!afterShutdown.Success && afterShutdown.ErrorCode == "manager_disposed",
+                "Disposed manager accepted a new episode operation.");
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
     }
 
     private static void ReleaseManagerInstallsOfflineEpisode()
