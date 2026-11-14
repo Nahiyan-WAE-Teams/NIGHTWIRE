@@ -33,6 +33,7 @@ internal static class Program
         Run("episode loader rejects modified manifest content", EpisodeLoaderRejectsTampering, ref failures);
         Run("episode loader rejects unlisted files", EpisodeLoaderRejectsUnlistedFiles, ref failures);
         Run("episode loader rejects linked parent directories before reading package files", EpisodeLoaderRejectsLinkedParentDirectory, ref failures);
+        Run("episode loader rejects a linked ancestor of the package root", EpisodeLoaderRejectsLinkedRootAncestor, ref failures);
         Run("episode loader rejects an older runtime", EpisodeLoaderRejectsOldRuntime, ref failures);
         Run("conversation runtime advances by authored delay and persists read state", ConversationRuntimePersistsProgress, ref failures);
         Run("conversation choices select the authored branch", ConversationRuntimeBranchesOnChoice, ref failures);
@@ -259,6 +260,29 @@ internal static class Program
             if (Directory.Exists(linkedDirectory)) Directory.Delete(linkedDirectory);
             if (Directory.Exists(outside)) Directory.Delete(outside, true);
             if (Directory.Exists(copy)) Directory.Delete(copy, true);
+        }
+    }
+
+    private static void EpisodeLoaderRejectsLinkedRootAncestor()
+    {
+        string package = CopySamplePackage();
+        string parent = Path.Combine(Path.GetTempPath(), "nightwire-package-parent-" + Guid.NewGuid().ToString("N"));
+        string linked = Path.Combine(parent, "linked");
+        Directory.CreateDirectory(parent);
+        try
+        {
+            Directory.CreateSymbolicLink(linked, Path.GetDirectoryName(package)!);
+            string linkedPackage = Path.Combine(linked, Path.GetFileName(package));
+            bool rejected = false;
+            try { new EpisodePackageLoader().Load(linkedPackage); }
+            catch (EpisodePackageLoadException exception) { rejected = exception.ErrorCode == "unsafe_root"; }
+            Assert(rejected, "Loader accepted a package root beneath a linked ancestor.");
+        }
+        finally
+        {
+            if (Directory.Exists(linked)) Directory.Delete(linked);
+            if (Directory.Exists(parent)) Directory.Delete(parent, true);
+            if (Directory.Exists(package)) Directory.Delete(package, true);
         }
     }
 
