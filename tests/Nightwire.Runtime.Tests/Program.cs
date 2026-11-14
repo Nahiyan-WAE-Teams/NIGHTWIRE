@@ -57,7 +57,7 @@ internal static class Program
         Run("episode installer installs and updates a verified package", EpisodeInstallerInstallsAndUpdates, ref failures);
         Run("episode installer rejects ZIP path traversal", EpisodeInstallerRejectsTraversal, ref failures);
         Run("episode downloader verifies a trusted archive hash", EpisodeDownloaderChecksTrustedHash, ref failures);
-        Run("signed release catalogue verifies trusted key and rejects rollback", ReleaseCatalogueVerifiesSignatureAndSequence, ref failures);
+        Run("signed release catalogue verifies signatures, rejects rollback, duplicate JSON keys, and malformed runtime versions", ReleaseCatalogueVerifiesSignatureAndSequence, ref failures);
         Run("installer startup recovery restores interrupted update backup", InstallerRecoveryRestoresPreviousInstall, ref failures);
         Run("installer rejects signed release identity mismatch before replacing existing content", InstallerRejectsReleaseIdentityMismatch, ref failures);
         Run("release manager refreshes signed catalogue and installs offline episode", ReleaseManagerInstallsOfflineEpisode, ref failures);
@@ -913,6 +913,35 @@ internal static class Program
         Assert(accepted.Success && sequenceStore.Sequence == 7, accepted.Error ?? "Accepted catalogue sequence was not persisted.");
         var rollback = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow, 8);
         Assert(!rollback.Success && rollback.ErrorCode == "catalogue_rollback", "Old catalogue sequence was accepted.");
+
+        string duplicateEnvelope = envelopeText.Replace(
+            "\\"key_id\\":\\"release-2026\\"",
+            "\\"key_id\\":\\"release-2026\\",\\"key_id\\":\\"release-2026\\"");
+        var duplicateEnvelopeResult = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(duplicateEnvelope), DateTime.UtcNow);
+        Assert(!duplicateEnvelopeResult.Success, "Duplicate envelope properties were accepted.");
+
+        string duplicatePayloadText = payloadText.Replace("\\"sequence\\":7", "\\"sequence\\":7,\\"sequence\\":7");
+        byte[] duplicatePayload = System.Text.Encoding.UTF8.GetBytes(duplicatePayloadText);
+        byte[] duplicateSignature = key.SignData(duplicatePayload, HashAlgorithmName.SHA256,
+            DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+        string duplicatePayloadEnvelope = "{\\"key_id\\":\\"release-2026\\",\\"algorithm\\":\\"ECDSA-P256-SHA256\\",\\"payload\\":\\"" +
+            Convert.ToBase64String(duplicatePayload) + "\\",\\"signature\\":\\"" +
+            Convert.ToBase64String(duplicateSignature) + "\\"}";
+        var duplicatePayloadResult = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(duplicatePayloadEnvelope), DateTime.UtcNow);
+        Assert(!duplicatePayloadResult.Success, "Duplicate signed-payload properties were accepted.");
+
+        string invalidRuntimePayloadText = payloadText.Replace(
+            "\\"minimum_runtime_version\\":\\"1.0.0\\"",
+            "\\"minimum_runtime_version\\":\\"1.0\\"");
+        byte[] invalidRuntimePayload = System.Text.Encoding.UTF8.GetBytes(invalidRuntimePayloadText);
+        byte[] invalidRuntimeSignature = key.SignData(invalidRuntimePayload, HashAlgorithmName.SHA256,
+            DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+        string invalidRuntimeEnvelope = "{\\"key_id\\":\\"release-2026\\",\\"algorithm\\":\\"ECDSA-P256-SHA256\\",\\"payload\\":\\"" +
+            Convert.ToBase64String(invalidRuntimePayload) + "\\",\\"signature\\":\\"" +
+            Convert.ToBase64String(invalidRuntimeSignature) + "\\"}";
+        var invalidRuntimeResult = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(invalidRuntimeEnvelope), DateTime.UtcNow);
+        Assert(!invalidRuntimeResult.Success && invalidRuntimeResult.ErrorCode == "runtime_version_invalid",
+            "Malformed minimum runtime version was accepted.");
 
         envelopeText = envelopeText.Replace(Convert.ToBase64String(signature), Convert.ToBase64String(new byte[64]));
         var tampered = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow);
