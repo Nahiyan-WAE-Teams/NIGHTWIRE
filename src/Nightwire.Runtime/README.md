@@ -142,3 +142,16 @@ The runtime test harness now includes call cue/subtitle timing, call completion,
 The resolver returns an `EpisodeAssetHandle` containing the stable ID, media type, MIME type, relative package path, byte length, and a read-only stream. It rechecks the canonical path, rejects symbolic links/reparse points and path traversal, enforces a configurable per-asset size limit, and recomputes the manifest SHA-256 before returning the stream. The original package file is never rewritten. The host must dispose each handle after media decoding or document viewing.
 
 This resolver does not download assets, extract archives, decode media, render UI, or choose implicit default unlocks. In schema 0.1, assets remain locked until an authored event explicitly unlocks them; future public/default asset policies should be explicit package metadata rather than inferred from folder names.
+
+
+## Episode download and installation
+
+The portable installation layer is in `Installation/`:
+
+- `EpisodePackageDownloader` streams HTTPS responses to a temporary `.part` file, enforces a configurable byte ceiling, reports byte progress, computes SHA-256, optionally checks a trusted release-catalogue digest, and only publishes the completed archive after validation. The built-in HTTP handler rejects redirects. If a host injects an `HttpClient`, it must configure redirects off as well.
+- `EpisodePackageInstaller` accepts ZIP archives, rejects unsafe/duplicate paths, symlinks, unlisted files, missing manifest entries, excessive entry counts, oversized expanded content, and suspicious compression ratios. It extracts entry-by-entry into a staging directory, verifies every manifest-listed file's size and SHA-256, then runs the full episode package loader before publishing.
+- Updates use same-volume directory moves: the old complete install is moved to a temporary backup, the validated staging directory becomes the active episode directory, and the backup is removed after success. If publishing fails, the installer attempts to restore the previous directory.
+
+The installer does not contact a server, discover releases, authenticate a publisher, or migrate player saves. The downloader's expected archive hash must come from a trusted release catalogue or signed metadata. Hashes inside an archive's own manifest prove consistency, not publisher authenticity. A signed release catalogue and key-rotation/revocation policy are required before production distribution. The application must not replace an episode while a runtime session is actively reading its files; the Unity host owns that lifecycle coordination.
+
+The archive is a ZIP containing `episode.json`, `manifest.json`, and exactly the files declared by the manifest. `episode.json` must itself be listed and hashed by `manifest.json`; `manifest.json` is not self-listed.
