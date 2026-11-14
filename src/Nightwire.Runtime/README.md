@@ -37,3 +37,10 @@ dotnet run --project tests/Nightwire.Runtime.Tests
 ```
 
 It covers episode-start execution, one-shot idempotency, atomic rejection of invalid action batches, and typed asset/call commands. It has not been executed in this environment.
+
+## Official compatibility references
+
+- [Unity 6 release support](https://unity.com/releases/unity-6/support) — Unity identifies 6.3 LTS as its current LTS baseline and recommends LTS when locking a production version.
+- [Unity .NET profile guidance](https://docs.unity3d.com/Manual/overview-of-dot-net-in-unity.html) — Unity recommends the .NET Standard API compatibility profile for new cross-platform projects.
+
+The repository's core project targets netstandard2.1 to match Unity's documented profile. The actual Unity Editor installation and Android build compatibility still need to be verified when the Unity project is created.
