@@ -212,17 +212,28 @@ namespace Nightwire.Runtime.Installation
             }
             Publish();
 
+            long lastPublishedBytes = 0;
             var progress = new Progress<EpisodeDownloadProgress>(value =>
             {
+                bool publish = false;
                 lock (_gate)
                 {
                     if (_rows.TryGetValue(episodeId, out var row))
                     {
                         row.BytesReceived = value.BytesReceived;
                         row.TotalBytes = value.TotalBytes;
+                        long step = value.TotalBytes.HasValue
+                            ? Math.Max(64 * 1024L, value.TotalBytes.Value / 100L)
+                            : 256 * 1024L;
+                        if (value.BytesReceived - lastPublishedBytes >= step ||
+                            (value.TotalBytes.HasValue && value.BytesReceived >= value.TotalBytes.Value))
+                        {
+                            lastPublishedBytes = value.BytesReceived;
+                            publish = true;
+                        }
                     }
                 }
-                Publish();
+                if (publish) Publish();
             });
 
             EpisodeManagerOperationResult result;
