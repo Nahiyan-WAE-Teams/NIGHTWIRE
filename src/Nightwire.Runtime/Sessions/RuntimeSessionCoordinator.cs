@@ -8,6 +8,7 @@ using Nightwire.Runtime.Progression;
 using Nightwire.Runtime.Saves;
 using Nightwire.Runtime.Calls;
 using Nightwire.Runtime.Minigames;
+using Nightwire.Runtime.Assets;
 
 namespace Nightwire.Runtime.Sessions
 {
@@ -113,6 +114,13 @@ namespace Nightwire.Runtime.Sessions
             result.RecoveredFromBackup = loaded.RecoveredFromBackup;
             result.Migrated = loaded.Migrated;
             return result;
+        }
+
+        public EpisodeAssetOpenResult OpenAsset(string assetId)
+        {
+            if (!TryContext(out var package, out var state, out var failure))
+                return new EpisodeAssetOpenResult { Success = false, ErrorCode = failure!.ErrorCode, Error = failure.Error };
+            return new EpisodeAssetResolver(package, state).Open(assetId);
         }
 
         public RuntimeSessionResult BeginConversation(string conversationId)
