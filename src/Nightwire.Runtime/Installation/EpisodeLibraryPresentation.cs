@@ -103,6 +103,7 @@ namespace Nightwire.Runtime.Installation
     public sealed class EpisodeLibrarySnapshot
     {
         public bool IsRefreshing { get; internal set; }
+        public bool IsOperationBusy { get; internal set; }
         public bool CatalogueAvailable { get; internal set; }
         public string? CatalogueError { get; internal set; }
         public IReadOnlyList<EpisodeLibraryRow> Episodes { get; internal set; } =
@@ -146,6 +147,7 @@ namespace Nightwire.Runtime.Installation
                     return new EpisodeLibrarySnapshot
                     {
                         IsRefreshing = _refreshing,
+                        IsOperationBusy = _operationCancellation != null,
                         CatalogueAvailable = _catalogueAvailable,
                         CatalogueError = _catalogueError,
                         Episodes = rows
