@@ -49,7 +49,6 @@ namespace Nightwire.Runtime.Minigames
             bool solved = expected.GetArrayLength() == sequence.Count;
             for (int i = 0; solved && i < sequence.Count; i++) solved = string.Equals(expected[i].GetString(), sequence[i], StringComparison.Ordinal);
             if (solved) progress.IsComplete = true;
-            if (solved) progress.IsComplete = true;
             var result = Snapshot(definition, progress);
             result.Solved = solved;
             result.AttemptsExhausted = !solved && result.AttemptsRemaining == 0;
@@ -111,6 +110,7 @@ namespace Nightwire.Runtime.Minigames
                 if (!progress.MatchedItemIds.Contains(a + "\u001f" + b) && !progress.MatchedItemIds.Contains(b + "\u001f" + a))
                 { solved = false; break; }
             }
+            if (solved) progress.IsComplete = true;
             var result = Snapshot(definition, progress);
             result.Solved = solved;
             result.AttemptsExhausted = !solved && result.AttemptsRemaining == 0;
