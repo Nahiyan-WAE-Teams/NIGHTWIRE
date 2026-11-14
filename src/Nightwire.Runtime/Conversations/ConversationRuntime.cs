@@ -111,7 +111,6 @@ namespace Nightwire.Runtime.Conversations
                     progress.WaitingChoiceMessageId = messageId;
                     break;
                 }
-
             }
 
             if (safety <= 0) return Fail(result, "Conversation exceeded the safe message-advance limit.");
@@ -127,7 +126,7 @@ namespace Nightwire.Runtime.Conversations
         {
             var result = ValidateContext(package, state);
             if (!result.Success) return result;
-            if (!TryGetActiveProgress(state, out var conversationId, out var progress))
+            if (!TryGetActiveProgress(state, out _, out var progress))
                 return Fail(result, "There is no active conversation.");
             if (!progress.DeliveredMessageIds.Contains(messageId))
                 return Fail(result, $"Message '{messageId}' has not been delivered.");
@@ -181,8 +180,6 @@ namespace Nightwire.Runtime.Conversations
             if (!story.Success) return Fail(result, story.Error ?? "Story event failed.");
 
             progress.SelectedOptions[progress.WaitingChoiceMessageId] = optionId;
-            progress.ReadMessageIds.Add(progress.WaitingChoiceMessageId);
-
             if (selected.TryGetProperty("set_flags", out var flags) && flags.ValueKind == JsonValueKind.Array)
             {
                 foreach (var flag in flags.EnumerateArray())
