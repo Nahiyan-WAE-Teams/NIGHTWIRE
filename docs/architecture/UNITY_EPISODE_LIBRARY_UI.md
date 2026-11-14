@@ -2,7 +2,7 @@
 
 ## Baseline checked
 
-The current production baseline remains **Unity 6.3 LTS (6000.3)**. Unity identifies 6.3 LTS as its current LTS line and recommends LTS for production projects that are locking an engine version. The UI integration uses the runtime UI Toolkit workflow documented for Unity 6.3: a UXML document, a `UIDocument`, and a `MonoBehaviour` that binds controls during `OnEnable` and unregisters during `OnDisable`.
+The current production baseline remains **Unity 6.3 LTS (6000.3)**. For Android plugin builds, match the Gradle/AGP versions to the exact Unity patch. Unity's current compatibility table lists Gradle 9.3.1 / AGP 9.1.1 for 6000.3.26f1 and later. Unity identifies 6.3 LTS as its current LTS line and recommends LTS for production projects that are locking an engine version. The UI integration uses the runtime UI Toolkit workflow documented for Unity 6.3: a UXML document, a `UIDocument`, and a `MonoBehaviour` that binds controls during `OnEnable` and unregisters during `OnDisable`.
 
 Official references:
 - Unity 6.3 LTS support and recommendation: https://unity.com/releases/unity-6/support
@@ -19,7 +19,10 @@ UI Toolkit is selected for this archive screen because it is a multi-resolution,
 - `unity/Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` — UI Toolkit view controller.
 - `unity/Assets/Nightwire/Scripts/NightwireApplicationRoot.cs` — application composition root for release, save, library, and session services.
 - `unity/Assets/Nightwire/Scripts/EpisodeSessionHost.cs` — resume/new-session selection and lease lifetime.
-- `unity/Assets/Nightwire/Scripts/INightwirePlatformServices.cs` — platform boundary for trusted keys and rollback-resistant sequence storage.
+- `unity/Assets/Nightwire/Scripts/INightwirePlatformServices.cs` — platform provider contract.
+- `unity/Assets/Nightwire/Scripts/AndroidNightwirePlatformServices.cs` — Android provider and Java bridge.
+- `unity/Android/NightwireSecureStore/` — StrongBox-backed encrypted sequence store Android library.
+- `tools/prepare-unity-runtime.sh` and `tools/Prepare-UnityRuntime.ps1` — dependency staging scripts.
 - `unity/Assets/Nightwire/Scripts/Nightwire.Unity.asmdef` — presentation assembly boundary referencing `Nightwire.Runtime`.
 - `src/Nightwire.Runtime/Installation/EpisodeLibraryPresentation.cs` — UI-neutral snapshot/progress adapter.
 - `src/Nightwire.Runtime/Installation/EpisodeLibraryPresentation.cs` — atomic per-episode session/install lease gate.
@@ -28,7 +31,7 @@ The visual direction uses near-black navy surfaces, restrained violet accents, c
 
 ## Unity scene setup
 
-1. Create a Unity 6.3 LTS project and import the runtime assembly and its verified dependencies.
+1. Create a Unity 6.3 LTS project. Run the runtime staging script from the repository root, then import the staged runtime/dependency DLLs and generated `link.xml`.
 2. Add `EpisodeLibraryView.uxml` and `EpisodeLibraryView.uss` to the Unity project. Assign the USS to the UXML document's Style Sheets list in UI Builder or the Inspector.
 3. Create a Panel Settings asset and a GameObject with a `UIDocument` component. Assign the UXML as its Source Asset and the Panel Settings asset.
 4. Add `EpisodeLibraryViewController` to the same GameObject.
@@ -49,7 +52,7 @@ The repository contains bootstrap/session-host integration source but does not y
 5. Binds the library presentation to the UI and connects the Play action to session opening.
 6. Saves active progress on application pause and saves/closes the session on application quit or root destruction.
 
-The platform contract intentionally has no default implementation. A production provider must provision public verification keys independently of downloaded catalogue data and store the highest accepted catalogue sequence in rollback-resistant platform storage. A normal editable preferences/file implementation is not sufficient. No catalogue URL, production key, or storage implementation is fabricated in this repository.
+The platform contract intentionally has no insecure default implementation. `AndroidNightwirePlatformServices` supplies the HTTPS URL and app-provisioned public keys, and bridges to `NightwireSecureStore`. The Android library requires API 28+ and StrongBox-backed AES keys. It rotates the key per sequence and deletes the previous key before committing the new encrypted record; an older preferences snapshot then references a deleted key and fails closed. This depends on the device's StrongBox guarantees and does not defend against a fully compromised/rooted OS. Server-side sequence enforcement remains recommended. No production catalogue URL or signing public key is fabricated in this repository.
 
 `EpisodeSessionHost` acquires the session lease before loading the package. It resumes when either the primary save or its recovery backup exists; otherwise it starts a new session. A failed open releases the lease. On close it saves, closes the coordinator, and only then releases the lease. The host is single-session and must be called on the Unity main thread.
 
@@ -77,8 +80,8 @@ This makes the session-start versus install-start decision atomic inside the pro
 
 ## Important dependency gate
 
-The portable runtime currently references `System.Text.Json 10.0.15` through its .NET project. Unity's .NET Standard 2.1 API profile does not automatically restore arbitrary NuGet package dependencies from the .csproj. Before the Unity project is considered buildable, the exact System.Text.Json dependency set must be imported and tested under Unity's Mono and Android IL2CPP backends, including linker preservation and cryptography support. Do not mark the runtime assembly as integrated until that device compatibility check is complete.
+The portable runtime currently references `System.Text.Json 10.0.15` through its .NET project. Unity's .NET Standard 2.1 API profile does not automatically restore arbitrary NuGet package dependencies from the .csproj. The repository now includes shell and PowerShell scripts that run `dotnet publish`, copy the resolved DLL set into `unity/Assets/Plugins/Nightwire/`, and generate `link.xml` with preservation entries. This staging workflow has not been run here. Before the Unity project is considered buildable, compile the imported dependencies under Unity Mono and Android IL2CPP, including linker preservation and cryptography support.
 
-The Unity UI files have not been compiled or executed in the Editor yet. Build, play-mode tests, and Android device verification remain pending.
+The Unity UI files and Android AAR have not been compiled or executed yet. Build, play-mode tests, StrongBox replay tests, and Android IL2CPP verification remain pending.
 
 UI Toolkit USS transitions are documented for Unity 6.3 and support short changes to color and transform properties: https://docs.unity.com/en-us/engine/6000.3/manual/uitoolkits/uielements/uie-uss/properties/reference
