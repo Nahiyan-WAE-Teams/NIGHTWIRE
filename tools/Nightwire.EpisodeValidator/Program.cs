@@ -97,8 +97,11 @@ internal static class Program
         {
             if (!assetById.TryAdd(asset.Id, asset))
                 Errors.Add($"manifest.json: duplicate asset_id '{asset.Id}'.");
-            if (!files.Any(f => string.Equals(f.Path, asset.Path, StringComparison.Ordinal)))
+            var assetFile = files.FirstOrDefault(f => string.Equals(f.Path, asset.Path, StringComparison.Ordinal));
+            if (assetFile is null)
                 Errors.Add($"manifest.json: asset '{asset.Id}' points to an unlisted file '{asset.Path}'.");
+            else if (assetFile.Kind != "media")
+                Errors.Add($"manifest.json: asset '{asset.Id}' must point to a file with kind 'media', got '{assetFile.Kind}'.");
         }
 
         var characters = new HashSet<string>(StringComparer.Ordinal);
@@ -696,6 +699,8 @@ internal static class Program
             if (storyEvent.TryGetProperty("trigger", out var trigger))
             {
                 var triggerType = GetString(trigger, "type");
+                if (triggerType is not ("episode_started" or "message_completed" or "choice_selected" or "call_ended" or "minigame_completed"))
+                    Errors.Add($"{eventId}: unsupported event trigger '{triggerType}'.");
                 var reference = triggerType switch
                 {
                     "message_completed" => GetString(trigger, "message_id"),
