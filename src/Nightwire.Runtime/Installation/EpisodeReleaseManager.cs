@@ -120,9 +120,12 @@ namespace Nightwire.Runtime.Installation
         private readonly IEpisodeInstallLeaseProvider _leaseProvider;
         private readonly bool _ownsDownloader;
         private readonly SemaphoreSlim _refreshGate = new SemaphoreSlim(1, 1);
+        private readonly CancellationTokenSource _lifetimeCancellation = new CancellationTokenSource();
         private readonly object _gate = new object();
         private readonly HashSet<string> _operations = new HashSet<string>(StringComparer.Ordinal);
         private VerifiedReleaseCatalogue? _catalogue;
+        private bool _disposed;
+        private bool _downloaderDisposed;
 
         public VerifiedReleaseCatalogue? CurrentCatalogue
         {
@@ -164,7 +167,14 @@ namespace Nightwire.Runtime.Installation
         public async Task<ReleaseCatalogueResult> RefreshCatalogueAsync(DateTime utcNow,
             CancellationToken cancellationToken = default)
         {
-            try { await _refreshGate.WaitAsync(cancellationToken).ConfigureAwait(false); }
+            lock (_gate)
+                if (_disposed)
+                    return CatalogueFailure("manager_disposed", "Episode release manager has been disposed.");
+
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, _lifetimeCancellation.Token);
+            CancellationToken operationToken = linkedCancellation.Token;
+            try { await _refreshGate.WaitAsync(operationToken).ConfigureAwait(false); }
             catch (OperationCanceledException)
             {
                 return CatalogueFailure("catalogue_fetch_cancelled", "Release catalogue refresh was cancelled.");
@@ -175,7 +185,7 @@ namespace Nightwire.Runtime.Installation
                 byte[] envelope;
                 try
                 {
-                    envelope = await _transport.FetchAsync(_catalogueUri, cancellationToken).ConfigureAwait(false);
+                    envelope = await _transport.FetchAsync(_catalogueUri, operationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -189,7 +199,10 @@ namespace Nightwire.Runtime.Installation
                 var accepted = _acceptance.Accept(envelope, utcNow);
                 if (accepted.Success && accepted.Catalogue != null)
                 {
-                    lock (_gate) _catalogue = accepted.Catalogue;
+                    lock (_gate)
+                    {
+                        if (!_disposed) _catalogue = accepted.Catalogue;
+                    }
                 }
                 return accepted;
             }
@@ -253,6 +266,7 @@ namespace Nightwire.Runtime.Installation
             EpisodeReleaseEntry? release;
             lock (_gate)
             {
+                if (_disposed) return Failure("manager_disposed", "Episode release manager has been disposed.", episodeId);
                 release = _catalogue?.Releases.FirstOrDefault(x =>
                     string.Equals(x.EpisodeId, episodeId, StringComparison.Ordinal));
                 if (release == null) return Failure("release_not_found", "Episode is not present in the currently accepted release catalogue.", episodeId);
@@ -260,6 +274,9 @@ namespace Nightwire.Runtime.Installation
                     return Failure("episode_operation_in_progress", "Another download or install is already running for this episode.", episodeId);
             }
 
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, _lifetimeCancellation.Token);
+            CancellationToken operationToken = linkedCancellation.Token;
             IDisposable? lease = null;
             string? archivePath = null;
             try
@@ -273,7 +290,7 @@ namespace Nightwire.Runtime.Installation
                 Directory.CreateDirectory(_downloadRoot);
                 Directory.CreateDirectory(_installRoot);
                 archivePath = Path.Combine(_downloadRoot, episodeId + "-" + release.EpisodeVersion + ".zip");
-                var download = await _downloader.DownloadReleaseAsync(release, archivePath, progress, cancellationToken)
+                var download = await _downloader.DownloadReleaseAsync(release, archivePath, progress, operationToken)
                     .ConfigureAwait(false);
                 if (!download.Success)
                     return new EpisodeManagerOperationResult
@@ -309,6 +326,7 @@ namespace Nightwire.Runtime.Installation
                 finally
                 {
                     lock (_gate) _operations.Remove(episodeId);
+                    DisposeDownloaderIfReady();
                 }
                 // Keep a successfully downloaded archive as a cache; failed partial downloads are removed by downloader.
             }
@@ -316,8 +334,29 @@ namespace Nightwire.Runtime.Installation
 
         public void Dispose()
         {
-            if (_ownsDownloader) _downloader.Dispose();
-            _refreshGate.Dispose();
+            lock (_gate)
+            {
+                if (_disposed) return;
+                _disposed = true;
+            }
+            _lifetimeCancellation.Cancel();
+            DisposeDownloaderIfReady();
+            // Do not dispose the semaphore here: an in-flight refresh releases it in its
+            // finally block after cancellation has propagated.
+        }
+
+        private void DisposeDownloaderIfReady()
+        {
+            bool dispose = false;
+            lock (_gate)
+            {
+                if (_disposed && _ownsDownloader && !_downloaderDisposed && _operations.Count == 0)
+                {
+                    _downloaderDisposed = true;
+                    dispose = true;
+                }
+            }
+            if (dispose) _downloader.Dispose();
         }
 
         private static ReleaseCatalogueResult CatalogueFailure(string code, string message) =>
