@@ -181,10 +181,12 @@ namespace Nightwire.Runtime.Installation
         }
 
         private static int Integer(JsonElement element, string name) => checked((int)Long(element, name));
+        private static bool IsAsciiLetterOrDigit(char c) =>
+            (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
         private static bool SafeId(string value) => value.Length <= 64 && value != "." && value != ".." &&
-            value.All(c => char.IsAsciiLetterOrDigit(c) || c == '.' || c == '_' || c == '-');
+            value.All(c => IsAsciiLetterOrDigit(c) || c == '.' || c == '_' || c == '-');
         private static bool SafeVersion(string value) => value.Length <= 64 &&
-            value.All(c => char.IsAsciiLetterOrDigit(c) || c == '.' || c == '+' || c == '-' );
+            value.All(c => IsAsciiLetterOrDigit(c) || c == '.' || c == '+' || c == '-' );
         private static bool IsSha256(string value) => value.Length == 64 &&
             value.All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
         private static ReleaseCatalogueResult Error(string code, string message) =>
