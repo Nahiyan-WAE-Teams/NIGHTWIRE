@@ -577,3 +577,33 @@ The signing private key is release-infrastructure-only. The app ships trusted pu
 Before any episode session is opened or a new install begins, the host calls `RecoverInterruptedInstalls(installRoot)`. The recovery pass removes abandoned `.install-*` staging directories and inspects retained `.backup-{episodeId}-{guid}` directories. If the episode destination is missing, the newest backup is restored. If the destination already exists, the new validated installation is considered published and obsolete backups can be removed. Unsafe destinations and cleanup failures produce warnings and leave the backup intact.
 
 The operation is idempotent and repairs the known interruption window between moving the old install aside and moving the new staging directory into place. It is not a general filesystem transaction or protection against storage-device failure. The host must call it at startup under an install lock, before runtime sessions can access episode files.
+
+
+## 24. Episode release manager and offline library
+
+The portable runtime now includes an initial `EpisodeReleaseManager` orchestration service. It connects the catalogue, downloader, installer, and package-loader boundaries; it is not a Unity UI implementation.
+
+### Catalogue refresh
+
+- The host supplies an HTTPS catalogue URI and an `IReleaseCatalogueTransport`.
+- The built-in `HttpReleaseCatalogueTransport` rejects redirects and enforces a bounded response size. A custom transport must enforce equivalent constraints.
+- The manager passes exact envelope bytes to `ReleaseCatalogueAcceptanceService`. It does not trust release metadata before signature verification.
+- A failed refresh does not replace the last accepted in-memory catalogue. Durable anti-rollback sequence storage remains host-provided.
+- Catalogue data is currently memory-only; refresh is required after process restart. Installed episodes remain available offline independently of catalogue availability.
+
+### Library and installation
+
+- The library enumerates installed episode directories and reloads packages through `EpisodePackageLoader`; only packages that pass local integrity and compatibility checks are reported as installed/offline.
+- Release state distinguishes downloadable, installed/offline, update available, installed but absent from the current catalogue, and invalid local package.
+- Installation is only possible from the currently accepted signed catalogue. The downloader verifies the signed archive byte count and SHA-256.
+- The manager checks the signed minimum runtime version against the host-supplied numeric runtime version.
+- The installer validates the package and checks its episode ID and content version against the signed release entry while content is still staged, before moving the previous install. A catalogue/archive identity mismatch therefore cannot replace the current install.
+- Per-episode operations are serialized within the manager instance. Cancellation and byte progress are forwarded from the downloader.
+
+### Gameplay-session exclusion
+
+The host must implement `IEpisodeInstallLeaseProvider`. Acquiring a lease must be atomic with starting a gameplay session for the same episode: either the session owns the episode, or the installer owns the update lease, never both. The host releases the lease when installation ends. Checking a session's active flag without a shared lock is insufficient because a session could start between the check and the directory replacement.
+
+Startup recovery must run before the host opens sessions or starts installation. The host remains responsible for coordinating multiple processes, trusted-key provisioning, protected sequence storage, platform paths, and UI lifecycle.
+
+This layer does not implement automatic background updates, cloud delivery, user-facing download screens, Android secure-storage adapters, or a Unity presentation scene. It does not delete or migrate player saves as part of content installation.
