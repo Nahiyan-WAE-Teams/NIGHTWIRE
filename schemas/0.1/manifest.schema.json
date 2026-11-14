@@ -45,7 +45,8 @@
               "minigame",
               "localization",
               "media",
-              "other"
+              "other",
+              "character_post"
             ]
           },
           "size_bytes": {
