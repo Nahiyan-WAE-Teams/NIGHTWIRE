@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1",
+  "episode_id": "nightwire.ep001",
+  "episode_version": "1.0.0",
+  "title_key": "episode.title",
+  "description_key": "episode.description",
+  "minimum_runtime_version": "0.1.0",
+  "entry_event": "event.episode_start",
+  "default_locale": "en",
+  "supported_locales": [
+    "en"
+  ],
+  "manifest": "manifest.json"
+}
