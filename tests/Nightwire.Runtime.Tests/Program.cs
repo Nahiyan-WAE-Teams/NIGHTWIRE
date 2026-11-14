@@ -427,7 +427,7 @@ internal static class Program
             Assert(result.Success, result.Error ?? "Session did not start.");
             Assert(coordinator.Progress != null && coordinator.Progress.EpisodeId == "nightwire.ep001",
                 "Session did not create episode progress.");
-            Assert(coordinator.Progress!.CompletedEventIds.Contains("episode_start"),
+            Assert(coordinator.Progress!.CompletedEventIds.Contains("event.episode_start"),
                 "Entry event was not processed.");
             Assert(result.Commands.Count > 0, "Entry event commands were not returned to the host.");
             Assert(File.Exists(store.GetSavePath("nightwire.ep001")), "New session was not saved.");
