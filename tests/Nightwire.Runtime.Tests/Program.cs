@@ -74,6 +74,7 @@ internal static class Program
         Run("release manager refreshes signed catalogue and installs offline episode", ReleaseManagerInstallsOfflineEpisode, ref failures);
         Run("release manager cancels active catalogue refresh safely on disposal", ReleaseManagerDisposalCancelsRefresh, ref failures);
         Run("release manager cancels active install and releases its lease on disposal", ReleaseManagerDisposalCancelsInstall, ref failures);
+        Run("episode library presentation cancels refresh and suppresses events after disposal", LibraryPresentationDisposalCancelsRefresh, ref failures);
         Run("episode access gate excludes session and installer ownership", EpisodeAccessGateExcludesSessionAndInstall, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
@@ -1365,6 +1366,46 @@ internal static class Program
         envelopeText = envelopeText.Replace(Convert.ToBase64String(signature), Convert.ToBase64String(new byte[64]));
         var tampered = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow);
         Assert(!tampered.Success && tampered.ErrorCode == "signature_invalid", "Invalid catalogue signature was accepted.");
+    }
+
+    private static void LibraryPresentationDisposalCancelsRefresh()
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var verifier = new ReleaseCatalogueVerifier(new[]
+        {
+            new TrustedReleaseKey { KeyId = "library-dispose", SubjectPublicKeyInfo = key.ExportSubjectPublicKeyInfo() }
+        });
+        var acceptance = new ReleaseCatalogueAcceptanceService(verifier, new MemoryReleaseSequenceStore());
+        var transport = new DeferredCatalogueTransport();
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-library-dispose-" + Guid.NewGuid().ToString("N"));
+        var manager = new EpisodeReleaseManager(new Uri("https://catalogue.example.test/releases.json"),
+            Path.Combine(root, "installed"), Path.Combine(root, "downloads"),
+            transport, acceptance, new StubInstallLeaseProvider(), "1.0.0");
+        var presentation = new EpisodeLibraryPresentation(manager);
+        int notificationsAfterDispose = 0;
+        bool disposed = false;
+        presentation.Changed += _ =>
+        {
+            if (disposed) Interlocked.Increment(ref notificationsAfterDispose);
+        };
+
+        Task<ReleaseCatalogueResult> refresh = presentation.RefreshAsync(DateTime.UtcNow);
+        disposed = true;
+        presentation.Dispose();
+        transport.Complete(Array.Empty<byte>());
+        var result = refresh.GetAwaiter().GetResult();
+
+        Assert(!result.Success && result.ErrorCode == "catalogue_fetch_cancelled",
+            "Disposing the library presentation did not cancel its active catalogue refresh.");
+        Assert(notificationsAfterDispose == 0,
+            "The disposed presentation published a Changed event after shutdown.");
+        Assert(!presentation.Snapshot.IsRefreshing,
+            "The disposed presentation retained a stale refreshing state.");
+        bool rejected = false;
+        try { presentation.RefreshAsync(DateTime.UtcNow).GetAwaiter().GetResult(); }
+        catch (ObjectDisposedException) { rejected = true; }
+        Assert(rejected, "A disposed library presentation accepted another refresh.");
+        manager.Dispose();
     }
 
     private static void EpisodeAccessGateExcludesSessionAndInstall()
