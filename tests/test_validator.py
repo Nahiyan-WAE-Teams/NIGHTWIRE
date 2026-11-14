@@ -79,6 +79,44 @@ class EpisodeValidatorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("choice points to missing message", result.stderr)
 
+    def test_call_invitation_must_resolve(self) -> None:
+        relative = "Characters/Anisha/Conversations/day01.json"
+        conversation_path = self.package / relative
+        conversation = json.loads(conversation_path.read_text(encoding="utf-8"))
+        conversation["messages"].append({
+            "message_id": "anisha.day01.call01",
+            "type": "call_invitation",
+            "sender_id": "anisha",
+            "call_id": "missing.call",
+        })
+        conversation_path.write_text(json.dumps(conversation, indent=2) + "\\n", encoding="utf-8")
+        self.refresh_manifest_entry(relative)
+        result = self.run_validator()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("does not resolve", result.stderr)
+
+    def test_minigame_sequence_must_use_declared_symbols(self) -> None:
+        relative = "Minigames/signal_sequence.json"
+        minigame_path = self.package / relative
+        minigame = json.loads(minigame_path.read_text(encoding="utf-8"))
+        minigame["configuration"]["sequence"][1] = "undeclared"
+        minigame_path.write_text(json.dumps(minigame, indent=2) + "\\n", encoding="utf-8")
+        self.refresh_manifest_entry(relative)
+        result = self.run_validator()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("not declared in symbols", result.stderr)
+
+    def test_post_author_must_resolve(self) -> None:
+        relative = "Characters/Anisha/Posts/post01.json"
+        post_path = self.package / relative
+        post = json.loads(post_path.read_text(encoding="utf-8"))
+        post["author_id"] = "missing_character"
+        post_path.write_text(json.dumps(post, indent=2) + "\\n", encoding="utf-8")
+        self.refresh_manifest_entry(relative)
+        result = self.run_validator()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("does not resolve to a character", result.stderr)
+
     def test_path_traversal_in_manifest_is_rejected(self) -> None:
         manifest_path = self.package / "manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
