@@ -58,8 +58,10 @@ namespace Nightwire.Runtime.Calls
                 if (selected.HasValue && selected.Value.TryGetProperty("entries", out var entries))
                     foreach (var entry in entries.EnumerateArray())
                     {
-                        long end = RequiredInt64(entry, "end_ms");
-                        if (end > progress.ElapsedMilliseconds - deltaMilliseconds && end <= progress.ElapsedMilliseconds)
+                        long start = RequiredInt64(entry, "start_ms");
+                        string subtitleKey = locale + "|" + start.ToString(System.Globalization.CultureInfo.InvariantCulture) + "|" +
+                            RequiredInt64(entry, "end_ms").ToString(System.Globalization.CultureInfo.InvariantCulture) + "|" + RequiredString(entry, "text_key");
+                        if (start <= progress.ElapsedMilliseconds && progress.FiredSubtitleIds.Add(subtitleKey))
                             result.Subtitles.Add(entry.Clone());
                     }
             }
