@@ -273,15 +273,15 @@ namespace Nightwire.Runtime.Installation
                     if (entries.ContainsKey(directory))
                         throw Fail("archive_path_type_conflict", $"Archive path '{directory}' is declared as both a file and a directory.");
                 }
-                foreach (string file in entries.Keys)
+                foreach (string path in entries.Keys.Concat(explicitDirectories))
                 {
-                    int separator = file.IndexOf('/');
+                    int separator = path.IndexOf('/');
                     while (separator >= 0)
                     {
-                        string parent = file.Substring(0, separator);
+                        string parent = path.Substring(0, separator);
                         if (entries.ContainsKey(parent))
                             throw Fail("archive_path_type_conflict", $"File '{parent}' cannot also be a parent directory.");
-                        separator = file.IndexOf('/', separator + 1);
+                        separator = path.IndexOf('/', separator + 1);
                     }
                 }
 
