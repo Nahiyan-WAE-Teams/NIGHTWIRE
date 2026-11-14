@@ -15,7 +15,7 @@ NIGHTWIRE is designed around a reusable game runtime and independently downloada
 
 ## Current development stage
 
-The episode package contract, schemas, sample package, semantic validator, portable C# runtime core, verified episode-directory loader, and first data-driven conversation interpreter are in place as drafts. Current work is building and reviewing the runtime foundation before Unity presentation.
+The episode package contract, schemas, sample package, semantic validator, portable C# runtime core, verified episode-directory loader, first data-driven conversation interpreter, and versioned local save store are in place as drafts. Current work is building and reviewing the runtime foundation before Unity presentation.
 
 See the [episode package specification](docs/architecture/EPISODE_PACKAGE_SPEC.md), [JSON Schema guide](docs/architecture/JSON_SCHEMA_GUIDE.md), [client runtime blueprint](docs/architecture/CLIENT_RUNTIME_BLUEPRINT.md), [public Moonvale reference research](docs/research/MOONVALE_PUBLIC_REFERENCE.md), [runtime core](src/Nightwire.Runtime/README.md), and [sample Episode 001](examples/Episode_001/episode.json). The v0.1 contracts include character posts, prerecorded calls, and declarative minigames.
 
@@ -30,7 +30,7 @@ Current baseline: Unity 6.3 LTS (to be verified at editor setup), .NET Standard 
 
 ## Development status
 
-A Unity scene-based playable game is not implemented yet. The portable C# runtime now includes domain/progress models, an allowlisted story-event interpreter, an unpacked episode loader that verifies manifest inventory, file sizes, SHA-256 hashes, safe paths, and cross-file references, plus a deterministic conversation interpreter for timed delivery, choices, branching, and player-owned delivery/read progress. Unity presentation, archive extraction, signed release verification, save serialization/migration, and actual test execution remain pending.
+A Unity scene-based playable game is not implemented yet. The portable C# runtime now includes domain/progress models, an allowlisted story-event interpreter, an unpacked episode loader that verifies manifest inventory, file sizes, SHA-256 hashes, safe paths, and cross-file references, plus a deterministic conversation interpreter and a versioned local save store with checksums, atomic replacement, backup recovery, and explicit episode-version migrations. Unity presentation, archive extraction, signed release verification, cloud synchronization, encryption, save-format migrations, and actual test execution remain pending.
 
 
 ## Validate an episode package
