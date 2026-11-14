@@ -1,0 +1,22 @@
+{
+  "schema_version": "0.1",
+  "minigame_id": "minigame.signal_sequence",
+  "type": "sequence_reconstruction",
+  "title_key": "minigame.signal_sequence.title",
+  "instructions_key": "minigame.signal_sequence.instructions",
+  "completion_event_id": "event.signal_sequence_complete",
+  "attempt_limit": 3,
+  "time_limit_seconds": 90,
+  "configuration": {
+    "sequence": [
+      "low",
+      "high",
+      "low"
+    ],
+    "symbols": [
+      "low",
+      "high"
+    ],
+    "hint_key": "minigame.signal_sequence.hint"
+  }
+}
