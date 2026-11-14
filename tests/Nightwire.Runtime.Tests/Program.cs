@@ -986,14 +986,15 @@ internal static class Program
         public void SaveHighestAcceptedSequence(long sequence) { Sequence = sequence; }
     }
 
-    private sealed class BlockingCatalogueTransport : IReleaseCatalogueTransport
+    private sealed class DeferredCatalogueTransport : IReleaseCatalogueTransport
     {
-        public async Task<byte[]> FetchAsync(Uri catalogueUri, CancellationToken cancellationToken)
-        {
-            var completion = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
-            using (cancellationToken.Register(() => completion.TrySetCanceled()))
-                return await completion.Task.ConfigureAwait(false);
-        }
+        private readonly TaskCompletionSource<byte[]> _completion =
+            new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<byte[]> FetchAsync(Uri catalogueUri, CancellationToken cancellationToken) =>
+            _completion.Task;
+
+        public void Complete(byte[] envelope) => _completion.TrySetResult(envelope);
     }
 
     private sealed class StubCatalogueTransport : IReleaseCatalogueTransport
@@ -1134,16 +1135,21 @@ internal static class Program
         {
             new TrustedReleaseKey { KeyId = "dispose-test", SubjectPublicKeyInfo = key.ExportSubjectPublicKeyInfo() }
         });
-        var acceptance = new ReleaseCatalogueAcceptanceService(verifier, new MemoryReleaseSequenceStore());
+        var sequenceStore = new MemoryReleaseSequenceStore();
+        var acceptance = new ReleaseCatalogueAcceptanceService(verifier, sequenceStore);
+        var transport = new DeferredCatalogueTransport();
         var manager = new EpisodeReleaseManager(new Uri("https://catalogue.example.test/releases.json"),
             Path.Combine(Path.GetTempPath(), "nightwire-dispose-install"),
             Path.Combine(Path.GetTempPath(), "nightwire-dispose-download"),
-            new BlockingCatalogueTransport(), acceptance, new StubInstallLeaseProvider(), "1.0.0");
+            transport, acceptance, new StubInstallLeaseProvider(), "1.0.0");
         Task<ReleaseCatalogueResult> refresh = manager.RefreshCatalogueAsync(DateTime.UtcNow);
         manager.Dispose();
+        transport.Complete(Array.Empty<byte>());
         var result = refresh.GetAwaiter().GetResult();
         Assert(!result.Success && result.ErrorCode == "catalogue_fetch_cancelled",
-            "Disposing the manager did not cancel an active catalogue refresh cleanly.");
+            "A transport that completed after shutdown was not cancelled before catalogue acceptance.");
+        Assert(sequenceStore.LoadHighestAcceptedSequence() == 0,
+            "A catalogue sequence was persisted after the release manager had been disposed.");
     }
 
     private static void ReleaseManagerInstallsOfflineEpisode()
