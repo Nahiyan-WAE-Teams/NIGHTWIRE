@@ -14,6 +14,7 @@ namespace Nightwire.Runtime.Domain
         public string MinimumRuntimeVersion { get; set; } = string.Empty;
         public string EntryEventId { get; set; } = string.Empty;
         public string DefaultLocale { get; set; } = string.Empty;
+        public string Manifest { get; set; } = "manifest.json";
         public List<string> SupportedLocales { get; } = new List<string>();
     }
 
