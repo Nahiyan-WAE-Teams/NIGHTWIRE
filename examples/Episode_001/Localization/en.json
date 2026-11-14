@@ -9,5 +9,9 @@
   "choice.anisha.day01.002.ask": "Tell me what happened.",
   "choice.anisha.day01.002.quiet": "Give me a moment.",
   "chat.anisha.day01.003": "I found something strange near the railway line.",
-  "chat.anisha.day01.004": "Okay. I'll wait."
+  "chat.anisha.day01.004": "Okay. I'll wait.",
+  "post.anisha.001.body": "I heard a strange signal near the old railway line last night.",
+  "minigame.signal_sequence.title": "Reconstruct the Signal",
+  "minigame.signal_sequence.instructions": "Repeat the signal pattern in the correct order.",
+  "minigame.signal_sequence.hint": "Listen for the alternating low and high tones."
 }
