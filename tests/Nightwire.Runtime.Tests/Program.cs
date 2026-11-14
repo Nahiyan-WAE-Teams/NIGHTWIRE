@@ -939,7 +939,7 @@ internal static class Program
         Directory.CreateDirectory(root);
         try
         {
-            for (int scenario = 0; scenario < 3; scenario++)
+            for (int scenario = 0; scenario < 4; scenario++)
             {
                 string archive = Path.Combine(root, "conflict-" + scenario + ".zip");
                 using (var file = new FileStream(archive, FileMode.CreateNew))
@@ -955,10 +955,15 @@ internal static class Program
                         zip.CreateEntry("node/");
                         using (var writer = new StreamWriter(zip.CreateEntry("node").Open())) writer.Write("file");
                     }
-                    else
+                    else if (scenario == 2)
                     {
                         zip.CreateEntry("node/");
                         zip.CreateEntry("node/");
+                    }
+                    else
+                    {
+                        using (var writer = new StreamWriter(zip.CreateEntry("node").Open())) writer.Write("file");
+                        zip.CreateEntry("node/child/");
                     }
                 }
 
