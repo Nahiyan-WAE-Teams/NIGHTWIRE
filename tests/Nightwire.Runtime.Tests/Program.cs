@@ -11,6 +11,12 @@ using Nightwire.Runtime.Sessions;
 using Nightwire.Runtime.Calls;
 using Nightwire.Runtime.Minigames;
 using Nightwire.Runtime.Assets;
+using Nightwire.Runtime.Installation;
+using System.IO.Compression;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Security.Cryptography;
 
 internal static class Program
@@ -46,6 +52,9 @@ internal static class Program
         Run("session coordinator dispatches solved minigame event", SessionDispatchesMinigameCompletion, ref failures);
         Run("asset resolver enforces unlocks and opens verified read-only content", AssetResolverEnforcesUnlockAndIntegrity, ref failures);
         Run("asset resolver rejects content modified after package load", AssetResolverRejectsPostLoadTampering, ref failures);
+        Run("episode installer installs and updates a verified package", EpisodeInstallerInstallsAndUpdates, ref failures);
+        Run("episode installer rejects ZIP path traversal", EpisodeInstallerRejectsTraversal, ref failures);
+        Run("episode downloader verifies a trusted archive hash", EpisodeDownloaderChecksTrustedHash, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -719,6 +728,101 @@ internal static class Program
         package.Manifest.Assets.Add(asset);
         package.AssetsById.Add(asset.AssetId, asset);
         return package;
+    }
+
+
+    private static void EpisodeInstallerInstallsAndUpdates()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-install-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string archive = Path.Combine(root, "episode.zip");
+            CreateSampleArchive(archive);
+            string installRoot = Path.Combine(root, "installed");
+            var installer = new EpisodePackageInstaller();
+            var first = installer.InstallArchive(archive, installRoot);
+            Assert(first.Success && !first.UpdatedExisting, first.Error ?? "Initial install failed.");
+            Assert(new EpisodePackageLoader().Load(first.InstallDirectory!).Descriptor.EpisodeId == "nightwire.ep001",
+                "Installed package failed runtime loading.");
+            var second = installer.InstallArchive(archive, installRoot);
+            Assert(second.Success && second.UpdatedExisting, second.Error ?? "Update failed.");
+            Assert(new EpisodePackageLoader().Load(second.InstallDirectory!).Descriptor.EpisodeVersion == "1.0.0",
+                "Updated package failed runtime loading.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void EpisodeInstallerRejectsTraversal()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-install-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string archive = Path.Combine(root, "bad.zip");
+            using (var file = new FileStream(archive, FileMode.CreateNew))
+            using (var zip = new ZipArchive(file, ZipArchiveMode.Create))
+            using (var writer = new StreamWriter(zip.CreateEntry("../outside.txt").Open()))
+                writer.Write("escape");
+            var result = new EpisodePackageInstaller().InstallArchive(archive, Path.Combine(root, "installed"));
+            Assert(!result.Success && result.ErrorCode == "unsafe_archive_path", "ZIP traversal was not rejected.");
+            Assert(!File.Exists(Path.Combine(root, "outside.txt")), "ZIP traversal wrote outside staging.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void EpisodeDownloaderChecksTrustedHash()
+    {
+        byte[] payload = System.Text.Encoding.UTF8.GetBytes("episode archive bytes");
+        using var sha = SHA256.Create();
+        string digest = BitConverter.ToString(sha.ComputeHash(payload)).Replace("-", string.Empty).ToLowerInvariant();
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-download-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            using var client = new HttpClient(new StubHttpHandler(payload));
+            using var downloader = new EpisodePackageDownloader(client: client);
+            string target = Path.Combine(root, "episode.zip");
+            var result = downloader.DownloadAsync(new Uri("https://cdn.example.test/episode.zip"), target, digest)
+                .GetAwaiter().GetResult();
+            Assert(result.Success && result.Sha256 == digest && File.ReadAllBytes(target).SequenceEqual(payload),
+                result.Error ?? "Verified download failed.");
+            var bad = downloader.DownloadAsync(new Uri("https://cdn.example.test/episode.zip"), target, new string('0', 64))
+                .GetAwaiter().GetResult();
+            Assert(!bad.Success && bad.ErrorCode == "download_hash_mismatch", "Incorrect trusted hash was accepted.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void CreateSampleArchive(string archivePath)
+    {
+        string source = Path.Combine(FindRepositoryRoot(), "examples", "Episode_001");
+        using var file = new FileStream(archivePath, FileMode.CreateNew);
+        using var zip = new ZipArchive(file, ZipArchiveMode.Create);
+        foreach (string path in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+        {
+            string relative = path.Substring(source.Length)
+                .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                .Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
+            var entry = zip.CreateEntry(relative, CompressionLevel.Optimal);
+            using var input = File.OpenRead(path);
+            using var output = entry.Open();
+            input.CopyTo(output);
+        }
+    }
+
+    private sealed class StubHttpHandler : HttpMessageHandler
+    {
+        private readonly byte[] _payload;
+        public StubHttpHandler(byte[] payload) { _payload = payload; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(_payload),
+                RequestMessage = request
+            });
+        }
     }
 
     private sealed class TestEpisodeMigration : IEpisodeProgressMigration
