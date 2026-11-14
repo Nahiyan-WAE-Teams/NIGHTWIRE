@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.nightwire.game/episode/0.1/minigame.schema.json",
+  "title": "Minigame definition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "minigame_id",
+    "type",
+    "title_key",
+    "instructions_key",
+    "completion_event_id",
+    "configuration"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "minigame_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{1,95}$"
+    },
+    "type": {
+      "enum": [
+        "frequency_tuning",
+        "sequence_reconstruction",
+        "evidence_matching"
+      ]
+    },
+    "title_key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "instructions_key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "completion_event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attempt_limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "time_limit_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3600
+    },
+    "configuration": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum_frequency",
+            "maximum_frequency",
+            "target_frequency",
+            "tolerance"
+          ],
+          "properties": {
+            "minimum_frequency": {
+              "type": "number"
+            },
+            "maximum_frequency": {
+              "type": "number"
+            },
+            "target_frequency": {
+              "type": "number"
+            },
+            "tolerance": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "unit_key": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sequence",
+            "symbols"
+          ],
+          "properties": {
+            "sequence": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "symbols": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 16,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "hint_key": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "items",
+            "pairs"
+          ],
+          "properties": {
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 24,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "item_id",
+                  "label_key"
+                ],
+                "properties": {
+                  "item_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "label_key": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "asset_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "pairs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "left_item_id",
+                  "right_item_id"
+                ],
+                "properties": {
+                  "left_item_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "right_item_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
