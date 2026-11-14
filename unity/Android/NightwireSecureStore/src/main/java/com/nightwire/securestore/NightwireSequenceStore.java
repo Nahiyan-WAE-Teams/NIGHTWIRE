@@ -19,10 +19,9 @@ import javax.crypto.spec.GCMParameterSpec;
 /**
  * Stores the accepted release-catalogue sequence encrypted with a rotating StrongBox key.
  *
- * Each successful update creates a new StrongBox key, encrypts the sequence, deletes the
- * previous key, and only then commits the new pointer. Restoring an older preferences snapshot
- * therefore points at a key that has already been deleted. If a crash happens between deletion
- * and commit, loading fails closed rather than silently resetting the counter.
+ * The preference filename is deliberately fixed so the application can exclude this exact
+ * file from both cloud backup and device-to-device transfer. The configured namespace remains
+ * authenticated as AES-GCM AAD and cannot be changed without making the record unreadable.
  */
 public final class NightwireSequenceStore {
     private static final String PREFS = "nightwire_catalogue_sequence_v1";
@@ -122,8 +121,9 @@ public final class NightwireSequenceStore {
         if (namespace == null || !namespace.matches("[A-Za-z0-9_.-]{1,80}")) {
             throw new IllegalArgumentException("Sequence namespace is invalid.");
         }
-        return context.getApplicationContext().getSharedPreferences(PREFS + "." + namespace,
-                Context.MODE_PRIVATE);
+        // Keep one stable filename: Android backup rules cannot use wildcards, and this
+        // security-critical record must be excluded from every supported transfer mode.
+        return context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
     private static boolean hasAnySequenceKey() throws Exception {
