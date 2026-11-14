@@ -2,7 +2,9 @@
 
 These are required device tests; they have not been executed.
 
-1. First load with no record returns sequence 0.
+1. First load with no record and no NIGHTWIRE sequence key returns sequence 0.
+2. After saving a sequence, clear or delete the SharedPreferences record while leaving AndroidKeyStore intact; load must fail closed because an orphaned NIGHTWIRE key remains.
+3. A missing record with a sequence key created under a different configured namespace must also fail closed rather than treating the namespace as a fresh installation.
 2. Save sequence 1, recreate the provider, and load 1.
 3. Save sequence 2; confirm sequence 1's key alias no longer exists.
 4. Restore a captured copy of the old SharedPreferences record after saving sequence 2; loading must fail because the old StrongBox key was deleted.
