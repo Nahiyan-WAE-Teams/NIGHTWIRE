@@ -30,7 +30,7 @@ namespace Nightwire.Runtime.Installation
     }
 
     /// <summary>
-    /// Installs verified ZIP episode packages using a staging directory and atomic directory moves.
+    /// Installs verified ZIP episode packages using a staging directory and rollback-capable directory moves.
     /// ZIP entries are treated as untrusted input; no archive path is extracted directly.
     /// </summary>
     public sealed class EpisodePackageInstaller
