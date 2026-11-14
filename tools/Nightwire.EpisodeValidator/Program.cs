@@ -458,6 +458,211 @@ internal static class Program
         return allMessageIds;
     }
 
+    private static void ValidatePosts(
+        Dictionary<string, JsonElement> posts, HashSet<string> characters,
+        Dictionary<string, Asset> assets)
+    {
+        foreach (var (postId, post) in posts)
+        {
+            var author = GetString(post, "author_id");
+            if (author is null || !characters.Contains(author))
+                Errors.Add($"Post '{postId}': author_id '{author}' does not resolve to a character.");
+            foreach (var assetId in GetStringArray(post, "media_asset_ids", postId))
+                if (!assets.ContainsKey(assetId))
+                    Errors.Add($"Post '{postId}': media asset '{assetId}' does not resolve.");
+
+            if (post.TryGetProperty("comments", out var comments) && comments.ValueKind == JsonValueKind.Array)
+            {
+                var commentIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var comment in comments.EnumerateArray())
+                {
+                    var commentId = GetString(comment, "comment_id");
+                    var commentAuthor = GetString(comment, "author_id");
+                    if (commentId is null || !commentIds.Add(commentId))
+                        Errors.Add($"Post '{postId}': missing or duplicate comment_id '{commentId}'.");
+                    if (commentAuthor is null || !characters.Contains(commentAuthor))
+                        Errors.Add($"Post '{postId}': comment author '{commentAuthor}' does not resolve to a character.");
+                }
+            }
+        }
+    }
+
+    private static void ValidateCalls(
+        Dictionary<string, JsonElement> calls, HashSet<string> characters,
+        Dictionary<string, Asset> assets, Dictionary<string, JsonElement> events,
+        List<string> locales)
+    {
+        foreach (var (callId, call) in calls)
+        {
+            foreach (var participant in GetStringArray(call, "participants", callId))
+                if (!characters.Contains(participant))
+                    Errors.Add($"Call '{callId}': participant '{participant}' has no character profile.");
+
+            var mode = GetString(call, "mode");
+            if (!call.TryGetProperty("media", out var media) || media.ValueKind != JsonValueKind.Object)
+            {
+                Errors.Add($"Call '{callId}': media must be an object.");
+            }
+            else
+            {
+                var requiredAsset = mode == "video" ? "video_asset_id" : "audio_asset_id";
+                var assetId = GetString(media, requiredAsset);
+                if (assetId is null || !assets.TryGetValue(assetId, out var asset))
+                    Errors.Add($"Call '{callId}': required {requiredAsset} '{assetId}' does not resolve.");
+                else if (asset.Type != mode)
+                    Errors.Add($"Call '{callId}': {requiredAsset} must reference a '{mode}' asset, got '{asset.Type}'.");
+                foreach (var optional in new[] { "audio_asset_id", "video_asset_id", "poster_asset_id" })
+                {
+                    var optionalId = GetString(media, optional);
+                    if (optionalId is not null && !assets.ContainsKey(optionalId))
+                        Errors.Add($"Call '{callId}': {optional} '{optionalId}' does not resolve.");
+                }
+            }
+
+            var duration = call.TryGetProperty("duration_ms", out var durationElement) && durationElement.TryGetInt64(out var durationMs)
+                ? durationMs : 0;
+            if (call.TryGetProperty("subtitle_tracks", out var tracks) && tracks.ValueKind == JsonValueKind.Array)
+            {
+                var trackLocales = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var track in tracks.EnumerateArray())
+                {
+                    var locale = GetString(track, "locale");
+                    if (locale is null || !trackLocales.Add(locale))
+                        Errors.Add($"Call '{callId}': missing or duplicate subtitle locale '{locale}'.");
+                    else if (!locales.Contains(locale, StringComparer.Ordinal))
+                        Errors.Add($"Call '{callId}': subtitle locale '{locale}' is not declared by the episode.");
+
+                    if (!track.TryGetProperty("entries", out var entries) || entries.ValueKind != JsonValueKind.Array) continue;
+                    foreach (var entry in entries.EnumerateArray())
+                    {
+                        var start = entry.TryGetProperty("start_ms", out var startValue) && startValue.TryGetInt64(out var startMs) ? startMs : -1;
+                        var end = entry.TryGetProperty("end_ms", out var endValue) && endValue.TryGetInt64(out var endMs) ? endMs : -1;
+                        if (start < 0 || end <= start || end > duration)
+                            Errors.Add($"Call '{callId}': subtitle interval {start}-{end} is outside call duration {duration}.");
+                        var speaker = GetString(entry, "speaker_id");
+                        if (speaker is not null && !characters.Contains(speaker))
+                            Errors.Add($"Call '{callId}': subtitle speaker '{speaker}' has no character profile.");
+                    }
+                }
+            }
+
+            if (call.TryGetProperty("cues", out var cues) && cues.ValueKind == JsonValueKind.Array)
+            {
+                var cueIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var cue in cues.EnumerateArray())
+                {
+                    var cueId = GetString(cue, "cue_id");
+                    if (cueId is null || !cueIds.Add(cueId))
+                        Errors.Add($"Call '{callId}': missing or duplicate cue_id '{cueId}'.");
+                    var at = cue.TryGetProperty("at_ms", out var atValue) && atValue.TryGetInt64(out var atMs) ? atMs : -1;
+                    if (at < 0 || at > duration)
+                        Errors.Add($"Call '{callId}': cue '{cueId}' is outside call duration.");
+                    var speaker = GetString(cue, "speaker_id");
+                    if (speaker is not null && !characters.Contains(speaker))
+                        Errors.Add($"Call '{callId}': cue speaker '{speaker}' has no character profile.");
+                }
+            }
+
+            var completionEvent = GetString(call, "completion_event_id");
+            if (completionEvent is not null &&
+                (!events.TryGetValue(completionEvent, out var completion) ||
+                 GetString(completion, "trigger") is not null ||
+                 !completion.TryGetProperty("trigger", out var trigger) ||
+                 GetString(trigger, "type") != "call_ended" ||
+                 GetString(trigger, "call_id") != callId))
+                Errors.Add($"Call '{callId}': completion_event_id '{completionEvent}' must reference its matching call_ended event.");
+        }
+    }
+
+    private static void ValidateMinigames(
+        Dictionary<string, JsonElement> minigames, Dictionary<string, Asset> assets,
+        Dictionary<string, JsonElement> events)
+    {
+        foreach (var (minigameId, minigame) in minigames)
+        {
+            var type = GetString(minigame, "type");
+            if (!minigame.TryGetProperty("configuration", out var config) || config.ValueKind != JsonValueKind.Object)
+            {
+                Errors.Add($"Minigame '{minigameId}': configuration must be an object.");
+                continue;
+            }
+
+            if (type == "frequency_tuning")
+            {
+                var min = GetNumber(config, "minimum_frequency");
+                var max = GetNumber(config, "maximum_frequency");
+                var target = GetNumber(config, "target_frequency");
+                var tolerance = GetNumber(config, "tolerance");
+                if (min is null || max is null || target is null || tolerance is null ||
+                    min >= max || target < min || target > max || tolerance <= 0)
+                    Errors.Add($"Minigame '{minigameId}': frequency range, target, and tolerance are inconsistent.");
+            }
+            else if (type == "sequence_reconstruction")
+            {
+                var symbols = GetStringArray(config, "symbols", minigameId).ToHashSet(StringComparer.Ordinal);
+                var sequence = GetStringArray(config, "sequence", minigameId);
+                if (sequence.Any(symbol => !symbols.Contains(symbol)))
+                    Errors.Add($"Minigame '{minigameId}': sequence contains a symbol not declared in symbols.");
+            }
+            else if (type == "evidence_matching")
+            {
+                var itemIds = new HashSet<string>(StringComparer.Ordinal);
+                if (config.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in items.EnumerateArray())
+                    {
+                        var itemId = GetString(item, "item_id");
+                        if (itemId is null || !itemIds.Add(itemId))
+                            Errors.Add($"Minigame '{minigameId}': missing or duplicate item_id '{itemId}'.");
+                        var assetId = GetString(item, "asset_id");
+                        if (assetId is not null && !assets.ContainsKey(assetId))
+                            Errors.Add($"Minigame '{minigameId}': item asset '{assetId}' does not resolve.");
+                    }
+                }
+                if (config.TryGetProperty("pairs", out var pairs) && pairs.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var pair in pairs.EnumerateArray())
+                    {
+                        var left = GetString(pair, "left_item_id");
+                        var right = GetString(pair, "right_item_id");
+                        if (left is null || right is null || left == right || !itemIds.Contains(left) || !itemIds.Contains(right))
+                            Errors.Add($"Minigame '{minigameId}': evidence pair '{left}'/'{right}' references invalid items.");
+                    }
+                }
+            }
+            else
+            {
+                Errors.Add($"Minigame '{minigameId}': unsupported type '{type}'.");
+            }
+
+            var completionEvent = GetString(minigame, "completion_event_id");
+            if (completionEvent is not null &&
+                (!events.TryGetValue(completionEvent, out var completion) ||
+                 !completion.TryGetProperty("trigger", out var trigger) ||
+                 GetString(trigger, "type") != "minigame_completed" ||
+                 GetString(trigger, "minigame_id") != minigameId))
+                Errors.Add($"Minigame '{minigameId}': completion_event_id '{completionEvent}' must reference its matching minigame_completed event.");
+        }
+    }
+
+    private static bool HasChoiceOption(JsonElement conversation, string optionId)
+    {
+        if (!conversation.TryGetProperty("messages", out var messages) || messages.ValueKind != JsonValueKind.Array) return false;
+        foreach (var message in messages.EnumerateArray())
+        {
+            if (GetString(message, "type") != "choice" ||
+                !message.TryGetProperty("options", out var options) || options.ValueKind != JsonValueKind.Array) continue;
+            foreach (var option in options.EnumerateArray())
+                if (GetString(option, "option_id") == optionId) return true;
+        }
+        return false;
+    }
+
+    private static double? GetNumber(JsonElement element, string property)
+    {
+        return element.TryGetProperty(property, out var value) && value.TryGetDouble(out var number) ? number : null;
+    }
+
     private static void ValidateEvents(
         Dictionary<string, JsonElement> events, Dictionary<string, JsonElement> conversations,
         Dictionary<string, JsonElement> calls, Dictionary<string, JsonElement> minigames,
