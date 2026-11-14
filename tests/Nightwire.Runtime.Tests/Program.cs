@@ -1145,7 +1145,7 @@ internal static class Program
             Directory.CreateSymbolicLink(linked, outside);
             bool rejected = false;
             try { new EpisodePackageInstaller().RecoverInterruptedInstalls(installRoot); }
-            catch (IOException) { rejected = true; }
+            catch (EpisodeInstallException exception) { rejected = exception.ErrorCode == "unsafe_install_root"; }
             Assert(rejected, "Installer accepted a linked ancestor directory.");
             Assert(!Directory.Exists(Path.Combine(outside, "episodes")),
                 "Installer created its root through a linked ancestor.");
