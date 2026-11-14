@@ -155,3 +155,14 @@ The portable installation layer is in `Installation/`:
 The installer does not contact a server, discover releases, authenticate a publisher, or migrate player saves. The downloader's expected archive hash must come from a trusted release catalogue or signed metadata. Hashes inside an archive's own manifest prove consistency, not publisher authenticity. A signed release catalogue and key-rotation/revocation policy are required before production distribution. The application must not replace an episode while a runtime session is actively reading its files; the Unity host owns that lifecycle coordination.
 
 The archive is a ZIP containing `episode.json`, `manifest.json`, and exactly the files declared by the manifest. `episode.json` must itself be listed and hashed by `manifest.json`; `manifest.json` is not self-listed.
+
+
+## Signed release catalogues and startup recovery
+
+`Installation/ReleaseCatalogueVerifier.cs` verifies a detached release catalogue envelope. The envelope carries `key_id`, fixed algorithm identifier `ECDSA-P256-SHA256`, Base64 `payload` bytes, and a Base64 IEEE-P1363 ECDSA signature. The signature covers the exact payload bytes; the verifier does not reserialize JSON before verification. Trusted P-256 public keys are supplied by the host from app-controlled configuration and are never accepted from the downloaded envelope.
+
+The signed payload schema version 1 contains a monotonically increasing `sequence`, `issued_utc`, `expires_utc`, and release entries with episode ID/version, HTTPS archive URL, exact archive byte count, SHA-256, and minimum runtime version. Verification checks key trust, signature, schema, time window, sequence floor, unique release identities, HTTPS URLs, sizes, and digests. The host must persist the highest accepted sequence and pass it as `minimumSequence`; the runtime does not silently persist anti-rollback state. `EpisodePackageDownloader.DownloadReleaseAsync` consumes a verified release entry and checks both its signed size and SHA-256 before publishing the downloaded archive.
+
+Key rotation requires a deliberate trust update: ship the next public key in an app update or introduce a separately specified root-signed keyset protocol. Never accept a replacement key merely because it appears in a catalogue signed by an untrusted key. The signing private key must remain in release infrastructure, not the client or repository.
+
+Call `EpisodePackageInstaller.RecoverInterruptedInstalls` once at app startup, before opening episode sessions or beginning another install. It removes abandoned staging directories and restores the newest retained backup when an episode destination is missing. If the new destination already exists, obsolete backups are cleaned. Recovery reports warnings rather than deleting backups when a destination is unsafe. This is idempotent startup repair for the installer's two-move update sequence; the host must ensure no install is concurrently running.
