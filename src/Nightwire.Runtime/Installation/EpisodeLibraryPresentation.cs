@@ -204,7 +204,7 @@ namespace Nightwire.Runtime.Installation
                 {
                     if (ReferenceEquals(_refreshCancellation, refreshSource))
                         _refreshCancellation = null;
-                    if (!_disposed) _refreshing = false;
+                    _refreshing = false;
                 }
                 refreshSource.Dispose();
                 Publish();
