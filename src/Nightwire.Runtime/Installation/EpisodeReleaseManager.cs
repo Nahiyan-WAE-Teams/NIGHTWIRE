@@ -196,6 +196,9 @@ namespace Nightwire.Runtime.Installation
                     return CatalogueFailure("catalogue_fetch_failed", exception.Message);
                 }
 
+                // A transport may complete despite cancellation. Never advance the
+                // durable catalogue sequence after this manager has been shut down.
+                operationToken.ThrowIfCancellationRequested();
                 var accepted = _acceptance.Accept(envelope, utcNow);
                 if (accepted.Success && accepted.Catalogue != null)
                 {
