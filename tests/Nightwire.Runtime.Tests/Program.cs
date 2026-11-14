@@ -6,6 +6,7 @@ using Nightwire.Runtime.Loading;
 using Nightwire.Runtime.Domain;
 using Nightwire.Runtime.Progression;
 using Nightwire.Runtime.Conversations;
+using Nightwire.Runtime.Saves;
 
 internal static class Program
 {
@@ -23,6 +24,10 @@ internal static class Program
         Run("conversation runtime advances by authored delay and persists read state", ConversationRuntimePersistsProgress, ref failures);
         Run("conversation choices select the authored branch", ConversationRuntimeBranchesOnChoice, ref failures);
         Run("choice effects update story flags and relationship scores", ConversationChoiceEffectsPersist, ref failures);
+        Run("save store round-trips player progress", SaveStoreRoundTripsProgress, ref failures);
+        Run("save store recovers from a corrupt primary using backup", SaveStoreRecoversBackup, ref failures);
+        Run("save store rejects a different episode identity", SaveStoreRejectsEpisodeMismatch, ref failures);
+        Run("save store applies an explicit episode migration", SaveStoreMigratesEpisodeVersion, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -287,6 +292,105 @@ internal static class Program
             flag.Kind == StoryFlagValueKind.Boolean && flag.BooleanValue, "Choice flag was not applied.");
         Assert(state.RelationshipScores.TryGetValue("anisha", out var score) && score == 5,
             "Relationship delta was not applied to the choice sender.");
+    }
+
+
+    private static void SaveStoreRoundTripsProgress()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-save-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var state = CreateState();
+            state.ActiveConversationId = "anisha.day01";
+            state.CompletedEventIds.Add("event.opening");
+            state.UnlockedAssetIds.Add("asset.photo");
+            state.StoryFlags["trust"] = StoryFlagValue.FromNumber(2.5);
+            state.RelationshipScores["anisha"] = 12;
+            state.Notifications.Add(new RuntimeNotification { NotificationId = "n1", TitleKey = "title", BodyKey = "body" });
+            var conversation = new ConversationProgressState
+            {
+                CurrentMessageId = "m2", NextMessageId = "m3", ElapsedDelaySeconds = 0.4
+            };
+            conversation.DeliveredMessageIds.Add("m1");
+            conversation.ReadMessageIds.Add("m1");
+            conversation.SelectedOptions["m2"] = "option.a";
+            state.ConversationProgress.Add("anisha.day01", conversation);
+
+            var store = new SaveStore(root);
+            store.Save(state);
+            var loaded = store.Load("nightwire.ep001", "1.0.0").State;
+            Assert(loaded.ActiveConversationId == "anisha.day01", "Active conversation did not round-trip.");
+            Assert(loaded.StoryFlags["trust"].Kind == StoryFlagValueKind.Number &&
+                Math.Abs(loaded.StoryFlags["trust"].NumberValue - 2.5) < 0.000001, "Typed story flag did not round-trip.");
+            Assert(loaded.RelationshipScores["anisha"] == 12, "Relationship score did not round-trip.");
+            Assert(loaded.ConversationProgress["anisha.day01"].SelectedOptions["m2"] == "option.a",
+                "Selected conversation option did not round-trip.");
+            Assert(loaded.Notifications.Count == 1 && loaded.Notifications[0].NotificationId == "n1",
+                "Notifications did not round-trip.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void SaveStoreRecoversBackup()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-save-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new SaveStore(root);
+            var state = CreateState();
+            state.RelationshipScores["anisha"] = 1;
+            store.Save(state);
+            state.RelationshipScores["anisha"] = 2;
+            store.Save(state);
+
+            File.WriteAllText(store.GetSavePath("nightwire.ep001"), "{corrupt");
+            var loaded = store.Load("nightwire.ep001", "1.0.0");
+            Assert(loaded.RecoveredFromBackup, "Load did not report backup recovery.");
+            Assert(loaded.State.RelationshipScores["anisha"] == 1, "Backup did not restore the last known-good save.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void SaveStoreRejectsEpisodeMismatch()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-save-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new SaveStore(root);
+            store.Save(CreateState());
+            bool rejected = false;
+            try { store.Load("nightwire.ep002", "1.0.0"); }
+            catch (SaveStoreException exception) { rejected = exception.ErrorCode == "save_not_found"; }
+            Assert(rejected, "A different episode unexpectedly loaded this save.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void SaveStoreMigratesEpisodeVersion()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-save-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new SaveStore(root);
+            store.Save(CreateState());
+            store.RegisterMigration(new TestEpisodeMigration());
+            var loaded = store.Load("nightwire.ep001", "1.1.0");
+            Assert(loaded.Migrated, "Load did not report the explicit migration.");
+            Assert(loaded.State.EpisodeVersion == "1.1.0", "Episode version was not advanced.");
+            Assert(loaded.State.StoryFlags.ContainsKey("migration_applied"), "Migration did not update player state.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private sealed class TestEpisodeMigration : IEpisodeProgressMigration
+    {
+        public string EpisodeId => "nightwire.ep001";
+        public string FromEpisodeVersion => "1.0.0";
+        public string ToEpisodeVersion => "1.1.0";
+        public void Migrate(EpisodeProgressState state)
+        {
+            state.StoryFlags["migration_applied"] = StoryFlagValue.FromBoolean(true);
+        }
     }
 
     private static string FindRepositoryRoot()
