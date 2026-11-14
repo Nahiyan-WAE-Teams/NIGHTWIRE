@@ -60,6 +60,7 @@ internal static class Program
         Run("installer startup recovery restores interrupted update backup", InstallerRecoveryRestoresPreviousInstall, ref failures);
         Run("installer rejects signed release identity mismatch before replacing existing content", InstallerRejectsReleaseIdentityMismatch, ref failures);
         Run("release manager refreshes signed catalogue and installs offline episode", ReleaseManagerInstallsOfflineEpisode, ref failures);
+        Run("episode access gate excludes session and installer ownership", EpisodeAccessGateExcludesSessionAndInstall, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -886,6 +887,27 @@ internal static class Program
         envelopeText = envelopeText.Replace(Convert.ToBase64String(signature), Convert.ToBase64String(new byte[64]));
         var tampered = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow);
         Assert(!tampered.Success && tampered.ErrorCode == "signature_invalid", "Invalid catalogue signature was accepted.");
+    }
+
+    private static void EpisodeAccessGateExcludesSessionAndInstall()
+    {
+        var access = new EpisodeAccessCoordinator();
+        Assert(access.TryAcquireSessionLease("nightwire.ep001", out var sessionLease) && sessionLease != null,
+            "Could not acquire an idle episode session lease.");
+        Assert(!access.TryAcquireInstallLease("nightwire.ep001", out var blockedInstall) && blockedInstall == null,
+            "Installer acquired an episode while its gameplay session was active.");
+        Assert(access.TryAcquireInstallLease("nightwire.ep002", out var otherEpisodeInstall) && otherEpisodeInstall != null,
+            "An unrelated episode was unnecessarily blocked.");
+        otherEpisodeInstall!.Dispose();
+        sessionLease!.Dispose();
+        Assert(access.TryAcquireInstallLease("nightwire.ep001", out var installLease) && installLease != null,
+            "Installer could not acquire the episode after the session closed.");
+        Assert(!access.TryAcquireSessionLease("nightwire.ep001", out var blockedSession) && blockedSession == null,
+            "A gameplay session opened while installation owned the episode.");
+        installLease!.Dispose();
+        Assert(access.TryAcquireSessionLease("nightwire.ep001", out var reopenedSession) && reopenedSession != null,
+            "Gameplay session could not open after installation released its lease.");
+        reopenedSession!.Dispose();
     }
 
     private static void ReleaseManagerInstallsOfflineEpisode()
