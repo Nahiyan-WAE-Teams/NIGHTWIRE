@@ -1,6 +1,6 @@
 # NIGHTWIRE Episode Package Specification
 
-- Status: Draft
+- Status: Draft; initial loader implementation available
 - Format version: 0.1
 - Last updated: 2026-11-14
 - Scope: authored episode content and its relationship to runtime/player data
@@ -467,3 +467,18 @@ See [JSON Schema Guide](JSON_SCHEMA_GUIDE.md) for the schema mapping and current
 A dependency-free .NET 10 command-line validator is provided in `tools/Nightwire.EpisodeValidator`. It currently checks the unpacked package's manifest integrity, path safety, inventory completeness, asset references, character and conversation references, message sender/choice references, character post references, call media/subtitle/timing/completion references, minigame configuration/completion references, event entry and message/call/minigame triggers, supported event actions, and localization coverage.
 
 It does not yet execute the complete JSON Schema Draft 2020-12 schemas. It is an initial semantic/package-integrity validator, not yet the final release validator. Archive extraction safety, signed release metadata, complete JSON Schema Draft 2020-12 evaluation, and runtime playback remain future work.
+
+
+## 17. Runtime loader implementation boundary
+
+The portable C# implementation is in `src/Nightwire.Runtime/Loading/EpisodePackageLoader.cs`. It consumes an already-unpacked episode directory; archive extraction and network download are intentionally outside this class.
+
+Before exposing the package to the runtime, it currently:
+- Checks descriptor/manifest identity, schema version, and minimum runtime compatibility.
+- Verifies every manifest-listed file size and SHA-256 digest.
+- Rejects duplicate paths, unlisted files, path traversal, symbolic links/reparse points, and configured package/JSON size-limit violations.
+- Indexes character profiles, conversations, character posts, calls, minigames, events, localization dictionaries, and media assets.
+- Resolves key character, message, choice, call, minigame, media, event, and localization references.
+- Produces a `LoadedEpisodePackage` and typed `EpisodeRuntimeDefinition` only after validation succeeds.
+
+This loader is not a complete JSON Schema Draft 2020-12 evaluator and does not authenticate the publisher. The release pipeline must still run the schema/semantic validator and verify signed release metadata before installation. The package is not considered trusted merely because its internal manifest hashes match.
