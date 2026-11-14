@@ -17,6 +17,7 @@ internal static class Program
         Run("episode loader verifies and indexes the sample package", EpisodeLoaderLoadsSample, ref failures);
         Run("episode loader rejects modified manifest content", EpisodeLoaderRejectsTampering, ref failures);
         Run("episode loader rejects unlisted files", EpisodeLoaderRejectsUnlistedFiles, ref failures);
+        Run("episode loader rejects an older runtime", EpisodeLoaderRejectsOldRuntime, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -186,6 +187,17 @@ internal static class Program
             Assert(rejected, "Unlisted package file was not rejected.");
         }
         finally { Directory.Delete(copy, true); }
+    }
+
+
+    private static void EpisodeLoaderRejectsOldRuntime()
+    {
+        string root = FindRepositoryRoot();
+        var loader = new EpisodePackageLoader(new EpisodePackageLoaderOptions { RuntimeVersion = "0.0.9" });
+        bool rejected = false;
+        try { loader.Load(Path.Combine(root, "examples", "Episode_001")); }
+        catch (EpisodePackageLoadException exception) { rejected = exception.ErrorCode == "runtime_too_old"; }
+        Assert(rejected, "Episode requiring a newer runtime was not rejected.");
     }
 
     private static string FindRepositoryRoot()
