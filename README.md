@@ -31,3 +31,14 @@ Exact Unity, .NET profile, and package dependency versions will be selected and 
 ## Development status
 
 No playable game or runtime implementation is claimed yet. Documentation in this repository describes the proposed architecture until implementation and tests establish otherwise.
+
+
+## Validate an episode package
+
+The initial package validator is available under `tools/Nightwire.EpisodeValidator`. With the .NET 10 SDK installed, run:
+
+```bash
+dotnet run --project tools/Nightwire.EpisodeValidator -- examples/Episode_001
+```
+
+The validator checks package integrity and cross-file references. See its [README](tools/Nightwire.EpisodeValidator/README.md) for the exact validation boundary.
