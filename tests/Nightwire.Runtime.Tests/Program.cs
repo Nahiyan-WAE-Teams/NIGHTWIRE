@@ -347,6 +347,10 @@ internal static class Program
             var loaded = store.Load("nightwire.ep001", "1.0.0");
             Assert(loaded.RecoveredFromBackup, "Load did not report backup recovery.");
             Assert(loaded.State.RelationshipScores["anisha"] == 1, "Backup did not restore the last known-good save.");
+            Assert(!File.ReadAllText(store.GetSavePath("nightwire.ep001")).StartsWith("{corrupt", StringComparison.Ordinal),
+                "Recovered backup was not restored to the primary save path.");
+            var secondLoad = store.Load("nightwire.ep001", "1.0.0");
+            Assert(!secondLoad.RecoveredFromBackup, "Restored primary save was still treated as corrupt.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
