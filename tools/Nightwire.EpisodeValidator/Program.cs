@@ -510,6 +510,10 @@ internal static class Program
                     Errors.Add($"Call '{callId}': participant '{participant}' has no character profile.");
 
             var mode = GetString(call, "mode");
+            if (mode is not ("audio" or "video"))
+                Errors.Add($"Call '{callId}': unsupported mode '{mode}'.");
+            if (GetString(call, "presentation") != "prerecorded")
+                Errors.Add($"Call '{callId}': presentation must be 'prerecorded'.");
             if (!call.TryGetProperty("media", out var media) || media.ValueKind != JsonValueKind.Object)
             {
                 Errors.Add($"Call '{callId}': media must be an object.");
@@ -577,6 +581,16 @@ internal static class Program
                     var cueId = GetString(cue, "cue_id");
                     if (cueId is null || !cueIds.Add(cueId))
                         Errors.Add($"Call '{callId}': missing or duplicate cue_id '{cueId}'.");
+                    var cueType = GetString(cue, "type");
+                    if (cueType is not ("visual_effect" or "speaker_focus" or "overlay_text"))
+                        Errors.Add($"Call '{callId}': unsupported cue type '{cueType}'.");
+                    if (cueType == "visual_effect" &&
+                        GetString(cue, "effect") is not ("signal_glitch" or "screen_flicker" or "static_burst" or "audio_distortion"))
+                        Errors.Add($"Call '{callId}': visual_effect cue '{cueId}' has an unsupported effect.");
+                    if (cueType == "speaker_focus" && GetString(cue, "speaker_id") is null)
+                        Errors.Add($"Call '{callId}': speaker_focus cue '{cueId}' requires speaker_id.");
+                    if (cueType == "overlay_text" && GetString(cue, "text_key") is null)
+                        Errors.Add($"Call '{callId}': overlay_text cue '{cueId}' requires text_key.");
                     var at = cue.TryGetProperty("at_ms", out var atValue) && atValue.TryGetInt64(out var atMs) ? atMs : -1;
                     if (at < 0 || at > duration)
                         Errors.Add($"Call '{callId}': cue '{cueId}' is outside call duration.");
