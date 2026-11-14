@@ -42,7 +42,6 @@ namespace Nightwire.Runtime.Minigames
             if (!TryGet(package, state, minigameId, out var definition, out var progress, out var error)) return Fail(error!);
             if (RequiredString(definition, "type") != "sequence_reconstruction") return Fail("This minigame does not accept sequence input.");
             if (IsExpired(definition, progress)) return Fail("The minigame time limit has expired.");
-            if (IsExpired(definition, progress)) return Fail("The minigame time limit has expired.");
             if (progress.AttemptsUsed >= AttemptLimit(definition)) return Fail("No attempts remain.");
             if (sequence == null) return Fail("Sequence input is required.");
             if (!definition.GetProperty("configuration").TryGetProperty("sequence", out var expected)) return Fail("Sequence configuration is missing.");
