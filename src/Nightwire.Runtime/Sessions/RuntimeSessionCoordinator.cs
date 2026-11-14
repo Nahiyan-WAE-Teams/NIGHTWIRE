@@ -139,6 +139,12 @@ namespace Nightwire.Runtime.Sessions
             var result = Success();
             result.NewlyDeliveredMessageIds.AddRange(operation.NewlyDeliveredMessageIds);
             foreach (var story in operation.StoryResults) AddStory(result, story);
+
+            // Elapsed delay is an in-memory clock while a message is pending. Persist only when
+            // a delivery boundary is crossed (or the safety yield is reached), not every frame.
+            // The host persists partial delay progress on pause/checkpoint through SaveNow().
+            if (operation.NewlyDeliveredMessageIds.Count == 0 && !operation.YieldedAtSafetyLimit)
+                return result;
             return Persist(result);
         }
 
