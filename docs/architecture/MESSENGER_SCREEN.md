@@ -37,7 +37,9 @@ Character names and status are resolved from each character profile's localizati
 
 ## Performance and persistence
 
-Conversation delay ticks update elapsed delay in memory and do not write the save file on every rendered frame. A save is committed when a message delivery boundary is crossed. The application root also checkpoints on pause and saves/closes when leaving the messenger. This preserves partial delay on normal lifecycle transitions without causing continuous disk writes.
+Conversation delay ticks update elapsed delay in memory and do not write the save file on every rendered frame. A save is committed when a message delivery boundary is crossed. The application root calls `SaveCheckpoint` on `OnApplicationPause(true)`; leaving the messenger and normal application quit call `SaveAndClose`, which runs `SaveNow` before `CloseSession`. `CloseSession` itself deliberately does not save. Its `SessionClosed` notification is for host cleanup (including releasing the episode lease), not a final checkpoint.
+
+The runtime serializes checkpoint commits against closure: if closure wins before a captured checkpoint reaches the commit gate, that stale checkpoint is rejected; if a synchronous save has already entered the gate, it completes before closure. The coordinator still requires all gameplay mutations to be serialized on Unity's main thread. A process can be terminated without a final lifecycle callback, so the host relies on the runtime's story-boundary saves as well as pause/close checkpoints; no callback-based design can promise a final save after abrupt termination.
 
 Inline image textures are cached for the duration of the screen session and destroyed when the messenger unbinds. The image reader uses the runtime's asset resolver, which checks the asset's unlock state, manifest membership, path, size, and SHA-256 before returning a stream.
 
