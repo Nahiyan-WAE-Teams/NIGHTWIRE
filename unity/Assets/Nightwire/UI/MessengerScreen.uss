@@ -246,3 +246,68 @@
     margin-bottom: 8px;
     background-color: rgb(5, 8, 16);
 }
+
+
+.profile-open-button {
+    align-self: flex-start;
+    margin-top: 5px;
+    padding: 4px 9px;
+    background-color: rgba(105, 91, 170, 0.18);
+    border-width: 1px;
+    border-color: rgba(166, 151, 230, 0.35);
+    border-radius: 5px;
+    color: #c8baff;
+    font-size: 10px;
+    letter-spacing: 1px;
+}
+
+.profile-overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+    background-color: rgba(3, 5, 13, 0.88);
+}
+
+.profile-card {
+    width: 100%;
+    max-width: 520px;
+    padding: 22px;
+    background-color: #111426;
+    border-width: 1px;
+    border-color: rgba(157, 139, 222, 0.45);
+    border-radius: 12px;
+}
+
+.profile-close-button {
+    align-self: flex-end;
+    color: #c8baff;
+    background-color: rgba(105, 91, 170, 0.2);
+    border-width: 1px;
+    border-color: rgba(166, 151, 230, 0.35);
+}
+
+.profile-name {
+    margin-top: 16px;
+    color: #f2efff;
+    font-size: 24px;
+    -unity-font-style: bold;
+}
+
+.profile-status {
+    margin-top: 6px;
+    color: #a99bd7;
+    font-size: 11px;
+    letter-spacing: 1px;
+}
+
+.profile-bio {
+    margin-top: 18px;
+    color: #d0d2df;
+    font-size: 14px;
+    white-space: normal;
+}
