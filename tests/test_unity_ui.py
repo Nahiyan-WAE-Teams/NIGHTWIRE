@@ -139,6 +139,16 @@ class NightwireUnityUiTests(unittest.TestCase):
         self.assertIn("unreadCount", source)
         self.assertIn('"UNREAD " + unreadCount.ToString()', source)
 
+    def test_call_timeline_tracks_media_clock_and_pauses_with_app(self):
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
+        for token in ("callLastMediaPositionMilliseconds", "callUsesVideo", "callPausedForApp",
+                      "callVideoPlayer.time * 1000.0", "callAudioSource.time * 1000.0",
+                      "private void OnApplicationPause(bool paused)", "callVideoPlayer.Pause()",
+                      "callAudioSource.UnPause()"):
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+        self.assertIn("callTickAccumulatorSeconds += (mediaPositionMilliseconds - callLastMediaPositionMilliseconds) / 1000.0", source)
+
     def test_group_conversations_render_a_participant_roster(self):
         uxml = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uxml").read_text(encoding="utf-8")
         source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
