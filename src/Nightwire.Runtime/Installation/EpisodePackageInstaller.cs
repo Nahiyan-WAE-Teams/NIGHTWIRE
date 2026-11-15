@@ -130,10 +130,27 @@ namespace Nightwire.Runtime.Installation
 
                     if (!destinationExists || !destinationValid)
                     {
-                        if (backups.Count == 0)
+                        string? recoverableBackup = null;
+                        foreach (string candidate in backups)
                         {
-                            if (destinationExists)
-                                warnings.Add("Episode destination is invalid and no backup is available for '" + pair.Key + "'.");
+                            try
+                            {
+                                LoadedEpisodePackage backupPackage = _loader.Load(candidate);
+                                if (!string.Equals(backupPackage.Descriptor.EpisodeId, pair.Key, StringComparison.Ordinal))
+                                    throw new InvalidDataException("Backup episode identity does not match its directory.");
+                                recoverableBackup = candidate;
+                                break;
+                            }
+                            catch (Exception exception)
+                            {
+                                warnings.Add("Retained backup is not a valid episode package for '" + pair.Key + "': " + exception.Message);
+                            }
+                        }
+
+                        if (recoverableBackup == null)
+                        {
+                            if (destinationExists && !destinationValid)
+                                warnings.Add("Episode destination is invalid and no valid backup is available for '" + pair.Key + "'.");
                             continue;
                         }
 
@@ -145,9 +162,9 @@ namespace Nightwire.Runtime.Installation
                         }
                         try
                         {
-                            Directory.Move(backups[0], destination);
+                            Directory.Move(recoverableBackup, destination);
                             restored.Add(pair.Key);
-                            backups.RemoveAt(0);
+                            backups.Remove(recoverableBackup);
                             if (quarantine != null && Directory.Exists(quarantine))
                             {
                                 try { Directory.Delete(quarantine, true); }
