@@ -105,3 +105,6 @@ For a Unity Personal license, configure these repository Actions secrets before 
 Then open **Actions → NIGHTWIRE Android APK → Run workflow**. A successful run uploads the `nightwire-android-apk` artifact. Do not commit license material or credentials. The first build is also an integration check: Unity must import the project, run the editor bootstrapper, compile all scripts/packages, generate the initial scene, and produce the Android player successfully.
 
 The current workflow uses Unity's default Android signing configuration for a development/test APK. It is not a Play Store release-signed artifact. Production signing requires a separately provisioned Android keystore and password/alias secrets; never put those values in source control or chat. A successful CI artifact still needs installation and device smoke testing before release.
+
+
+Call presentation advances its subtitle/effect timeline from the actual AudioSource or VideoPlayer playback position, and pauses/resumes call media with the application lifecycle. Physical-device decoder synchronization remains a release verification item.
