@@ -62,6 +62,18 @@ namespace Nightwire.Unity.UI
         private Label callTimer;
         private Label callStatus;
         private Button callRetryButton;
+        private Button minigameEntryButton;
+        private VisualElement minigameScreen;
+        private Label minigameTitle;
+        private Label minigameInstructions;
+        private Label minigameProgress;
+        private VisualElement minigameChallengeContent;
+        private Label minigameFeedback;
+        private Button minigameContinueButton;
+        private string activeMinigameId;
+        private double minigameTickAccumulator;
+        private readonly List<string> selectedSequence = new List<string>();
+        private string selectedEvidenceItemId;
         private string activeContactId;
         private string locale;
         private string activeConversationId;
@@ -135,6 +147,8 @@ namespace Nightwire.Unity.UI
         private void Update()
         {
             UpdateMediaPlayback();
+            UpdateCallPlayback();
+            UpdateMinigamePlayback();
             UpdateCallPlayback();
             if (!string.IsNullOrEmpty(activeCallId)) return;
             if (!bound || session == null || !session.IsActive || session.Progress == null)
@@ -211,6 +225,14 @@ namespace Nightwire.Unity.UI
             callTimer = root?.Q<Label>("call-timer");
             callStatus = root?.Q<Label>("call-status");
             callRetryButton = root?.Q<Button>("call-retry-button");
+            minigameEntryButton = root?.Q<Button>("minigame-entry-button");
+            minigameScreen = root?.Q<VisualElement>("minigame-screen");
+            minigameTitle = root?.Q<Label>("minigame-title");
+            minigameInstructions = root?.Q<Label>("minigame-instructions");
+            minigameProgress = root?.Q<Label>("minigame-progress");
+            minigameChallengeContent = root?.Q<VisualElement>("minigame-challenge-content");
+            minigameFeedback = root?.Q<Label>("minigame-feedback");
+            minigameContinueButton = root?.Q<Button>("minigame-continue-button");
 
             if (root == null || messageList == null || socialFeedList == null || evidenceList == null ||
                 responseDock == null || messagesTabButton == null || feedTabButton == null ||
@@ -223,7 +245,10 @@ namespace Nightwire.Unity.UI
                 callScreen == null || callKicker == null || callContact == null ||
                 callVideoSurface == null || callAudioAvatar == null || callEffectOverlay == null ||
                 callSpeaker == null || callSubtitle == null || callTimer == null ||
-                callStatus == null || callRetryButton == null)
+                callStatus == null || callRetryButton == null ||
+                minigameEntryButton == null || minigameScreen == null || minigameTitle == null ||
+                minigameInstructions == null || minigameProgress == null ||
+                minigameChallengeContent == null || minigameFeedback == null || minigameContinueButton == null)
             {
                 Debug.LogError("NIGHTWIRE messenger UXML is missing a required named element.", this);
                 return;
@@ -236,6 +261,8 @@ namespace Nightwire.Unity.UI
             profileOpenButton.clicked += ShowContactProfile;
             profileCloseButton.clicked += HideContactProfile;
             callRetryButton.clicked += RetryCallMedia;
+            minigameEntryButton.clicked += StartPendingMinigame;
+            minigameContinueButton.clicked += CloseMinigamePresentation;
             bound = true;
             ShowMessagesTab();
             ActivateCurrentConversation();
@@ -263,6 +290,10 @@ namespace Nightwire.Unity.UI
                 profileCloseButton.clicked -= HideContactProfile;
             if (bound && callRetryButton != null)
                 callRetryButton.clicked -= RetryCallMedia;
+            if (bound && minigameEntryButton != null)
+                minigameEntryButton.clicked -= StartPendingMinigame;
+            if (bound && minigameContinueButton != null)
+                minigameContinueButton.clicked -= CloseMinigamePresentation;
             bound = false;
             session = null;
             sessionHost = null;
@@ -300,10 +331,21 @@ namespace Nightwire.Unity.UI
             callTimer = null;
             callStatus = null;
             callRetryButton = null;
+            minigameEntryButton = null;
+            minigameScreen = null;
+            minigameTitle = null;
+            minigameInstructions = null;
+            minigameProgress = null;
+            minigameChallengeContent = null;
+            minigameFeedback = null;
+            minigameContinueButton = null;
             activeContactId = null;
             activeConversationId = null;
             StopMediaPlayback();
             StopCallMedia();
+            activeMinigameId = null;
+            selectedSequence.Clear();
+            selectedEvidenceItemId = null;
             ClearImageCache();
         }
 
@@ -555,6 +597,8 @@ namespace Nightwire.Unity.UI
                     groupParticipants.style.display = DisplayStyle.None;
                     profileOpenButton.text = "VIEW PROFILE";
                 }
+                bool hasPendingMinigame = !string.IsNullOrEmpty(session.Progress.PendingMinigameId);
+                minigameEntryButton.style.display = hasPendingMinigame ? DisplayStyle.Flex : DisplayStyle.None;
                 var progress = session.Progress.ConversationProgress.TryGetValue(conversationId, out var current)
                     ? current : null;
 
