@@ -76,6 +76,25 @@ namespace Nightwire.Runtime.Installation
                 EnsureNoLinkedAncestors(destination);
                 Directory.CreateDirectory(directory);
                 EnsureNoLinkedAncestors(destination);
+                if (!string.IsNullOrEmpty(expectedSha256) && expectedSizeBytes.HasValue && File.Exists(destination))
+                {
+                    var existingInfo = new FileInfo(destination);
+                    if (existingInfo.Length == expectedSizeBytes.Value)
+                    {
+                        string existingDigest;
+                        using (var existing = new FileStream(destination, FileMode.Open, FileAccess.Read, FileShare.Read))
+                        using (var existingSha = SHA256.Create())
+                            existingDigest = ToHex(existingSha.ComputeHash(existing));
+                        if (string.Equals(existingDigest, expectedSha256, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return new EpisodeDownloadResult
+                            {
+                                Success = true, FilePath = destination, BytesDownloaded = existingInfo.Length,
+                                Sha256 = existingDigest
+                            };
+                        }
+                    }
+                }
                 temporary = Path.Combine(directory, ".download-" + Guid.NewGuid().ToString("N") + ".part");
 
                 using var request = new HttpRequestMessage(HttpMethod.Get, source);
