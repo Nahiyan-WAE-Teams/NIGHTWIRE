@@ -129,6 +129,7 @@ namespace Nightwire.Runtime.Installation
         private readonly object _gate = new object();
         private readonly HashSet<string> _operations = new HashSet<string>(StringComparer.Ordinal);
         private VerifiedReleaseCatalogue? _catalogue;
+        private EpisodeInstallRecoveryResult? _startupRecovery;
         private bool _disposed;
         private bool _downloaderDisposed;
         private int _activeRefreshes;
@@ -166,10 +167,19 @@ namespace Nightwire.Runtime.Installation
             _installer = installer ?? new EpisodePackageInstaller(loader: _loader);
         }
 
-        /// <summary>Must run before sessions or installs are opened.</summary>
+        /// <summary>
+        /// Performs interrupted-install recovery once, before library discovery or installation.
+        /// The manager serializes this operation with disposal and install admission.
+        /// </summary>
         public EpisodeInstallRecoveryResult RecoverAtStartup()
         {
-            return _installer.RecoverInterruptedInstalls(_installRoot);
+            lock (_gate)
+            {
+                if (_disposed) throw new ObjectDisposedException(nameof(EpisodeReleaseManager));
+                if (_startupRecovery != null) return _startupRecovery;
+                _startupRecovery = _installer.RecoverInterruptedInstalls(_installRoot);
+                return _startupRecovery;
+            }
         }
 
         public async Task<ReleaseCatalogueResult> RefreshCatalogueAsync(DateTime utcNow,
@@ -239,6 +249,7 @@ namespace Nightwire.Runtime.Installation
 
         public IReadOnlyList<EpisodeLibraryEntry> GetLibrary()
         {
+            RecoverAtStartup();
             VerifiedReleaseCatalogue? catalogue;
             lock (_gate) catalogue = _catalogue;
             var releases = catalogue?.Releases.ToDictionary(x => x.EpisodeId, StringComparer.Ordinal)
@@ -292,6 +303,16 @@ namespace Nightwire.Runtime.Installation
         public async Task<EpisodeManagerOperationResult> InstallOrUpdateAsync(string episodeId,
             IProgress<EpisodeDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
         {
+            try { RecoverAtStartup(); }
+            catch (ObjectDisposedException)
+            {
+                return Failure("manager_disposed", "Episode release manager has been disposed.", episodeId);
+            }
+            catch (Exception exception)
+            {
+                return Failure("install_recovery_failed", exception.Message, episodeId);
+            }
+
             EpisodeReleaseEntry? release;
             lock (_gate)
             {
