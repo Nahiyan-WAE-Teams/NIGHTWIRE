@@ -4,6 +4,7 @@
         <ui:VisualElement class="ambient-glow" />
         <ui:VisualElement class="messenger-header">
             <ui:Button name="back-button" text="‹ ARCHIVE" class="back-button" />
+            <ui:Button name="inbox-open-button" text="CHATS" class="inbox-open-button" />
             <ui:VisualElement class="contact-block">
                 <ui:Label name="contact-name" text="NIGHTWIRE CONTACT" class="contact-name" />
                 <ui:Label name="contact-status" text="LOCAL STORY CHANNEL · EPISODE CONTENT" class="contact-status" />
@@ -56,6 +57,14 @@
             <ui:Label name="call-timer" text="00:00" class="call-timer" />
             <ui:Label name="call-status" text="VERIFYING CALL MEDIA…" class="call-status" />
             <ui:Button name="call-retry-button" text="RETRY MEDIA" class="call-retry-button" style="display: none;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="conversation-inbox" class="conversation-inbox" style="display: none;">
+            <ui:VisualElement class="inbox-heading-row">
+                <ui:Label text="YOUR MESSAGES" class="inbox-title" />
+                <ui:Button name="inbox-close-button" text="CLOSE" class="inbox-close-button" />
+            </ui:VisualElement>
+            <ui:Label text="OPENED CONVERSATIONS · EPISODE LOCAL" class="inbox-subtitle" />
+            <ui:ScrollView name="conversation-inbox-list" class="conversation-inbox-list" />
         </ui:VisualElement>
         <ui:VisualElement name="profile-overlay" class="profile-overlay" style="display: none;">
             <ui:VisualElement class="profile-card">
