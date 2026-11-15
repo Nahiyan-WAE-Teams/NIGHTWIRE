@@ -128,6 +128,9 @@ namespace Nightwire.Runtime.Installation
         private readonly CancellationTokenSource _lifetimeCancellation = new CancellationTokenSource();
         private readonly object _gate = new object();
         private readonly HashSet<string> _operations = new HashSet<string>(StringComparer.Ordinal);
+        private static readonly object SharedEpisodeOperationsGate = new object();
+        private static readonly HashSet<string> SharedEpisodeOperations =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private VerifiedReleaseCatalogue? _catalogue;
         private EpisodeInstallRecoveryResult? _startupRecovery;
         private bool _disposed;
@@ -328,6 +331,12 @@ namespace Nightwire.Runtime.Installation
                 if (release == null) return Failure("release_not_found", "Episode is not present in the currently accepted release catalogue.", episodeId);
                 if (!_operations.Add(episodeId))
                     return Failure("episode_operation_in_progress", "Another download or install is already running for this episode.", episodeId);
+                if (!TryAcquireSharedEpisodeOperation(episodeId))
+                {
+                    _operations.Remove(episodeId);
+                    return Failure("episode_operation_in_progress",
+                        "Another release manager is already downloading or installing this episode.", episodeId);
+                }
             }
 
             using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -394,6 +403,7 @@ namespace Nightwire.Runtime.Installation
                 finally
                 {
                     lock (_gate) _operations.Remove(episodeId);
+                    ReleaseSharedEpisodeOperation(episodeId);
                     DisposeDownloaderIfReady();
                 }
                 // Keep a successfully downloaded archive as a cache; failed partial downloads are removed by downloader.
@@ -422,6 +432,22 @@ namespace Nightwire.Runtime.Installation
                 DisposeResourcesIfReady();
             }
             // Resource disposal is deferred until all refreshes and installs have unwound.
+        }
+
+        private bool TryAcquireSharedEpisodeOperation(string episodeId)
+        {
+            string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(_installRoot));
+            string key = root + "\\n" + episodeId;
+            lock (SharedEpisodeOperationsGate)
+                return SharedEpisodeOperations.Add(key);
+        }
+
+        private void ReleaseSharedEpisodeOperation(string episodeId)
+        {
+            string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(_installRoot));
+            string key = root + "\\n" + episodeId;
+            lock (SharedEpisodeOperationsGate)
+                SharedEpisodeOperations.Remove(key);
         }
 
         private static void EnsureNoLinkedAncestors(string path)
