@@ -33,7 +33,7 @@ namespace Nightwire.Runtime.Saves
 
     /// <summary>
     /// Versioned local save persistence with checksums, bounded reads, atomic replacement, and backup recovery.
-    /// One instance should be used per game save root; callers serialize access to a given episode save.
+    /// Save operations are serialized per episode across instances in this process; hosts must coordinate other processes.
     /// </summary>
     public sealed class SaveStore
     {
