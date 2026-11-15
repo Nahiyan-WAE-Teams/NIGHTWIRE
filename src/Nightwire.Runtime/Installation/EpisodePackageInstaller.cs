@@ -37,6 +37,9 @@ namespace Nightwire.Runtime.Installation
     {
         private readonly EpisodeInstallerOptions _options;
         private readonly EpisodePackageLoader _loader;
+        private static readonly object InstallRootLocksGate = new object();
+        private static readonly Dictionary<string, object> InstallRootLocks =
+            new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
         public EpisodePackageInstaller(EpisodeInstallerOptions? options = null, EpisodePackageLoader? loader = null)
         {
@@ -52,6 +55,13 @@ namespace Nightwire.Runtime.Installation
         /// Restores the newest backup when an update was interrupted after moving the old install.
         /// </summary>
         public EpisodeInstallRecoveryResult RecoverInterruptedInstalls(string installRoot)
+        {
+            string root = Path.GetFullPath(installRoot);
+            lock (GetInstallRootLock(root))
+                return RecoverInterruptedInstallsCore(root);
+        }
+
+        private EpisodeInstallRecoveryResult RecoverInterruptedInstallsCore(string installRoot)
         {
             var restored = new List<string>();
             var warnings = new List<string>();
@@ -100,17 +110,58 @@ namespace Nightwire.Runtime.Installation
                         warnings.Add("Episode destination is a file; backup retained for '" + pair.Key + "'.");
                         continue;
                     }
-                    if (Directory.Exists(destination) && (File.GetAttributes(destination) & FileAttributes.ReparsePoint) != 0)
+                    bool destinationExists = Directory.Exists(destination);
+                    if (destinationExists && (File.GetAttributes(destination) & FileAttributes.ReparsePoint) != 0)
                     {
                         warnings.Add("Episode destination is a symbolic link or reparse point; backup retained for '" + pair.Key + "'.");
                         continue;
                     }
-                    if (!Directory.Exists(destination))
+
+                    bool destinationValid = false;
+                    if (destinationExists)
                     {
-                        Directory.Move(backups[0], destination);
-                        restored.Add(pair.Key);
-                        backups.RemoveAt(0);
+                        try
+                        {
+                            LoadedEpisodePackage installed = _loader.Load(destination);
+                            destinationValid = string.Equals(installed.Descriptor.EpisodeId, pair.Key, StringComparison.Ordinal);
+                        }
+                        catch { destinationValid = false; }
                     }
+
+                    if (!destinationExists || !destinationValid)
+                    {
+                        if (backups.Count == 0)
+                        {
+                            if (destinationExists)
+                                warnings.Add("Episode destination is invalid and no backup is available for '" + pair.Key + "'.");
+                            continue;
+                        }
+
+                        string? quarantine = null;
+                        if (destinationExists)
+                        {
+                            quarantine = Path.Combine(root, ".invalid-" + pair.Key + "-" + Guid.NewGuid().ToString("N"));
+                            Directory.Move(destination, quarantine);
+                        }
+                        try
+                        {
+                            Directory.Move(backups[0], destination);
+                            restored.Add(pair.Key);
+                            backups.RemoveAt(0);
+                            if (quarantine != null && Directory.Exists(quarantine))
+                            {
+                                try { Directory.Delete(quarantine, true); }
+                                catch (Exception exception) { warnings.Add("Recovered episode but could not remove invalid destination quarantine: " + exception.Message); }
+                            }
+                        }
+                        catch
+                        {
+                            if (quarantine != null && Directory.Exists(quarantine) && !Directory.Exists(destination))
+                                Directory.Move(quarantine, destination);
+                            throw;
+                        }
+                    }
+
                     foreach (string obsolete in backups)
                     {
                         try { Directory.Delete(obsolete, true); removedBackups++; }
@@ -133,6 +184,20 @@ namespace Nightwire.Runtime.Installation
         }
 
         public EpisodeInstallResult InstallArchive(string archivePath, string installRoot, string? expectedEpisodeId = null, string? expectedEpisodeVersion = null)
+        {
+            try
+            {
+                string root = Path.GetFullPath(installRoot);
+                lock (GetInstallRootLock(root))
+                    return InstallArchiveCore(archivePath, root, expectedEpisodeId, expectedEpisodeVersion);
+            }
+            catch (Exception exception)
+            {
+                return Error("install_failed", exception.Message);
+            }
+        }
+
+        private EpisodeInstallResult InstallArchiveCore(string archivePath, string installRoot, string? expectedEpisodeId, string? expectedEpisodeVersion)
         {
             string? staging = null;
             string? backup = null;
@@ -391,6 +456,20 @@ namespace Nightwire.Runtime.Installation
                 total += read;
                 if (total > maxBytes) throw Fail("metadata_too_large", "Metadata expanded beyond its size limit.");
                 output.Write(buffer, 0, read);
+            }
+        }
+
+        private static object GetInstallRootLock(string root)
+        {
+            string canonicalRoot = Path.GetFullPath(root);
+            lock (InstallRootLocksGate)
+            {
+                if (!InstallRootLocks.TryGetValue(canonicalRoot, out object? gate))
+                {
+                    gate = new object();
+                    InstallRootLocks.Add(canonicalRoot, gate);
+                }
+                return gate;
             }
         }
 
