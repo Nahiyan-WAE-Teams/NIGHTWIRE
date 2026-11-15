@@ -2,10 +2,14 @@
 
 ## Baseline checked
 
-The current production baseline remains **Unity 6.3 LTS (6000.3)**. For Android plugin builds, match the Gradle/AGP versions to the exact Unity patch. Unity's current compatibility table lists Gradle 9.3.1 / AGP 9.1.1 for 6000.3.26f1 and later. Unity identifies 6.3 LTS as its current LTS line and recommends LTS for production projects that are locking an engine version. The UI integration uses the runtime UI Toolkit workflow documented for Unity 6.3: a UXML document, a `UIDocument`, and a `MonoBehaviour` that binds controls during `OnEnable` and unregisters during `OnDisable`.
+The current production baseline is **Unity 6.3 LTS (6000.3.28f1)**. This patch includes the November 2026 fixes required by Unity's security advisory; do not pin earlier 6000.3 patches. For Android plugin builds, match the Gradle/AGP versions to the exact Unity patch. Unity's current compatibility table lists Gradle 9.3.1 / AGP 9.1.1 for 6000.3.28f1. Unity identifies 6.3 LTS as its current LTS line and recommends LTS for production projects that are locking an engine version. The official 6000.3 Android compatibility table specifies Gradle 9.3.1 / AGP 9.1.1 for 6000.3.26f1 and later; Android SDK build tools 36.0.0, NDK r27c, and JDK 17 are supported for 6000.3.28f1+. The UI integration uses the runtime UI Toolkit workflow documented for Unity 6.3: a UXML document, a `UIDocument`, and a `MonoBehaviour` that binds controls during `OnEnable` and unregisters during `OnDisable`.
 
 Official references:
 - Unity 6.3 LTS support and recommendation: https://unity.com/releases/unity-6/support
+- Unity 6000.3.28f1 release: https://unity.com/releases/editor/whats-new/6000.3.28f1
+- Unity November 2026 security update: https://unity.com/security/unity-emudhra-compromise
+- Unity 6000.3 Android Gradle/AGP compatibility: https://docs.unity.com/en-us/engine/6000.3/manual/platform-specific/android/introducing/gradle-overview/version-compatibility
+- Unity 6000.3 Android SDK/NDK/JDK compatibility: https://docs.unity.com/en-us/engine/6000.3/manual/platform-specific/android/getting-started/sdksetup/supported-dependency-versions
 - Unity 6.3 runtime UI setup: https://docs.unity.com/en-us/engine/6000.3/manual/uitoolkits/uielements/uie-support-for-runtime-ui/uie-get-started-with-runtime-ui
 - Unity 6.3 Android Gradle/AGP compatibility: https://docs.unity.com/en-us/engine/6000.3/manual/platform-specific/android/introducing/gradle-overview/version-compatibility
 - Android StrongBox AES key generation: https://developer.android.com/reference/android/security/keystore/KeyGenParameterSpec
