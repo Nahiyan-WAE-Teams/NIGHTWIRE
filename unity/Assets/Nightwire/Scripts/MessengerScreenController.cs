@@ -4,6 +4,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Linq;
 using Nightwire.Runtime.Domain;
 using Nightwire.Unity;
 using Nightwire.Runtime.Sessions;
@@ -29,6 +30,12 @@ namespace Nightwire.Unity.UI
         private RuntimeSessionCoordinator session;
         private VisualElement root;
         private ScrollView messageList;
+        private ScrollView socialFeedList;
+        private ScrollView evidenceList;
+        private VisualElement responseDock;
+        private Button messagesTabButton;
+        private Button feedTabButton;
+        private Button evidenceTabButton;
         private Label contactName;
         private Label contactStatus;
         private Label episodeTitle;
@@ -149,6 +156,12 @@ namespace Nightwire.Unity.UI
 
             root = document.rootVisualElement.Q<VisualElement>("messenger-root");
             messageList = root?.Q<ScrollView>("message-list");
+            socialFeedList = root?.Q<ScrollView>("social-feed-list");
+            evidenceList = root?.Q<ScrollView>("evidence-list");
+            responseDock = root?.Q<VisualElement>("response-dock");
+            messagesTabButton = root?.Q<Button>("messages-tab");
+            feedTabButton = root?.Q<Button>("feed-tab");
+            evidenceTabButton = root?.Q<Button>("evidence-tab");
             contactName = root?.Q<Label>("contact-name");
             contactStatus = root?.Q<Label>("contact-status");
             episodeTitle = root?.Q<Label>("episode-title");
@@ -164,7 +177,9 @@ namespace Nightwire.Unity.UI
             profileStatus = root?.Q<Label>("profile-status");
             profileBio = root?.Q<Label>("profile-bio");
 
-            if (root == null || messageList == null || contactName == null || contactStatus == null ||
+            if (root == null || messageList == null || socialFeedList == null || evidenceList == null ||
+                responseDock == null || messagesTabButton == null || feedTabButton == null ||
+                evidenceTabButton == null || contactName == null || contactStatus == null ||
                 episodeTitle == null || typingIndicator == null || choiceList == null ||
                 responseHeading == null || conversationStatus == null || backButton == null ||
                 profileOpenButton == null || profileCloseButton == null || profileOverlay == null ||
@@ -175,9 +190,13 @@ namespace Nightwire.Unity.UI
             }
 
             backButton.clicked += BackClicked;
+            messagesTabButton.clicked += ShowMessagesTab;
+            feedTabButton.clicked += ShowFeedTab;
+            evidenceTabButton.clicked += ShowEvidenceTab;
             profileOpenButton.clicked += ShowContactProfile;
             profileCloseButton.clicked += HideContactProfile;
             bound = true;
+            ShowMessagesTab();
             ActivateCurrentConversation();
             RenderConversation();
         }
@@ -191,6 +210,12 @@ namespace Nightwire.Unity.UI
         {
             if (bound && backButton != null)
                 backButton.clicked -= BackClicked;
+            if (bound && messagesTabButton != null)
+                messagesTabButton.clicked -= ShowMessagesTab;
+            if (bound && feedTabButton != null)
+                feedTabButton.clicked -= ShowFeedTab;
+            if (bound && evidenceTabButton != null)
+                evidenceTabButton.clicked -= ShowEvidenceTab;
             if (bound && profileOpenButton != null)
                 profileOpenButton.clicked -= ShowContactProfile;
             if (bound && profileCloseButton != null)
@@ -200,6 +225,12 @@ namespace Nightwire.Unity.UI
             sessionHost = null;
             root = null;
             messageList = null;
+            socialFeedList = null;
+            evidenceList = null;
+            responseDock = null;
+            messagesTabButton = null;
+            feedTabButton = null;
+            evidenceTabButton = null;
             contactName = null;
             contactStatus = null;
             episodeTitle = null;
@@ -234,6 +265,193 @@ namespace Nightwire.Unity.UI
                 var begin = session.BeginConversation(activeConversationId);
                 if (!begin.Success)
                     SetStatus(begin.Error ?? "Conversation could not begin.");
+            }
+        }
+
+        private void ShowMessagesTab()
+        {
+            SetActiveTab("messages");
+            if (messageList != null) messageList.style.display = DisplayStyle.Flex;
+            if (socialFeedList != null) socialFeedList.style.display = DisplayStyle.None;
+            if (evidenceList != null) evidenceList.style.display = DisplayStyle.None;
+            if (responseDock != null) responseDock.style.display = DisplayStyle.Flex;
+            if (typingIndicator != null) typingIndicator.style.display = DisplayStyle.Flex;
+        }
+
+        private void ShowFeedTab()
+        {
+            SetActiveTab("feed");
+            if (messageList != null) messageList.style.display = DisplayStyle.None;
+            if (socialFeedList != null) socialFeedList.style.display = DisplayStyle.Flex;
+            if (evidenceList != null) evidenceList.style.display = DisplayStyle.None;
+            if (responseDock != null) responseDock.style.display = DisplayStyle.None;
+            if (typingIndicator != null) typingIndicator.style.display = DisplayStyle.None;
+            RenderSocialFeed();
+        }
+
+        private void ShowEvidenceTab()
+        {
+            SetActiveTab("evidence");
+            if (messageList != null) messageList.style.display = DisplayStyle.None;
+            if (socialFeedList != null) socialFeedList.style.display = DisplayStyle.None;
+            if (evidenceList != null) evidenceList.style.display = DisplayStyle.Flex;
+            if (responseDock != null) responseDock.style.display = DisplayStyle.None;
+            if (typingIndicator != null) typingIndicator.style.display = DisplayStyle.None;
+            RenderEvidenceLibrary();
+        }
+
+        private void SetActiveTab(string active)
+        {
+            messagesTabButton?.EnableInClassList("messenger-tab-active", active == "messages");
+            feedTabButton?.EnableInClassList("messenger-tab-active", active == "feed");
+            evidenceTabButton?.EnableInClassList("messenger-tab-active", active == "evidence");
+        }
+
+        private void RenderSocialFeed()
+        {
+            if (socialFeedList == null || session?.Package == null) return;
+            socialFeedList.Clear();
+            var posts = session.Package.CharacterPosts.Values
+                .OrderBy(post => ReadString(post, "published_at"), StringComparer.Ordinal)
+                .ToArray();
+            if (posts.Length == 0)
+            {
+                var empty = new Label("NO SOCIAL ACTIVITY IN THIS EPISODE YET.");
+                empty.AddToClassList("evidence-empty");
+                socialFeedList.Add(empty);
+                return;
+            }
+
+            foreach (var post in posts)
+            {
+                var card = new VisualElement();
+                card.AddToClassList("feed-card");
+                string authorId = ReadString(post, "author_id");
+                var author = new Label(CharacterName(authorId));
+                author.AddToClassList("feed-author");
+                card.Add(author);
+                var date = new Label(ReadString(post, "published_at"));
+                date.AddToClassList("feed-date");
+                card.Add(date);
+                string bodyKey = ReadString(post, "body_key");
+                var body = new Label(Localize(bodyKey, "Post content unavailable."));
+                body.AddToClassList("feed-body");
+                card.Add(body);
+
+                if (post.TryGetProperty("media_asset_ids", out var mediaIds) &&
+                    mediaIds.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var mediaId in mediaIds.EnumerateArray())
+                    {
+                        if (mediaId.ValueKind != JsonValueKind.String) continue;
+                        string assetId = mediaId.GetString() ?? string.Empty;
+                        if (assetId.Length == 0) continue;
+                        if (session.Package.AssetsById.TryGetValue(assetId, out var asset) &&
+                            string.Equals(asset.Type, "image", StringComparison.OrdinalIgnoreCase))
+                            AddImageAttachment(card, assetId);
+                        else
+                        {
+                            var mediaNote = new Label(session.Progress.UnlockedAssetIds.Contains(assetId)
+                                ? "ATTACHMENT · " + assetId : "LOCKED ATTACHMENT");
+                            mediaNote.AddToClassList("message-media-note");
+                            card.Add(mediaNote);
+                        }
+                    }
+                }
+
+                if (post.TryGetProperty("comments", out var comments) && comments.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var comment in comments.EnumerateArray())
+                    {
+                        string commentAuthor = CharacterName(ReadString(comment, "author_id"));
+                        string commentText = Localize(ReadString(comment, "body_key"), string.Empty);
+                        if (commentText.Length == 0) continue;
+                        var line = new Label(commentAuthor + "  ·  " + commentText);
+                        line.AddToClassList("feed-comment");
+                        card.Add(line);
+                    }
+                }
+                socialFeedList.Add(card);
+            }
+        }
+
+        private void RenderEvidenceLibrary()
+        {
+            if (evidenceList == null || session?.Package == null || session.Progress == null) return;
+            evidenceList.Clear();
+            var unlocked = session.Package.AssetsById.Values
+                .Where(asset => session.Progress.UnlockedAssetIds.Contains(asset.AssetId))
+                .OrderBy(asset => asset.AssetId, StringComparer.Ordinal)
+                .ToArray();
+            if (unlocked.Length == 0)
+            {
+                var empty = new Label("NO EVIDENCE UNLOCKED YET. KEEP FOLLOWING THE STORY.");
+                empty.AddToClassList("evidence-empty");
+                evidenceList.Add(empty);
+                return;
+            }
+
+            foreach (var asset in unlocked)
+            {
+                var card = new VisualElement();
+                card.AddToClassList("evidence-card");
+                var title = new Label(asset.AssetId.Replace('_', ' ').ToUpperInvariant());
+                title.AddToClassList("evidence-title");
+                card.Add(title);
+                var meta = new Label(asset.Type.ToUpperInvariant() + "  ·  " + asset.MimeType);
+                meta.AddToClassList("evidence-meta");
+                card.Add(meta);
+
+                if (string.Equals(asset.Type, "image", StringComparison.OrdinalIgnoreCase))
+                    AddImageAttachment(card, asset.AssetId);
+                else if (string.Equals(asset.Type, "audio", StringComparison.OrdinalIgnoreCase))
+                    AddAudioAttachment(card, asset.AssetId);
+                else if (string.Equals(asset.Type, "video", StringComparison.OrdinalIgnoreCase))
+                    AddVideoAttachment(card, asset.AssetId);
+                else if (string.Equals(asset.Type, "document", StringComparison.OrdinalIgnoreCase))
+                    AddDocumentAttachment(card, asset.AssetId, asset.Path);
+                else
+                {
+                    var note = new Label("This evidence type is stored in the verified episode archive.");
+                    note.AddToClassList("message-media-note");
+                    card.Add(note);
+                }
+                evidenceList.Add(card);
+            }
+        }
+
+        private void AddDocumentAttachment(VisualElement container, string assetId, string relativePath)
+        {
+            var opened = session?.OpenAsset(assetId);
+            if (opened == null || !opened.Success || opened.Asset == null)
+            {
+                var unavailable = new Label("DOCUMENT UNAVAILABLE · " + assetId);
+                unavailable.AddToClassList("message-media-note");
+                container.Add(unavailable);
+                return;
+            }
+
+            using (opened.Asset)
+            {
+                string extension = Path.GetExtension(relativePath).ToLowerInvariant();
+                bool textDocument = extension == ".txt" || extension == ".md" ||
+                    extension == ".json" || opened.Asset.MimeType.StartsWith("text/", StringComparison.OrdinalIgnoreCase);
+                if (!textDocument || opened.Asset.SizeBytes > 1048576)
+                {
+                    var note = new Label("VERIFIED DOCUMENT · " + Path.GetFileName(relativePath) +
+                        " · " + opened.Asset.SizeBytes.ToString() + " BYTES");
+                    note.AddToClassList("message-media-note");
+                    container.Add(note);
+                    return;
+                }
+
+                using (var reader = new StreamReader(opened.Asset.Content, Encoding.UTF8, true, 4096, true))
+                {
+                    string content = reader.ReadToEnd();
+                    var preview = new Label(content);
+                    preview.AddToClassList("document-preview");
+                    container.Add(preview);
+                }
             }
         }
 
