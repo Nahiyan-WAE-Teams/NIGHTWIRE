@@ -60,7 +60,7 @@
       "path": "Events/mira_intro.json",
       "kind": "event",
       "size_bytes": 257,
-      "sha256": "16663d2493f7a2acb6a3c6b942f1fd653be5fddc1414ad11d5fcc9c3e0fd4225"
+      "sha256": "69e560fd64b66e0033dfb2225e63fae9394a901c39753349e3c25eb40cc8c791"
     },
     {
       "path": "Events/rafi_intro.json",
