@@ -13,6 +13,7 @@ namespace Nightwire.Unity
     public interface INightwirePurchaseFulfillment
     {
         Task<bool> VerifyAndFulfillAsync(PendingOrder order);
+        Task<bool> ReconcileRestoredPurchasesAsync(Orders orders);
     }
 
     /// <summary>
@@ -70,6 +71,7 @@ namespace Nightwire.Unity
                 controller.OnProductsFetched += OnProductsFetched;
                 controller.OnProductsFetchFailed += OnProductsFetchFailed;
                 controller.OnPurchasePending += OnPurchasePending;
+                controller.OnPurchasesFetched += OnPurchasesFetched;
 
                 SetStatus("Connecting to the store…");
                 await controller.Connect();
@@ -139,6 +141,32 @@ namespace Nightwire.Unity
             controller.FetchPurchases(storeName);
         }
 
+        private async void OnPurchasesFetched(string storeName, Orders orders)
+        {
+            if (!string.Equals(storeName, nativeStoreName, StringComparison.Ordinal))
+                return;
+
+            var fulfillment = fulfillmentProvider as INightwirePurchaseFulfillment;
+            if (fulfillment == null)
+            {
+                SetStatus("Existing purchases were found, but entitlement reconciliation is not configured.");
+                return;
+            }
+
+            try
+            {
+                bool reconciled = await fulfillment.ReconcileRestoredPurchasesAsync(orders);
+                SetStatus(reconciled
+                    ? "Existing purchases were reconciled with the trusted account."
+                    : "Existing purchase reconciliation is pending; no local entitlement was granted.");
+            }
+            catch (Exception exception)
+            {
+                SetStatus("Existing purchase reconciliation failed.");
+                Debug.LogException(exception, this);
+            }
+        }
+
         private void OnProductsFetchFailed(string storeName, ProductFetchFailed failure)
         {
             SetStatus("Store products could not be loaded: " + failure.FailureReason);
@@ -165,7 +193,7 @@ namespace Nightwire.Unity
                 bool fulfilled = await fulfillment.VerifyAndFulfillAsync(order);
                 if (!fulfilled)
                 {
-                    SetStatus("Purchase verification is pending. No items were granted.");
+                    SetStatus("The transaction remains pending. No items were granted.");
                     return;
                 }
 
@@ -194,6 +222,7 @@ namespace Nightwire.Unity
             controller.OnProductsFetched -= OnProductsFetched;
             controller.OnProductsFetchFailed -= OnProductsFetchFailed;
             controller.OnPurchasePending -= OnPurchasePending;
+            controller.OnPurchasesFetched -= OnPurchasesFetched;
         }
     }
 }
