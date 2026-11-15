@@ -27,7 +27,7 @@ namespace Nightwire.Runtime.Sessions
 
     /// <summary>
     /// Coordinates one loaded episode, its player progress, story events, conversations, and local saves.
-    /// The Unity host owns this coordinator on its game thread and renders only the typed commands it returns.
+    /// The Unity host owns this coordinator on its game thread, serializes all calls to a given instance, and renders only the typed commands it returns.
     /// </summary>
     public sealed class RuntimeSessionCoordinator
     {
@@ -72,6 +72,7 @@ namespace Nightwire.Runtime.Sessions
             var story = _storyEngine.ProcessTrigger(package.RuntimeDefinition, state,
                 new StoryTrigger { Type = StoryTriggerType.EpisodeStarted });
             if (!story.Success) return Fail("entry_event_failed", story.Error ?? "Episode entry event failed.");
+            // SaveNew performs the existence check and initial commit under one per-episode lock.
             try { _saveStore.SaveNew(state); }
             catch (SaveStoreException exception) { return Fail(exception.ErrorCode, exception.Message); }
 
