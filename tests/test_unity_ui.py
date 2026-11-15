@@ -40,9 +40,20 @@ class NightwireUnityUiTests(unittest.TestCase):
                 self.assertIn("project://database/Assets/Nightwire/UI/", source)
                 self.assertIn(".uss", source)
 
-    def test_unity_assembly_references_portable_runtime(self):
+    def test_unity_assembly_references_required_engine_modules_and_iap(self):
         asmdef = json.loads((ROOT / "unity/Assets/Nightwire/Scripts/Nightwire.Unity.asmdef").read_text(encoding="utf-8"))
-        self.assertIn("Nightwire.Runtime", asmdef["references"])
+        for reference in ("UnityEngine.UIElementsModule", "UnityEngine.VideoModule",
+                          "UnityEngine.AudioModule", "Unity.Purchasing"):
+            with self.subTest(reference=reference):
+                self.assertIn(reference, asmdef["references"])
+
+    def test_cloud_build_stages_runtime_before_unity_compilation(self):
+        script = (ROOT / "tools/prepare-unity-runtime.sh").read_text(encoding="utf-8")
+        powershell = (ROOT / "tools/Prepare-UnityRuntime.ps1").read_text(encoding="utf-8")
+        self.assertIn("powershell.exe", script)
+        self.assertIn("dotnet-install.ps1", powershell)
+        self.assertIn('-Channel "10.0"', powershell)
+        self.assertIn("dotnet publish", powershell)
 
     def test_editor_bootstrapper_generates_scene_and_bundled_episode(self):
         source = (ROOT / "unity/Assets/Editor/NightwireProjectBootstrapper.cs").read_text(encoding="utf-8")
