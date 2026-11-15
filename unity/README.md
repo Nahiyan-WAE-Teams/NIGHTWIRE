@@ -6,7 +6,7 @@ The repository now contains a Unity 6.3 project scaffold, an editor-generated ma
 
 ## First-time setup
 
-1. From the repository root, run `tools/prepare-unity-runtime.sh` (macOS/Linux) or `tools/Prepare-UnityRuntime.ps1` (Windows). This publishes the portable .NET Standard 2.1 runtime and stages `Nightwire.Runtime.dll`, its resolved dependencies, and `link.xml` into `unity/Assets/Plugins/Nightwire/`.
+1. From the repository root, run `tools/prepare-unity-runtime.sh` (macOS/Linux) or `tools/Prepare-UnityRuntime.ps1` (Windows). This publishes the portable .NET Standard 2.1 runtime and stages `Nightwire.Runtime.dll`, its resolved dependencies, and `link.xml` into `unity/Assets/Plugins/Nightwire/`. The Windows script bootstraps the .NET 10 SDK if the builder does not already have it.
 2. Open the `unity/` folder as a project in Unity **6000.3.28f1**.
 3. The editor bootstrapper creates `NightwirePanelSettings.asset`, generates `NightwireMain.unity`, adds it to Build Settings, and packages `examples/Episode_001` into `Assets/StreamingAssets/Nightwire/Episode_001.zip`.
 4. Select the generated `NightwireMain` scene and press Play. The bundled sample episode is installed into the app's persistent episode library on first launch. It is an offline development seed; it does not use the remote signed-catalogue path.
@@ -50,7 +50,7 @@ These versions follow Unity's official 6000.3 compatibility tables. The editor p
 - `Assets/Nightwire/Scripts/NightwireBundledEpisodeSeeder.cs` — first-run sample episode installer.
 - `Assets/Nightwire/Scripts/NightwireAtmosphereController.cs` — three procedural fog layers that drift independently across both archive and messenger screens.
 - `Assets/Editor/NightwireProjectBootstrapper.cs` — generates the initial scene, panel settings, and bundled sample archive.
-- `Assets/Nightwire/Scripts/Nightwire.Unity.asmdef` — presentation assembly boundary referencing `Nightwire.Runtime`.
+- `Assets/Nightwire/Scripts/Nightwire.Unity.asmdef` — presentation assembly boundary with explicit UI Toolkit, Video, Audio, and Unity Purchasing references. The portable `Nightwire.Runtime.dll` is staged as a precompiled plugin and auto-referenced by Unity.
 
 ## Current playable scope and remaining UI work
 
@@ -81,6 +81,18 @@ The episode engine already has data contracts and runtime support for several of
 ## Monetization baseline
 
 Unity In-App Purchasing 5.5.0 is pinned in `Packages/manifest.json`. `NightwireIapService` uses the IAP 5.5 `PurchasingController` and local product catalogue. It deliberately disables purchase initiation until a production `INightwirePurchaseFulfillment` provider is assigned; pending orders are not confirmed unless the trusted provider reports durable verification and fulfillment. No client-side purchase success or currency grant is fabricated. The product-first economy and production release gates are documented in [monetization and store setup](../docs/monetization/ECONOMY_AND_STORE.md). Play Console products, the trusted backend verifier/ledger, refund handling, and any rewarded-ad provider still need configuration and end-to-end testing.
+
+## Unity Build Automation cloud build setup
+
+The Unity Build Automation target must run the runtime staging hook before Unity starts compiling scripts. In the target's **Advanced Settings → Script hooks → Pre-Build Script**, set the repository-relative path to:
+
+```text
+tools/prepare-unity-runtime.sh
+```
+
+The hook runs after repository checkout and before the Unity Editor process. On the Windows 11 24H2 builder it invokes the PowerShell staging script, which installs the .NET 10 SDK if necessary, publishes the portable runtime, and copies the runtime plus NuGet dependencies into `unity/Assets/Plugins/Nightwire/`. Do not omit this hook: without it, the presentation assembly cannot resolve `Nightwire.Runtime` or `System.Text.Json`.
+
+The Unity package manifest explicitly includes the built-in Audio, UIElements, and Video modules, and the presentation assembly explicitly references those module assemblies plus `Unity.Purchasing`.
 
 ## Separate CI pipelines
 
