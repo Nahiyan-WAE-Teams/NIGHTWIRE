@@ -25,7 +25,8 @@ namespace Nightwire.Unity
             string downloadRoot = Path.Combine(dataRoot, "Downloads");
             string destination = Path.Combine(installRoot, episodeId);
             var installer = new EpisodePackageInstaller();
-
+            bool recoverySucceeded = true;
+            bool existingValid = false;
             try
             {
                 installer.RecoverInterruptedInstalls(installRoot);
@@ -34,12 +35,9 @@ namespace Nightwire.Unity
                     try
                     {
                         var existing = new EpisodePackageLoader().Load(destination);
-                        if (string.Equals(existing.Descriptor.EpisodeId, episodeId, StringComparison.Ordinal) &&
-                            string.Equals(existing.Descriptor.EpisodeVersion, episodeVersion, StringComparison.Ordinal))
-                        {
-                            completed?.Invoke(true);
-                            yield break;
-                        }
+                        existingValid =
+                            string.Equals(existing.Descriptor.EpisodeId, episodeId, StringComparison.Ordinal) &&
+                            string.Equals(existing.Descriptor.EpisodeVersion, episodeVersion, StringComparison.Ordinal);
                     }
                     catch (Exception exception)
                     {
@@ -49,8 +47,18 @@ namespace Nightwire.Unity
             }
             catch (Exception exception)
             {
+                recoverySucceeded = false;
                 Debug.LogException(exception, this);
+            }
+
+            if (!recoverySucceeded)
+            {
                 completed?.Invoke(false);
+                yield break;
+            }
+            if (existingValid)
+            {
+                completed?.Invoke(true);
                 yield break;
             }
 
