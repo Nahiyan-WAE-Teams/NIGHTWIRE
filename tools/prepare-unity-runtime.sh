@@ -2,12 +2,25 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Unity Build Automation's Windows builder runs Bash scripts. Its documented
+# Windows image includes PowerShell but does not guarantee a .NET SDK, so use
+# the PowerShell staging script there (it bootstraps .NET 10 when needed).
+if [[ "${OS:-}" == "Windows_NT" ]] || command -v powershell.exe >/dev/null 2>&1; then
+  PS_SCRIPT="$ROOT/tools/Prepare-UnityRuntime.ps1"
+  if command -v cygpath >/dev/null 2>&1; then
+    PS_SCRIPT="$(cygpath -w "$PS_SCRIPT")"
+  fi
+  powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$PS_SCRIPT"
+  exit $?
+fi
+
 PROJECT="$ROOT/src/Nightwire.Runtime/Nightwire.Runtime.csproj"
 PUBLISH_DIR="$ROOT/.nightwire-unity-publish"
 DEST="$ROOT/unity/Assets/Plugins/Nightwire"
 
 if ! command -v dotnet >/dev/null 2>&1; then
-  echo "ERROR: .NET SDK is required. Install a current SDK before staging the Unity runtime." >&2
+  echo "ERROR: .NET SDK is required to stage the Unity runtime." >&2
   exit 1
 fi
 
@@ -38,4 +51,3 @@ fi
 } > "$DEST/link.xml"
 
 echo "Staged $copied assemblies in unity/Assets/Plugins/Nightwire."
-echo "Review plugin platform settings in Unity, then compile Editor and Android IL2CPP before release."
