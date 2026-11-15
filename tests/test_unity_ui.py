@@ -105,6 +105,17 @@ class NightwireUnityUiTests(unittest.TestCase):
         self.assertIn("if (!fulfilled)", source)
         self.assertIn("The transaction remains pending", source)
 
+    def test_prerecorded_call_ui_has_subtitles_effects_and_verified_media(self):
+        uxml = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uxml").read_text(encoding="utf-8")
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
+        for token in ("call-screen", "call-video-surface", "call-subtitle", "call-speaker", "call-effect-overlay", "call-timer", "call-retry-button"):
+            with self.subTest(token=token):
+                self.assertIn(token, uxml)
+        for token in ("StartCallPlayback", "AdvanceCallPlayback", "CacheVerifiedMediaAsset", "CallVideoPrepared", "ApplyCallCue", "CallParticipantName", "result.CallTimeline.Subtitles"):
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+        self.assertIn('answer.clicked += () => StartCallPresentation(callId);', source)
+        self.assertIn('callTickAccumulatorSeconds < 1.0', source)
     def test_group_conversations_render_a_participant_roster(self):
         uxml = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uxml").read_text(encoding="utf-8")
         source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
