@@ -105,6 +105,26 @@ class NightwireUnityUiTests(unittest.TestCase):
         self.assertIn("if (!fulfilled)", source)
         self.assertIn("The transaction remains pending", source)
 
+    def test_messenger_exposes_messages_social_feed_and_evidence_tabs(self):
+        uxml = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uxml").read_text(encoding="utf-8")
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
+        for token in ("messages-tab", "feed-tab", "evidence-tab", "social-feed-list", "evidence-list"):
+            with self.subTest(token=token):
+                self.assertIn(token, uxml)
+        for token in ("RenderSocialFeed", "RenderEvidenceLibrary", "AddDocumentAttachment",
+                      "session.Package.CharacterPosts", "session.Progress.UnlockedAssetIds"):
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+
+    def test_document_preview_opens_only_verified_unlocked_asset(self):
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
+        start = source.index("private void AddDocumentAttachment")
+        end = source.index("private void RenderConversation", start)
+        method = source[start:end]
+        self.assertIn("session?.OpenAsset(assetId)", method)
+        self.assertIn("opened.Asset.SizeBytes > 1048576", method)
+        self.assertIn("textDocument", method)
+
     def test_development_provider_does_not_refresh_remote_catalogue(self):
         source = (ROOT / "unity/Assets/Nightwire/Scripts/NightwireDevelopmentPlatformServices.cs").read_text(encoding="utf-8")
         self.assertIn("ShouldRefreshCatalogue => false", source)
