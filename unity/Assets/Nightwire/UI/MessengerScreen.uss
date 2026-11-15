@@ -441,3 +441,18 @@
 .minigame-sequence-preview { min-height: 48px; margin-bottom: 14px; padding: 12px; color: #e5dbff; background-color: rgba(6, 10, 21, 0.9); font-size: 13px; white-space: normal; }
 .minigame-submit-button { margin-top: 16px; background-color: #654a96; }
 .minigame-continue-button { min-height: 42px; margin-top: 12px; color: #f0eaff; background-color: #493b72; border-width: 1px; border-color: #9a82c8; border-radius: 7px; }
+
+.inbox-open-button { min-width: 62px; min-height: 34px; margin-left: 8px; color: #dcd4f1; background-color: rgba(39, 34, 64, 0.9); border-width: 1px; border-color: rgba(139, 117, 184, 0.65); border-radius: 6px; font-size: 9px; letter-spacing: 1px; }
+.conversation-inbox { position: absolute; left: 0; right: 0; top: 0; bottom: 0; padding: 24px 18px; background-color: rgba(4, 7, 16, 0.985); }
+.inbox-heading-row { flex-direction: row; align-items: center; justify-content: space-between; }
+.inbox-title { color: #f1edff; font-size: 19px; -unity-font-style: bold; letter-spacing: 1px; }
+.inbox-close-button { min-height: 34px; color: #dcd4f1; background-color: rgba(39, 34, 64, 0.9); border-width: 1px; border-color: rgba(139, 117, 184, 0.65); border-radius: 6px; font-size: 9px; }
+.inbox-subtitle { margin-top: 8px; margin-bottom: 18px; color: #8e83aa; font-size: 9px; letter-spacing: 1.3px; }
+.conversation-inbox-list { flex-grow: 1; }
+.inbox-conversation-item { min-height: 78px; margin-bottom: 8px; padding: 12px; flex-direction: row; align-items: center; justify-content: space-between; background-color: rgba(18, 24, 42, 0.88); border-width: 1px; border-color: rgba(93, 83, 126, 0.5); border-radius: 8px; }
+.inbox-conversation-active { border-color: #9b7bd0; background-color: rgba(45, 35, 68, 0.9); }
+.inbox-conversation-copy { flex-grow: 1; margin-right: 8px; }
+.inbox-conversation-name { color: #eee9fa; font-size: 12px; -unity-font-style: bold; }
+.inbox-conversation-preview { margin-top: 5px; color: #9da7bb; font-size: 10px; white-space: normal; }
+.inbox-conversation-state { color: #a58bd0; font-size: 8px; letter-spacing: 1px; }
+.inbox-empty { margin-top: 28px; color: #8f98ad; font-size: 11px; -unity-text-align: middle-center; }
