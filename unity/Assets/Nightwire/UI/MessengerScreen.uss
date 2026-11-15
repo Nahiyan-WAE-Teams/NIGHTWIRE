@@ -428,3 +428,16 @@
 .call-effect-screen_flicker { background-color: rgba(190, 196, 218, 0.24); }
 .call-effect-static_burst { background-color: rgba(219, 223, 238, 0.34); }
 .call-effect-audio_distortion { background-color: rgba(74, 44, 119, 0.36); }
+
+.minigame-entry-button { margin-top: 10px; min-height: 42px; color: #f0eaff; background-color: rgba(92, 68, 143, 0.82); border-width: 1px; border-color: #9e83d1; border-radius: 7px; font-size: 10px; letter-spacing: 1px; }
+.minigame-screen { position: absolute; left: 0; right: 0; top: 0; bottom: 0; justify-content: flex-start; align-items: stretch; padding: 26px 20px; background-color: rgba(4, 7, 16, 0.98); }
+.minigame-kicker { color: #9278c4; font-size: 9px; letter-spacing: 2px; -unity-font-style: bold; }
+.minigame-title { margin-top: 14px; color: #f1edff; font-size: 22px; -unity-font-style: bold; }
+.minigame-instructions { margin-top: 10px; margin-bottom: 14px; color: #b9c1d6; font-size: 12px; white-space: normal; }
+.minigame-progress { margin-bottom: 14px; color: #a68bdc; font-size: 10px; letter-spacing: 1px; }
+.minigame-challenge-content { flex-grow: 1; padding: 12px; background-color: rgba(18, 24, 42, 0.82); border-width: 1px; border-color: rgba(103, 87, 145, 0.55); border-radius: 10px; }
+.minigame-feedback { min-height: 42px; margin-top: 12px; color: #d3c5f1; font-size: 11px; white-space: normal; }
+.minigame-symbol-button, .minigame-submit-button, .minigame-evidence-button { min-height: 42px; margin: 4px; padding-left: 12px; padding-right: 12px; color: #ece7fa; background-color: rgba(65, 52, 99, 0.9); border-width: 1px; border-color: rgba(154, 128, 202, 0.8); border-radius: 6px; }
+.minigame-sequence-preview { min-height: 48px; margin-bottom: 14px; padding: 12px; color: #e5dbff; background-color: rgba(6, 10, 21, 0.9); font-size: 13px; white-space: normal; }
+.minigame-submit-button { margin-top: 16px; background-color: #654a96; }
+.minigame-continue-button { min-height: 42px; margin-top: 12px; color: #f0eaff; background-color: #493b72; border-width: 1px; border-color: #9a82c8; border-radius: 7px; }
