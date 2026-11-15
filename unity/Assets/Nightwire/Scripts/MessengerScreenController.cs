@@ -50,6 +50,10 @@ namespace Nightwire.Unity.UI
         private VisualElement conversationInbox;
         private ScrollView conversationInboxList;
         private Button profileOpenButton;
+        private Button contactsOpenButton;
+        private Button contactsCloseButton;
+        private ScrollView contactsList;
+        private VisualElement contactsOverlay;
         private Button profileCloseButton;
         private VisualElement profileOverlay;
         private Label profileName;
@@ -219,6 +223,10 @@ namespace Nightwire.Unity.UI
             conversationInbox = root?.Q<VisualElement>("conversation-inbox");
             conversationInboxList = root?.Q<ScrollView>("conversation-inbox-list");
             profileOpenButton = root?.Q<Button>("profile-open-button");
+            contactsOpenButton = root?.Q<Button>("contacts-open-button");
+            contactsCloseButton = root?.Q<Button>("contacts-close-button");
+            contactsList = root?.Q<ScrollView>("contacts-list");
+            contactsOverlay = root?.Q<VisualElement>("contacts-overlay");
             profileCloseButton = root?.Q<Button>("profile-close-button");
             profileOverlay = root?.Q<VisualElement>("profile-overlay");
             profileName = root?.Q<Label>("profile-name");
@@ -250,7 +258,8 @@ namespace Nightwire.Unity.UI
                 groupParticipants == null ||
                 episodeTitle == null || typingIndicator == null || choiceList == null ||
                 responseHeading == null || conversationStatus == null || backButton == null ||
-                profileOpenButton == null || profileCloseButton == null || profileOverlay == null ||
+                profileOpenButton == null || contactsOpenButton == null || contactsCloseButton == null ||
+                contactsList == null || contactsOverlay == null || profileCloseButton == null || profileOverlay == null ||
                 profileName == null || profileStatus == null || profileBio == null || inboxOpenButton == null || inboxCloseButton == null ||
                 conversationInbox == null || conversationInboxList == null ||
                 callScreen == null || callKicker == null || callContact == null ||
@@ -272,6 +281,8 @@ namespace Nightwire.Unity.UI
             feedTabButton.clicked += ShowFeedTab;
             evidenceTabButton.clicked += ShowEvidenceTab;
             profileOpenButton.clicked += ShowContactProfile;
+            contactsOpenButton.clicked += ShowContactDirectory;
+            contactsCloseButton.clicked += HideContactDirectory;
             profileCloseButton.clicked += HideContactProfile;
             callRetryButton.clicked += RetryCallMedia;
             minigameEntryButton.clicked += StartPendingMinigame;
@@ -303,6 +314,10 @@ namespace Nightwire.Unity.UI
                 evidenceTabButton.clicked -= ShowEvidenceTab;
             if (bound && profileOpenButton != null)
                 profileOpenButton.clicked -= ShowContactProfile;
+            if (bound && contactsOpenButton != null)
+                contactsOpenButton.clicked -= ShowContactDirectory;
+            if (bound && contactsCloseButton != null)
+                contactsCloseButton.clicked -= HideContactDirectory;
             if (bound && profileCloseButton != null)
                 profileCloseButton.clicked -= HideContactProfile;
             if (bound && callRetryButton != null)
@@ -336,6 +351,10 @@ namespace Nightwire.Unity.UI
             conversationInbox = null;
             conversationInboxList = null;
             profileOpenButton = null;
+            contactsOpenButton = null;
+            contactsCloseButton = null;
+            contactsList = null;
+            contactsOverlay = null;
             profileCloseButton = null;
             profileOverlay = null;
             profileName = null;
@@ -1675,15 +1694,67 @@ namespace Nightwire.Unity.UI
             return result;
         }
 
-        private void ShowContactProfile()
+        private void ShowContactDirectory()
         {
-            if (profileOverlay == null || session?.Package == null ||
-                string.IsNullOrEmpty(activeContactId) ||
-                !session.Package.CharacterProfiles.TryGetValue(activeContactId, out var profile))
+            if (contactsOverlay == null || session?.Package == null)
                 return;
 
-            profileName.text = CharacterName(activeContactId);
-            profileStatus.text = CharacterStatus(activeContactId);
+            contactsList.Clear();
+            foreach (var entry in session.Package.CharacterProfiles.OrderBy(
+                pair => CharacterName(pair.Key), StringComparer.Ordinal))
+            {
+                string characterId = entry.Key;
+                var card = new Button();
+                card.AddToClassList("contact-directory-card");
+                var identity = new VisualElement();
+                identity.AddToClassList("contact-directory-identity");
+                string displayName = CharacterName(characterId);
+                var avatar = new Label(displayName.Length > 0 ? displayName.Substring(0, 1).ToUpperInvariant() : "?");
+                avatar.AddToClassList("contact-directory-avatar");
+                identity.Add(avatar);
+                var copy = new VisualElement();
+                copy.AddToClassList("contact-directory-copy");
+                var name = new Label(displayName);
+                name.AddToClassList("contact-directory-name");
+                var status = new Label(CharacterStatus(characterId));
+                status.AddToClassList("contact-directory-status");
+                var bio = new Label(Localize(ReadString(entry.Value, "bio_key"), "No profile information available."));
+                bio.AddToClassList("contact-directory-bio");
+                copy.Add(name);
+                copy.Add(status);
+                copy.Add(bio);
+                identity.Add(copy);
+                card.Add(identity);
+                card.clicked += () => ShowContactProfile(characterId);
+                contactsList.Add(card);
+            }
+
+            contactsOverlay.style.display = DisplayStyle.Flex;
+        }
+
+        private void HideContactDirectory()
+        {
+            if (contactsOverlay != null)
+                contactsOverlay.style.display = DisplayStyle.None;
+        }
+
+        private void ShowContactProfile()
+        {
+            if (string.IsNullOrEmpty(activeContactId))
+                return;
+            ShowContactProfile(activeContactId);
+        }
+
+        private void ShowContactProfile(string characterId)
+        {
+            if (profileOverlay == null || session?.Package == null ||
+                string.IsNullOrEmpty(characterId) ||
+                !session.Package.CharacterProfiles.TryGetValue(characterId, out var profile))
+                return;
+
+            HideContactDirectory();
+            profileName.text = CharacterName(characterId);
+            profileStatus.text = CharacterStatus(characterId);
             profileBio.text = Localize(ReadString(profile, "bio_key"), "No profile information available.");
             profileOverlay.style.display = DisplayStyle.Flex;
         }
