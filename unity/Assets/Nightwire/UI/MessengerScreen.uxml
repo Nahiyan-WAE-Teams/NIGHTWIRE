@@ -15,12 +15,19 @@
             <ui:Label name="episode-title" text="THE FIRST SIGNAL" class="episode-kicker" />
             <ui:Label text="MESSAGES ARE STORED WITH YOUR EPISODE" class="archive-note" />
         </ui:VisualElement>
+        <ui:VisualElement class="messenger-tabs">
+            <ui:Button name="messages-tab" text="MESSAGES" class="messenger-tab messenger-tab-active" />
+            <ui:Button name="feed-tab" text="SOCIAL FEED" class="messenger-tab" />
+            <ui:Button name="evidence-tab" text="EVIDENCE" class="messenger-tab" />
+        </ui:VisualElement>
         <ui:ScrollView name="message-list" class="message-list" />
+        <ui:ScrollView name="social-feed-list" class="secondary-content" style="display: none;" />
+        <ui:ScrollView name="evidence-list" class="secondary-content" style="display: none;" />
         <ui:VisualElement name="typing-indicator" class="typing-indicator">
             <ui:Label text="..." class="typing-dots" />
             <ui:Label text="INCOMING MESSAGE" class="typing-label" />
         </ui:VisualElement>
-        <ui:VisualElement class="response-dock">
+        <ui:VisualElement name="response-dock" class="response-dock">
             <ui:Label name="response-heading" text="STORY RESPONSE" class="response-heading" />
             <ui:VisualElement name="choice-list" class="choice-list" />
             <ui:Label name="conversation-status" text="Waiting for the next transmission…" class="conversation-status" />
