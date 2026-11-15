@@ -51,6 +51,7 @@ internal static class Program
         Run("save store normalizes migration exceptions without modifying the persisted save", SaveStoreNormalizesMigrationFailure, ref failures);
         Run("session coordinator starts an episode and persists its entry event", SessionStartsAndPersists, ref failures);
         Run("runtime session close notifies hosts once and isolates observer failures", RuntimeSessionCloseNotifiesHosts, ref failures);
+        Run("closed runtime session cannot checkpoint stale progress", ClosedSessionCannotCheckpointStaleProgress, ref failures);
         Run("session coordinator resumes conversation progress", SessionResumesConversation, ref failures);
         Run("conversation delay ticks do not write a save every frame", ConversationDelayTicksAvoidSaveWrites, ref failures);
         Run("session coordinator prevents accidental new-game overwrite", SessionPreventsOverwrite, ref failures);
@@ -740,6 +741,36 @@ internal static class Program
             Assert(notifications == 1, "A failed save must notify hosts exactly once.");
             coordinator.CloseSession();
             Assert(notifications == 1, "Closing an already inactive session emitted another notification.");
+        }
+        finally
+        {
+            if (Directory.Exists(episode)) Directory.Delete(episode, true);
+            if (Directory.Exists(saves)) Directory.Delete(saves, true);
+        }
+    }
+
+    private static void ClosedSessionCannotCheckpointStaleProgress()
+    {
+        string episode = CopySamplePackage();
+        string saves = Path.Combine(Path.GetTempPath(), "nightwire-session-closed-checkpoint-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new SaveStore(saves);
+            var coordinator = new RuntimeSessionCoordinator(store);
+            Assert(coordinator.StartNewSession(episode).Success, "Session did not start.");
+            EpisodeProgressState capturedProgress = coordinator.Progress!;
+            capturedProgress.RelationshipScores["anisha"] = 7;
+            Assert(coordinator.SaveNow().Success, "Initial checkpoint failed.");
+
+            coordinator.CloseSession();
+            capturedProgress.RelationshipScores["anisha"] = 99;
+            RuntimeSessionResult staleCheckpoint = coordinator.SaveNow();
+
+            Assert(!staleCheckpoint.Success && staleCheckpoint.ErrorCode == "session_not_active",
+                "A closed session accepted a new checkpoint.");
+            var persisted = store.Load("nightwire.ep001", "1.0.0").State;
+            Assert(persisted.RelationshipScores["anisha"] == 7,
+                "A stale progress object changed the committed save after session closure.");
         }
         finally
         {
