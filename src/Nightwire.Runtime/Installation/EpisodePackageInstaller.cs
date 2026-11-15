@@ -478,7 +478,7 @@ namespace Nightwire.Runtime.Installation
 
         internal static object GetInstallRootLock(string root)
         {
-            string canonicalRoot = Path.GetFullPath(root);
+            string canonicalRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
             lock (InstallRootLocksGate)
             {
                 if (!InstallRootLocks.TryGetValue(canonicalRoot, out object? gate))
