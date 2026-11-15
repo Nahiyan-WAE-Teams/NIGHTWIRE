@@ -1,0 +1,60 @@
+import json
+import sys
+import unittest
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+from validate_unity_ui import validate_project
+
+
+class NightwireUnityUiTests(unittest.TestCase):
+    def test_unity_project_uses_patched_lts_version(self):
+        version = (ROOT / "unity/ProjectSettings/ProjectVersion.txt").read_text(encoding="utf-8")
+        self.assertIn("m_EditorVersion: 6000.3.28f1", version)
+
+    def test_unity_package_manifest_is_valid(self):
+        manifest = json.loads((ROOT / "unity/Packages/manifest.json").read_text(encoding="utf-8"))
+        self.assertIsInstance(manifest["dependencies"], dict)
+
+    def test_both_runtime_uxml_documents_are_valid_xml(self):
+        for relative in (
+            "unity/Assets/Nightwire/UI/EpisodeLibraryView.uxml",
+            "unity/Assets/Nightwire/UI/MessengerScreen.uxml",
+        ):
+            with self.subTest(relative=relative):
+                ET.parse(ROOT / relative)
+
+    def test_all_controller_query_names_exist_in_their_uxml(self):
+        errors = validate_project()
+        self.assertFalse(errors, "\\n".join(errors))
+
+    def test_stylesheets_are_attached_to_uxml_documents(self):
+        for relative in (
+            "unity/Assets/Nightwire/UI/EpisodeLibraryView.uxml",
+            "unity/Assets/Nightwire/UI/MessengerScreen.uxml",
+        ):
+            with self.subTest(relative=relative):
+                source = (ROOT / relative).read_text(encoding="utf-8")
+                self.assertIn("project://database/Assets/Nightwire/UI/", source)
+                self.assertIn(".uss", source)
+
+    def test_unity_assembly_references_portable_runtime(self):
+        asmdef = json.loads((ROOT / "unity/Assets/Nightwire/Scripts/Nightwire.Unity.asmdef").read_text(encoding="utf-8"))
+        self.assertIn("Nightwire.Runtime", asmdef["references"])
+
+    def test_editor_bootstrapper_generates_scene_and_bundled_episode(self):
+        source = (ROOT / "unity/Assets/Editor/NightwireProjectBootstrapper.cs").read_text(encoding="utf-8")
+        self.assertIn("NightwireMain.unity", source)
+        self.assertIn("Episode_001.zip", source)
+        self.assertIn("EditorBuildSettings.scenes", source)
+
+    def test_development_provider_does_not_refresh_remote_catalogue(self):
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/NightwireDevelopmentPlatformServices.cs").read_text(encoding="utf-8")
+        self.assertIn("ShouldRefreshCatalogue => false", source)
+        self.assertIn("disabled in release players", source)
+
+
+if __name__ == "__main__":
+    unittest.main()
