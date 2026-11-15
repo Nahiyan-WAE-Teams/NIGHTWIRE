@@ -3,7 +3,7 @@
   "event_id": "event.mira_intro",
   "trigger": {
     "type": "message_completed",
-    "message_id": "rafi.day01.006"
+    "message_id": "rafi.day01.007"
   },
   "actions": [
     {
