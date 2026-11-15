@@ -74,6 +74,7 @@ internal static class Program
         Run("episode downloader rejects a linked destination ancestor", EpisodeDownloaderRejectsLinkedDestinationAncestor, ref failures);
         Run("signed release catalogue verifies signatures, rejects rollback, duplicate JSON keys, and malformed runtime versions", ReleaseCatalogueVerifiesSignatureAndSequence, ref failures);
         Run("installer startup recovery restores interrupted update backup", InstallerRecoveryRestoresPreviousInstall, ref failures);
+        Run("installer recovery restores a valid backup over an invalid destination", InstallerRecoveryRestoresBackupOverInvalidDestination, ref failures);
         Run("installer rejects a symlinked ancestor of its install root", InstallerRejectsSymlinkedRootAncestor, ref failures);
         Run("installer rejects signed release identity mismatch before replacing existing content", InstallerRejectsReleaseIdentityMismatch, ref failures);
         Run("release manager performs one-time install recovery before library access", ReleaseManagerRecoversBeforeLibraryAccess, ref failures);
@@ -1679,6 +1680,43 @@ internal static class Program
             var afterShutdown = manager.InstallOrUpdateAsync("nightwire.ep001").GetAwaiter().GetResult();
             Assert(!afterShutdown.Success && afterShutdown.ErrorCode == "manager_disposed",
                 "Disposed manager accepted a new episode operation.");
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    private static void InstallerRecoveryRestoresBackupOverInvalidDestination()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-installer-invalid-recovery-" + Guid.NewGuid().ToString("N"));
+        string installRoot = Path.Combine(root, "installed");
+        Directory.CreateDirectory(root);
+        try
+        {
+            string archive = Path.Combine(root, "episode.zip");
+            CreateSampleArchive(archive);
+            var installer = new EpisodePackageInstaller();
+            var installed = installer.InstallArchive(archive, installRoot);
+            Assert(installed.Success, installed.Error ?? "Could not create the valid installed package.");
+
+            string backup = Path.Combine(installRoot,
+                ".backup-nightwire.ep001-" + Guid.NewGuid().ToString("N"));
+            Directory.Move(installed.InstallDirectory!, backup);
+            string destination = Path.Combine(installRoot, "nightwire.ep001");
+            Directory.CreateDirectory(destination);
+            File.WriteAllText(Path.Combine(destination, "partial.marker"), "damaged replacement");
+
+            var recovery = installer.RecoverInterruptedInstalls(installRoot);
+            Assert(recovery.RestoredEpisodeIds.Contains("nightwire.ep001"),
+                "Recovery did not restore the backup over the invalid destination.");
+            var restored = new EpisodePackageLoader().Load(destination);
+            Assert(restored.Descriptor.EpisodeId == "nightwire.ep001" &&
+                restored.Descriptor.EpisodeVersion == "1.0.0",
+                "Recovery did not restore a fully loadable previous episode.");
+            Assert(!File.Exists(Path.Combine(destination, "partial.marker")),
+                "The invalid destination remained active after recovery.");
+            Assert(!Directory.Exists(backup), "Successfully restored backup was not consumed.");
         }
         finally
         {
