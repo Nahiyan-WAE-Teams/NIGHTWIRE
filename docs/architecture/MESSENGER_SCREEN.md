@@ -30,7 +30,9 @@ The first messenger screen is a Unity UI Toolkit presentation adapter over the p
 | `text`, `system` | Localized text bubble |
 | `choice` | Localized prompt and authored choice buttons |
 | `image` | Inline preview if the asset is unlocked, manifest-listed, hash-verified, and below the inline size limit |
-| `audio`, `video`, `document` | Identified attachment placeholder |
+| `audio`, `video` | Verified in-message playback |
+| `document` | Verified attachment placeholder / bounded text preview in Evidence |
+| `call_invitation` | Answer action opens the prerecorded call screen with runtime-synchronized media, subtitles, speaker focus, cues, and completion trigger |
 | `call_invitation` | Incoming-call placeholder with call ID |
 
 Character names and status are resolved from each character profile's localization keys. The episode title is resolved from the package descriptor. The locale is the episode default locale until a player language preference is wired into settings.
@@ -68,3 +70,12 @@ The Evidence tab enumerates only assets explicitly unlocked in player progress. 
 ## Group conversation presentation
 
 Conversation headers inspect the complete participant list rather than treating the first non-player participant as the only contact. Multi-contact conversations receive a Group Chat header and a localized participant roster; each incoming message retains its sender label. The profile shortcut opens the first listed member's profile. Conversation delivery, choices, and progress remain on the same shared conversation runtime schema.
+
+
+## Prerecorded call presentation
+
+The messenger now turns an authored call invitation into an Answer action only when its call ID matches the runtime's pending call. Starting it calls StartCallPlayback, resolves the typed audio/video asset through the manifest-verified and unlocked asset resolver, and opens a full-screen call surface. Video uses a prepared Unity VideoPlayer/RenderTexture; audio uses a decoded AudioClip. Resumed calls seek media to the persisted elapsed position.
+
+The call timeline advances in one-second checkpoints through AdvanceCallPlayback, preserving progress without writing a save on every rendered frame. Returned localized subtitle entries, speaker-focus cues, overlay-text cues, and allowlisted visual-effect cues are applied to the call surface. Completion invokes the runtime's call-ended story trigger and returns to the messenger. If media verification or decoding fails, timeline advancement pauses and a retry control is shown. Unity's VideoPlayer Prepare/prepareCompleted flow is used so video is ready before playback begins (Unity 6000.3 API reference: https://docs.unity3d.com/6000.3/Documentation/ScriptReference/Video.VideoPlayer.Prepare.html).
+
+This is source integration, not device-verified playback. Actual codec support, audio/video drift, decoder behavior, subtitle timing, and background/resume behavior still require Unity Editor and Android device testing.
