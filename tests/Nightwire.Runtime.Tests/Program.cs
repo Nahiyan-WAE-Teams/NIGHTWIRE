@@ -83,6 +83,7 @@ internal static class Program
         Run("release manager cancels active install and releases its lease on disposal", ReleaseManagerDisposalCancelsInstall, ref failures);
         Run("episode library presentation cancels refresh and suppresses events after disposal", LibraryPresentationDisposalCancelsRefresh, ref failures);
         Run("episode access gate excludes session and installer ownership", EpisodeAccessGateExcludesSessionAndInstall, ref failures);
+        Run("episode access gate coordinates independent instances and case variants", EpisodeAccessGateCoordinatesInstances, ref failures);
         Console.WriteLine(failures == 0 ? "All runtime tests passed." : $"{failures} runtime test(s) failed.");
         return failures == 0 ? 0 : 1;
     }
@@ -1600,6 +1601,25 @@ internal static class Program
         Assert(access.TryAcquireSessionLease("nightwire.ep001", out var reopenedSession) && reopenedSession != null,
             "Gameplay session could not open after installation released its lease.");
         reopenedSession!.Dispose();
+    }
+
+    private static void EpisodeAccessGateCoordinatesInstances()
+    {
+        var first = new EpisodeAccessCoordinator();
+        var second = new EpisodeAccessCoordinator();
+        Assert(first.TryAcquireSessionLease("nightwire.ep001", out var session) && session != null,
+            "First access coordinator could not acquire the session lease.");
+        Assert(!second.TryAcquireInstallLease("NIGHTWIRE.EP001", out var blockedInstall) && blockedInstall == null,
+            "A second coordinator bypassed the active session lease using a case variant.");
+        session!.Dispose();
+        Assert(second.TryAcquireInstallLease("nightwire.ep001", out var install) && install != null,
+            "Install lease could not be acquired after the session released access.");
+        Assert(!first.TryAcquireSessionLease("NIGHTWIRE.EP001", out var blockedSession) && blockedSession == null,
+            "A first coordinator bypassed the active install lease using a case variant.");
+        install!.Dispose();
+        Assert(first.TryAcquireSessionLease("nightwire.ep001", out var reopened) && reopened != null,
+            "Session access was not released across coordinator instances.");
+        reopened!.Dispose();
     }
 
     private static void ReleaseManagerDisposalCancelsRefresh()
