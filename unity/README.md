@@ -42,7 +42,7 @@ These versions follow Unity's official 6000.3 compatibility tables. The editor p
 - `Assets/Nightwire/UI/EpisodeLibraryView.uxml` and `.uss` — dark episode archive.
 - `Assets/Nightwire/UI/MessengerScreen.uxml` and `.uss` — conversation interface, message bubbles, image previews, choice dock, and opened-conversation inbox.
 - `Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` — archive presentation adapter.
-- `Assets/Nightwire/Scripts/MessengerScreenController.cs` — package-driven text, choices, localized character profiles, episode social feed, unlocked evidence library, bounded text-document previews, verified images, and verified audio/video playback.
+- `Assets/Nightwire/Scripts/MessengerScreenController.cs` — package-driven text, choices, localized character profiles, episode contact directory, episode social feed, unlocked evidence library, bounded text-document previews, verified images, and verified audio/video playback.
 - `Assets/Nightwire/Scripts/NightwireApplicationRoot.cs` — composition root, startup recovery, and session lifecycle.
 - `Assets/Nightwire/Scripts/EpisodeSessionHost.cs` — resume/new-session selection and per-episode session lease.
 - `Assets/Nightwire/Scripts/AndroidNightwirePlatformServices.cs` — production Android release configuration and StrongBox bridge.
@@ -85,7 +85,7 @@ Unity In-App Purchasing 5.5.0 is pinned in `Packages/manifest.json`. `NightwireI
 ## Separate CI pipelines
 
 - **Engine CI** builds the portable runtime and validator, validates the sample episode, and runs the 62 runtime regression tests plus validator integration tests.
-- **Game UI CI** stages the runtime assemblies and checks Unity project metadata, UXML parsing, controller-to-UXML named-element contracts, stylesheet references, assembly references, verified audio/video integration contracts, and 21 UI source regression tests.
+- **Game UI CI** stages the runtime assemblies and checks Unity project metadata, UXML parsing, controller-to-UXML named-element contracts, stylesheet references, assembly references, verified audio/video integration contracts, and 22 UI source regression tests.
 
 Game UI CI stages the runtime assemblies, validates UI source contracts, builds the Android StrongBox secure-store AAR with JDK 17 / Gradle 9.3.1 / Android SDK 36, verifies its JNI class and backup-exclusion resources, and uploads the AAR as the `nightwire-android-secure-store-aar` workflow artifact. It is still not a Unity Editor compile or Android player build. Unity Editor compilation, Play Mode testing, final manifest merge, and Android device/StrongBox verification require an actual Unity 6000.3.28f1 installation and device/toolchain execution.
 
@@ -108,3 +108,5 @@ The current workflow uses Unity's default Android signing configuration for a de
 
 
 Call presentation advances its subtitle/effect timeline from the actual AudioSource or VideoPlayer playback position, and pauses/resumes call media with the application lifecycle. Physical-device decoder synchronization remains a release verification item.
+
+The messenger now includes an episode-scoped contact directory with localized character names, statuses, and biographies. Contact browsing does not unlock conversations or alter story progress.
