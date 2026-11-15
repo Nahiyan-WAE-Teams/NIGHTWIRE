@@ -62,10 +62,10 @@ namespace Nightwire.Unity
                 yield break;
             }
 
-            string archivePath = Path.Combine(Application.streamingAssetsPath, "Nightwire", "Episode_001.zip");
-            string archiveUrl = archivePath.StartsWith("jar:", StringComparison.OrdinalIgnoreCase)
-                ? archivePath
-                : new Uri(archivePath).AbsoluteUri;
+            string streamingArchivePath = Path.Combine(Application.streamingAssetsPath, "Nightwire", "Episode_001.zip");
+            string archiveUrl = streamingArchivePath.StartsWith("jar:", StringComparison.OrdinalIgnoreCase)
+                ? streamingArchivePath
+                : new Uri(streamingArchivePath).AbsoluteUri;
             using (var request = UnityWebRequest.Get(archiveUrl))
             {
                 request.timeout = 60;
@@ -85,9 +85,9 @@ namespace Nightwire.Unity
                         throw new InvalidDataException("Bundled episode archive is empty or exceeds its configured size limit.");
 
                     Directory.CreateDirectory(downloadRoot);
-                    string archivePath = Path.Combine(downloadRoot, "bundled-episode-001.zip");
-                    File.WriteAllBytes(archivePath, archiveBytes);
-                    var result = installer.InstallArchive(archivePath, installRoot, episodeId, episodeVersion);
+                    string downloadedArchivePath = Path.Combine(downloadRoot, "bundled-episode-001.zip");
+                    File.WriteAllBytes(downloadedArchivePath, archiveBytes);
+                    var result = installer.InstallArchive(downloadedArchivePath, installRoot, episodeId, episodeVersion);
                     if (!result.Success)
                         throw new InvalidDataException("Bundled episode installation failed: " + result.Error);
                     completed?.Invoke(true);
