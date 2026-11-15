@@ -85,6 +85,16 @@ class NightwireUnityUiTests(unittest.TestCase):
                 self.assertIn(token, source)
         self.assertEqual(bootstrap.count("AddComponent<NightwireAtmosphereController>()"), 2)
 
+    def test_messenger_exposes_localized_character_profile_overlay(self):
+        uxml = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uxml").read_text(encoding="utf-8")
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
+        for token in ("profile-open-button", "profile-overlay", "profile-name", "profile-status", "profile-bio"):
+            with self.subTest(token=token):
+                self.assertIn(token, uxml)
+        for token in ("ShowContactProfile", "HideContactProfile", 'ReadString(profile, "bio_key")'):
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+
     def test_iap_service_uses_iap_55_and_requires_server_fulfillment(self):
         source = (ROOT / "unity/Assets/Nightwire/Scripts/NightwireIapService.cs").read_text(encoding="utf-8")
         for token in ("PurchasingController", "CatalogProvider", "OnPurchasePending", "ConfirmPurchase",
