@@ -1,12 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Nightwire.Runtime.Domain;
 using Nightwire.Unity;
 using Nightwire.Runtime.Sessions;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.UIElements;
+using UnityEngine.Video;
 
 namespace Nightwire.Unity.UI
 {
@@ -19,6 +23,7 @@ namespace Nightwire.Unity.UI
     {
         [SerializeField] private UIDocument document;
         [SerializeField] private long maximumInlineImageBytes = 12582912;
+        [SerializeField] private long maximumInlineMediaBytes = 268435456;
 
         private EpisodeSessionHost sessionHost;
         private RuntimeSessionCoordinator session;
@@ -37,6 +42,18 @@ namespace Nightwire.Unity.UI
         private bool bound;
         private bool isRendering;
         private readonly Dictionary<string, Texture2D> imageCache = new Dictionary<string, Texture2D>(StringComparer.Ordinal);
+        private AudioSource mediaAudioSource;
+        private AudioClip activeAudioClip;
+        private Coroutine audioLoadCoroutine;
+        private string activeAudioAssetId;
+        private Button activeAudioButton;
+        private Label activeAudioStatus;
+        private bool audioPaused;
+        private VideoPlayer mediaVideoPlayer;
+        private RenderTexture videoRenderTexture;
+        private string activeVideoAssetId;
+        private Button activeVideoButton;
+        private Label activeVideoStatus;
 
         public event Action CloseRequested;
 
@@ -170,6 +187,7 @@ namespace Nightwire.Unity.UI
             conversationStatus = null;
             backButton = null;
             activeConversationId = null;
+            StopMediaPlayback();
             ClearImageCache();
         }
 
@@ -292,9 +310,13 @@ namespace Nightwire.Unity.UI
 
             if (type == "image")
                 AddImageAttachment(bubble, ReadString(message, "asset_id"));
-            else if (type == "audio" || type == "video" || type == "document")
+            else if (type == "audio")
+                AddAudioAttachment(bubble, ReadString(message, "asset_id"));
+            else if (type == "video")
+                AddVideoAttachment(bubble, ReadString(message, "asset_id"));
+            else if (type == "document")
             {
-                var attachment = new Label(type.ToUpperInvariant() + " ATTACHMENT");
+                var attachment = new Label("DOCUMENT ATTACHMENT · STORED IN EPISODE");
                 attachment.AddToClassList("message-media-note");
                 bubble.Add(attachment);
             }
@@ -318,6 +340,334 @@ namespace Nightwire.Unity.UI
             bubble.Add(time);
             row.Add(bubble);
             return row;
+        }
+
+        private void AddAudioAttachment(VisualElement bubble, string assetId)
+        {
+            var player = new VisualElement();
+            player.AddToClassList("message-media-player");
+            var status = new Label("VOICE MESSAGE · READY");
+            status.AddToClassList("message-media-status");
+            var button = new Button { text = "PLAY AUDIO" };
+            button.AddToClassList("message-media-control");
+            button.clicked += () => ToggleAudio(assetId, button, status);
+            player.Add(status);
+            player.Add(button);
+            bubble.Add(player);
+        }
+
+        private void AddVideoAttachment(VisualElement bubble, string assetId)
+        {
+            var player = new VisualElement();
+            player.AddToClassList("message-media-player");
+            var preview = new Image();
+            preview.AddToClassList("message-video-preview");
+            preview.scaleMode = ScaleMode.ScaleToFit;
+            var status = new Label("VIDEO MESSAGE · READY");
+            status.AddToClassList("message-media-status");
+            var button = new Button { text = "PLAY VIDEO" };
+            button.AddToClassList("message-media-control");
+            button.clicked += () => ToggleVideo(assetId, preview, button, status);
+            player.Add(preview);
+            player.Add(status);
+            player.Add(button);
+            bubble.Add(player);
+        }
+
+        private void ToggleAudio(string assetId, Button button, Label status)
+        {
+            if (string.IsNullOrEmpty(assetId))
+            {
+                status.text = "AUDIO REFERENCE MISSING";
+                return;
+            }
+
+            EnsureAudioSource();
+            if (string.Equals(activeAudioAssetId, assetId, StringComparison.Ordinal) && activeAudioClip != null)
+            {
+                if (mediaAudioSource.isPlaying)
+                {
+                    mediaAudioSource.Pause();
+                    audioPaused = true;
+                    button.text = "RESUME AUDIO";
+                    status.text = "PAUSED";
+                }
+                else if (audioPaused)
+                {
+                    mediaAudioSource.UnPause();
+                    audioPaused = false;
+                    button.text = "PAUSE AUDIO";
+                    status.text = "PLAYING";
+                }
+                else
+                {
+                    mediaAudioSource.time = 0;
+                    mediaAudioSource.Play();
+                    button.text = "PAUSE AUDIO";
+                    status.text = "PLAYING";
+                }
+                return;
+            }
+
+            if (audioLoadCoroutine != null) StopCoroutine(audioLoadCoroutine);
+            mediaAudioSource.Stop();
+            activeAudioAssetId = assetId;
+            activeAudioButton = button;
+            activeAudioStatus = status;
+            activeAudioClip = null;
+            audioPaused = false;
+            button.SetEnabled(false);
+            status.text = "VERIFYING AUDIO…";
+            audioLoadCoroutine = StartCoroutine(LoadAndPlayAudio(assetId, button, status));
+        }
+
+        private System.Collections.IEnumerator LoadAndPlayAudio(string assetId, Button button, Label status)
+        {
+            string path;
+            try { path = CacheVerifiedMediaAsset(assetId); }
+            catch (Exception exception)
+            {
+                status.text = "AUDIO UNAVAILABLE · " + exception.Message;
+                button.SetEnabled(true);
+                audioLoadCoroutine = null;
+                yield break;
+            }
+
+            string url = new Uri(path).AbsoluteUri;
+            using (var request = UnityWebRequestMultimedia.GetAudioClip(url, GetAudioType(path)))
+            {
+                request.timeout = 60;
+                yield return request.SendWebRequest();
+                if (request.result != UnityWebRequest.Result.Success)
+                {
+                    status.text = "AUDIO DECODE FAILED · " + request.error;
+                    button.SetEnabled(true);
+                    audioLoadCoroutine = null;
+                    yield break;
+                }
+
+                var clip = DownloadHandlerAudioClip.GetContent(request);
+                if (clip == null)
+                {
+                    status.text = "AUDIO DECODE FAILED";
+                    button.SetEnabled(true);
+                    audioLoadCoroutine = null;
+                    yield break;
+                }
+
+                if (activeAudioClip != null) Destroy(activeAudioClip);
+                activeAudioClip = clip;
+                activeAudioClip.name = assetId;
+                mediaAudioSource.clip = activeAudioClip;
+                mediaAudioSource.Play();
+                button.SetEnabled(true);
+                button.text = "PAUSE AUDIO";
+                status.text = "PLAYING";
+                audioLoadCoroutine = null;
+            }
+        }
+
+        private void ToggleVideo(string assetId, Image preview, Button button, Label status)
+        {
+            if (string.IsNullOrEmpty(assetId))
+            {
+                status.text = "VIDEO REFERENCE MISSING";
+                return;
+            }
+
+            EnsureVideoPlayer();
+            if (string.Equals(activeVideoAssetId, assetId, StringComparison.Ordinal) &&
+                mediaVideoPlayer.isPrepared)
+            {
+                if (mediaVideoPlayer.isPlaying)
+                {
+                    mediaVideoPlayer.Pause();
+                    button.text = "RESUME VIDEO";
+                    status.text = "PAUSED";
+                }
+                else
+                {
+                    mediaVideoPlayer.Play();
+                    button.text = "PAUSE VIDEO";
+                    status.text = "PLAYING";
+                }
+                return;
+            }
+
+            string path;
+            try { path = CacheVerifiedMediaAsset(assetId); }
+            catch (Exception exception)
+            {
+                status.text = "VIDEO UNAVAILABLE · " + exception.Message;
+                return;
+            }
+
+            mediaVideoPlayer.Stop();
+            activeVideoAssetId = assetId;
+            activeVideoButton = button;
+            activeVideoStatus = status;
+            preview.image = videoRenderTexture;
+            button.SetEnabled(false);
+            button.text = "PREPARING VIDEO";
+            status.text = "PREPARING VIDEO…";
+            mediaVideoPlayer.url = new Uri(path).AbsoluteUri;
+            mediaVideoPlayer.Prepare();
+        }
+
+        private void EnsureAudioSource()
+        {
+            if (mediaAudioSource == null)
+                mediaAudioSource = GetComponent<AudioSource>() ?? gameObject.AddComponent<AudioSource>();
+            mediaAudioSource.playOnAwake = false;
+            mediaAudioSource.loop = false;
+        }
+
+        private void EnsureVideoPlayer()
+        {
+            EnsureAudioSource();
+            if (videoRenderTexture == null)
+            {
+                videoRenderTexture = new RenderTexture(960, 540, 0, RenderTextureFormat.ARGB32);
+                videoRenderTexture.Create();
+            }
+            if (mediaVideoPlayer == null)
+            {
+                mediaVideoPlayer = GetComponent<VideoPlayer>() ?? gameObject.AddComponent<VideoPlayer>();
+                mediaVideoPlayer.playOnAwake = false;
+                mediaVideoPlayer.isLooping = false;
+                mediaVideoPlayer.renderMode = VideoRenderMode.RenderTexture;
+                mediaVideoPlayer.targetTexture = videoRenderTexture;
+                mediaVideoPlayer.audioOutputMode = VideoAudioOutputMode.AudioSource;
+                mediaVideoPlayer.EnableAudioTrack(0, true);
+                mediaVideoPlayer.SetTargetAudioSource(0, mediaAudioSource);
+                mediaVideoPlayer.prepareCompleted += VideoPrepared;
+                mediaVideoPlayer.loopPointReached += VideoCompleted;
+                mediaVideoPlayer.errorReceived += VideoFailed;
+            }
+        }
+
+        private void VideoPrepared(VideoPlayer player)
+        {
+            if (player != mediaVideoPlayer) return;
+            player.Play();
+            if (activeVideoButton != null)
+            {
+                activeVideoButton.SetEnabled(true);
+                activeVideoButton.text = "PAUSE VIDEO";
+            }
+            if (activeVideoStatus != null) activeVideoStatus.text = "PLAYING";
+        }
+
+        private void VideoCompleted(VideoPlayer player)
+        {
+            if (player != mediaVideoPlayer) return;
+            if (activeVideoButton != null) activeVideoButton.text = "REPLAY VIDEO";
+            if (activeVideoStatus != null) activeVideoStatus.text = "PLAYBACK COMPLETE";
+        }
+
+        private void VideoFailed(VideoPlayer player, string message)
+        {
+            if (player != mediaVideoPlayer) return;
+            if (activeVideoButton != null)
+            {
+                activeVideoButton.SetEnabled(true);
+                activeVideoButton.text = "RETRY VIDEO";
+            }
+            if (activeVideoStatus != null) activeVideoStatus.text = "VIDEO PLAYBACK FAILED · " + message;
+        }
+
+        private string CacheVerifiedMediaAsset(string assetId)
+        {
+            if (session == null || session.Package == null ||
+                !session.Package.AssetsById.TryGetValue(assetId, out var metadata))
+                throw new InvalidOperationException("The media asset is not part of the active episode manifest.");
+
+            var opened = session.OpenAsset(assetId);
+            if (!opened.Success || opened.Asset == null)
+                throw new InvalidOperationException(opened.Error ?? "The media asset is locked or unavailable.");
+
+            using (opened.Asset)
+            {
+                if (opened.Asset.SizeBytes <= 0 || opened.Asset.SizeBytes > maximumInlineMediaBytes)
+                    throw new InvalidOperationException("The media asset exceeds the inline playback size limit.");
+
+                string extension = Path.GetExtension(metadata.Path);
+                if (extension.Length > 10 || extension.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                    extension = string.Empty;
+
+                byte[] identity = Encoding.UTF8.GetBytes(assetId);
+                string fileId;
+                using (var sha = SHA256.Create())
+                    fileId = BitConverter.ToString(sha.ComputeHash(identity)).Replace("-", string.Empty).ToLowerInvariant();
+
+                string directory = Path.Combine(Application.temporaryCachePath, "NightwireMedia");
+                Directory.CreateDirectory(directory);
+                string destination = Path.Combine(directory, fileId + extension);
+                string temporary = destination + ".tmp";
+                using (var output = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    var buffer = new byte[81920];
+                    long copied = 0;
+                    int read;
+                    while ((read = opened.Asset.Content.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        copied += read;
+                        if (copied > maximumInlineMediaBytes)
+                            throw new InvalidDataException("The media asset exceeded its playback size limit while being copied.");
+                        output.Write(buffer, 0, read);
+                    }
+                    output.Flush();
+                }
+
+                if (File.Exists(destination)) File.Replace(temporary, destination, null);
+                else File.Move(temporary, destination);
+                return destination;
+            }
+        }
+
+        private static AudioType GetAudioType(string path)
+        {
+            switch (Path.GetExtension(path).ToLowerInvariant())
+            {
+                case ".mp3": return AudioType.MPEG;
+                case ".wav": return AudioType.WAV;
+                case ".ogg": return AudioType.OGGVORBIS;
+                case ".aif":
+                case ".aiff": return AudioType.AIFF;
+                case ".m4a":
+                case ".aac": return AudioType.ACC;
+                default: return AudioType.UNKNOWN;
+            }
+        }
+
+        private void StopMediaPlayback()
+        {
+            if (audioLoadCoroutine != null)
+            {
+                StopCoroutine(audioLoadCoroutine);
+                audioLoadCoroutine = null;
+            }
+            if (mediaAudioSource != null) mediaAudioSource.Stop();
+            if (activeAudioClip != null)
+            {
+                Destroy(activeAudioClip);
+                activeAudioClip = null;
+            }
+            activeAudioAssetId = null;
+            activeAudioButton = null;
+            activeAudioStatus = null;
+            audioPaused = false;
+
+            if (mediaVideoPlayer != null) mediaVideoPlayer.Stop();
+            activeVideoAssetId = null;
+            activeVideoButton = null;
+            activeVideoStatus = null;
+            if (videoRenderTexture != null)
+            {
+                videoRenderTexture.Release();
+                Destroy(videoRenderTexture);
+                videoRenderTexture = null;
+            }
         }
 
         private void AddImageAttachment(VisualElement bubble, string assetId)
