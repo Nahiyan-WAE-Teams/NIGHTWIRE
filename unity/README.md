@@ -75,7 +75,7 @@ The episode engine already has data contracts and runtime support for several of
 ## Separate CI pipelines
 
 - **Engine CI** builds the portable runtime and validator, validates the sample episode, and runs the 62 runtime regression tests plus validator integration tests.
-- **Game UI CI** stages the runtime assemblies and checks Unity project metadata, UXML parsing, controller-to-UXML named-element contracts, stylesheet references, assembly references, and UI source tests.
+- **Game UI CI** stages the runtime assemblies and checks Unity project metadata, UXML parsing, controller-to-UXML named-element contracts, stylesheet references, assembly references, verified audio/video integration contracts, and 10 UI source regression tests.
 
 Game UI CI is currently a source/integration validation pipeline, not a Unity Editor compile or Android player build. Unity Editor compilation, Play Mode testing, AAR build, and Android device verification still require an actual Unity 6000.3.28f1 installation and device/toolchain execution.
 
