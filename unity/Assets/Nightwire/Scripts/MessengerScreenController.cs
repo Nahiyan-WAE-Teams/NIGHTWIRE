@@ -149,7 +149,6 @@ namespace Nightwire.Unity.UI
             UpdateMediaPlayback();
             UpdateCallPlayback();
             UpdateMinigamePlayback();
-            UpdateCallPlayback();
             if (!string.IsNullOrEmpty(activeCallId)) return;
             if (!bound || session == null || !session.IsActive || session.Progress == null)
                 return;
