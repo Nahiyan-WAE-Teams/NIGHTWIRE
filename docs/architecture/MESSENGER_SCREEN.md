@@ -84,3 +84,8 @@ This is source integration, not device-verified playback. Actual codec support, 
 ## Investigation minigames
 
 When a story event sets PendingMinigameId, the messenger exposes an investigation entry action. The screen reads the verified episode minigame definition and builds one of three controls: a bounded symbol-sequence composer, a frequency slider using the authored minimum/maximum range, or a two-item evidence matcher. All submissions call the portable RuntimeSessionCoordinator methods (SubmitSequence, SubmitFrequency, MatchEvidence); no answer is evaluated in Unity UI code. Timed minigames advance in one-second checkpoints and persist through AdvanceMinigameTime. Solved/failed state is shown before returning to the conversation. The current schema has no explicit failure event or retry-reset contract, so an exhausted minigame can intentionally stall story progression unless its episode design provides another route.
+
+
+## Conversation inbox
+
+The header's CHATS action opens an episode-local inbox. It lists only conversation IDs that already have player progress, so it cannot expose or start story threads before the episode's authored events have opened them. Each row shows the participant/group identity, latest delivered message preview, unread count, and completion/choice state. Selecting a row switches the runtime's active conversation with `BeginConversation`; each thread's delivery timers, read receipts, selected choices, and branching state remain in its own persisted `ConversationProgressState`. This is a thread switcher for already-opened conversations, not a general contact directory or an unlock bypass.
