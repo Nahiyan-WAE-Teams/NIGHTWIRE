@@ -94,3 +94,8 @@ The header's CHATS action opens an episode-local inbox. It lists only conversati
 ## Call playback clock and application lifecycle
 
 Prerecorded call subtitle/cue progression is driven by the active Unity media player's playback position rather than an independent wall-clock accumulator. Audio uses the decoded AudioSource position; video uses VideoPlayer.time. This keeps authored timeline events aligned with the media clock when decoding stalls or playback cadence varies. When Android backgrounds the application during an active call, the presentation pauses the media player and stops advancing the call timeline; on resume it continues from the same playback position. This remains subject to device-specific decoder behavior and must be verified on physical Android devices.
+
+
+## Episode contact directory
+
+The messenger header opens an episode-scoped contact directory built from the verified package's character profiles. Each entry shows the localized display name, status, and biography; selecting an entry opens its profile detail. The player profile is excluded from the contact list. The directory is presentation-only and does not create conversations or unlock story content.
