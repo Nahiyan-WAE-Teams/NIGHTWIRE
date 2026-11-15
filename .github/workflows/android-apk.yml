@@ -53,6 +53,7 @@ jobs:
           projectPath: unity
           unityVersion: 6000.3.28f1
           targetPlatform: Android
+          buildMethod: Nightwire.Unity.Editor.NightwireAndroidBuild.Build
           androidExportType: androidPackage
           allowDirtyBuild: true
           buildName: NIGHTWIRE
