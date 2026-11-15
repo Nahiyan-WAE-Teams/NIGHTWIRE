@@ -93,9 +93,11 @@ namespace Nightwire.Runtime.Saves
             string path = Path.Combine(directory, "save.json");
             string temp = path + ".tmp";
             string backup = path + ".bak";
+            string backupTemp = backup + ".tmp";
             EnsureNotLink(path, "primary save");
             EnsureNotLink(temp, "temporary save");
             EnsureNotLink(backup, "backup save");
+            EnsureNotLink(backupTemp, "temporary backup save");
 
             var payload = SavePayload.FromState(state);
             byte[] payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOptions);
@@ -117,18 +119,43 @@ namespace Nightwire.Runtime.Saves
 
             try
             {
-                using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
+                // Build and flush the new primary candidate before touching either committed file.
+                if (File.Exists(temp)) File.Delete(temp);
+                EnsureNotLink(temp, "temporary save");
+                using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 {
                     stream.Write(bytes, 0, bytes.Length);
                     stream.Flush(true);
                 }
-                if (File.Exists(path)) File.Copy(path, backup, true);
+
+                // Never copy directly over the last-known-good backup: a crash during a
+                // direct copy could truncate it. Publish a fully flushed backup candidate first.
+                if (File.Exists(path))
+                {
+                    if (File.Exists(backupTemp)) File.Delete(backupTemp);
+                    EnsureNotLink(backupTemp, "temporary backup save");
+                    using (var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    using (var output = new FileStream(backupTemp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    {
+                        input.CopyTo(output);
+                        output.Flush(true);
+                    }
+                    EnsureNotLink(backupTemp, "temporary backup save");
+                    EnsureNotLink(backup, "backup save");
+                    File.Move(backupTemp, backup, true);
+                }
+
+                // Commit the new primary last. Until this rename succeeds, the old primary
+                // remains authoritative and the previous backup remains available.
+                EnsureNotLink(temp, "temporary save");
+                EnsureNotLink(path, "primary save");
                 File.Move(temp, path, true);
             }
             catch (Exception exception) when (!(exception is SaveStoreException))
             {
                 TryDelete(temp);
-                throw new SaveStoreException("save_write_failed", "Could not commit the save file. The previous save was left in place where possible.", exception);
+                TryDelete(backupTemp);
+                throw new SaveStoreException("save_write_failed", "Could not commit the save file. The previous committed save remains available where possible.", exception);
             }
         }
 
