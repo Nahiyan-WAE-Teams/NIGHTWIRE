@@ -38,6 +38,7 @@ namespace Nightwire.Unity.UI
         private Button evidenceTabButton;
         private Label contactName;
         private Label contactStatus;
+        private Label groupParticipants;
         private Label episodeTitle;
         private VisualElement typingIndicator;
         private VisualElement choiceList;
@@ -164,6 +165,7 @@ namespace Nightwire.Unity.UI
             evidenceTabButton = root?.Q<Button>("evidence-tab");
             contactName = root?.Q<Label>("contact-name");
             contactStatus = root?.Q<Label>("contact-status");
+            groupParticipants = root?.Q<Label>("group-participants");
             episodeTitle = root?.Q<Label>("episode-title");
             typingIndicator = root?.Q<VisualElement>("typing-indicator");
             choiceList = root?.Q<VisualElement>("choice-list");
@@ -180,6 +182,7 @@ namespace Nightwire.Unity.UI
             if (root == null || messageList == null || socialFeedList == null || evidenceList == null ||
                 responseDock == null || messagesTabButton == null || feedTabButton == null ||
                 evidenceTabButton == null || contactName == null || contactStatus == null ||
+                groupParticipants == null ||
                 episodeTitle == null || typingIndicator == null || choiceList == null ||
                 responseHeading == null || conversationStatus == null || backButton == null ||
                 profileOpenButton == null || profileCloseButton == null || profileOverlay == null ||
@@ -233,6 +236,7 @@ namespace Nightwire.Unity.UI
             evidenceTabButton = null;
             contactName = null;
             contactStatus = null;
+            groupParticipants = null;
             episodeTitle = null;
             typingIndicator = null;
             choiceList = null;
@@ -480,10 +484,25 @@ namespace Nightwire.Unity.UI
                     return;
                 }
 
-                string otherParticipant = FindOtherParticipant(conversation);
-                activeContactId = otherParticipant;
-                contactName.text = CharacterName(otherParticipant);
-                contactStatus.text = CharacterStatus(otherParticipant);
+                var otherParticipants = FindOtherParticipants(conversation);
+                activeContactId = otherParticipants.Count > 0 ? otherParticipants[0] : "nightwire";
+                bool isGroupConversation = otherParticipants.Count > 1;
+                if (isGroupConversation)
+                {
+                    contactName.text = "GROUP CHAT";
+                    contactStatus.text = otherParticipants.Count.ToString() + " PARTICIPANTS · EPISODE CHANNEL";
+                    groupParticipants.text = string.Join("  ·  ", otherParticipants.Select(CharacterName));
+                    groupParticipants.style.display = DisplayStyle.Flex;
+                    profileOpenButton.text = "VIEW MEMBER";
+                }
+                else
+                {
+                    contactName.text = CharacterName(activeContactId);
+                    contactStatus.text = CharacterStatus(activeContactId);
+                    groupParticipants.text = string.Empty;
+                    groupParticipants.style.display = DisplayStyle.None;
+                    profileOpenButton.text = "VIEW PROFILE";
+                }
                 var progress = session.Progress.ConversationProgress.TryGetValue(conversationId, out var current)
                     ? current : null;
 
@@ -1071,8 +1090,9 @@ namespace Nightwire.Unity.UI
             CloseRequested?.Invoke();
         }
 
-        private string FindOtherParticipant(JsonElement conversation)
+        private List<string> FindOtherParticipants(JsonElement conversation)
         {
+            var result = new List<string>();
             if (conversation.TryGetProperty("participants", out var participants) &&
                 participants.ValueKind == JsonValueKind.Array)
             {
@@ -1080,11 +1100,11 @@ namespace Nightwire.Unity.UI
                 {
                     if (participant.ValueKind != JsonValueKind.String) continue;
                     string id = participant.GetString() ?? string.Empty;
-                    if (!string.Equals(id, "player", StringComparison.Ordinal))
-                        return id;
+                    if (id.Length > 0 && !string.Equals(id, "player", StringComparison.Ordinal))
+                        result.Add(id);
                 }
             }
-            return "nightwire";
+            return result;
         }
 
         private void ShowContactProfile()
