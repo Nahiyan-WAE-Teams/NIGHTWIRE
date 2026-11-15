@@ -98,6 +98,7 @@ def validate_project(require_staged_runtime: bool = False) -> list[str]:
         UNITY / "Assets" / "Editor" / "NightwireProjectBootstrapper.cs",
         UNITY / "Assets" / "Nightwire" / "Scripts" / "NightwireDevelopmentPlatformServices.cs",
         UNITY / "Assets" / "Nightwire" / "Scripts" / "NightwireBundledEpisodeSeeder.cs",
+        UNITY / "Assets" / "Nightwire" / "Scripts" / "NightwireAtmosphereController.cs",
     ]
     for path in required_files:
         if not path.is_file():
