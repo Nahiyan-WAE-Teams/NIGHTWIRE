@@ -117,7 +117,6 @@ namespace Nightwire.Runtime.Installation
         private readonly Version _runtimeVersion;
         private readonly string _installRoot;
         private readonly string _downloadRoot;
-        private readonly string _downloadInstanceId = Guid.NewGuid().ToString("N");
         private readonly IReleaseCatalogueTransport _transport;
         private readonly ReleaseCatalogueAcceptanceService _acceptance;
         private readonly EpisodePackageDownloader _downloader;
@@ -355,10 +354,10 @@ namespace Nightwire.Runtime.Installation
                     return Failure("runtime_version_incompatible", "This episode requires a newer or unsupported runtime version.", episodeId);
 
                 // Downloader and installer validate every path ancestor before creating their roots.
-                // Each manager writes its cache into a private subdirectory. Managers may
-                // intentionally share a download root while targeting different install roots;
-                // their archive filenames must never collide in that configuration.
-                string managerDownloadRoot = Path.Combine(_downloadRoot, ".manager-" + _downloadInstanceId);
+                // Cache identity follows the canonical install root, not manager lifetime.
+                // This isolates different libraries that share a download root while allowing
+                // a later manager instance to reuse a previously verified archive.
+                string managerDownloadRoot = GetDownloadCacheDirectory(_installRoot, _downloadRoot);
                 archivePath = Path.Combine(managerDownloadRoot, episodeId + "-" + release.EpisodeVersion + ".zip");
                 var download = await _downloader.DownloadReleaseAsync(release, archivePath, progress, operationToken)
                     .ConfigureAwait(false);
@@ -437,6 +436,17 @@ namespace Nightwire.Runtime.Installation
                 DisposeResourcesIfReady();
             }
             // Resource disposal is deferred until all refreshes and installs have unwound.
+        }
+
+        private static string GetDownloadCacheDirectory(string installRoot, string downloadRoot)
+        {
+            string canonicalRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(installRoot));
+            if (Path.DirectorySeparatorChar == '\\\\')
+                canonicalRoot = canonicalRoot.ToUpperInvariant();
+            byte[] identity = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonicalRoot));
+            var builder = new System.Text.StringBuilder(identity.Length * 2);
+            foreach (byte value in identity) builder.Append(value.ToString("x2", System.Globalization.CultureInfo.InvariantCulture));
+            return Path.Combine(downloadRoot, ".library-" + builder);
         }
 
         private bool TryAcquireSharedEpisodeOperation(string episodeId)
