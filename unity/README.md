@@ -85,7 +85,7 @@ Unity In-App Purchasing 5.5.0 is pinned in `Packages/manifest.json`. `NightwireI
 ## Separate CI pipelines
 
 - **Engine CI** builds the portable runtime and validator, validates the sample episode, and runs the 62 runtime regression tests plus validator integration tests.
-- **Game UI CI** stages the runtime assemblies and checks Unity project metadata, UXML parsing, controller-to-UXML named-element contracts, stylesheet references, assembly references, verified audio/video integration contracts, and 23 UI source regression tests.
+- **Game UI CI** stages the runtime assemblies and checks Unity project metadata, UXML parsing, controller-to-UXML named-element contracts, stylesheet references, assembly references, verified audio/video integration contracts, and 24 UI source regression tests.
 
 Game UI CI stages the runtime assemblies, validates UI source contracts, builds the Android StrongBox secure-store AAR with JDK 17 / Gradle 9.3.1 / Android SDK 36, verifies its JNI class and backup-exclusion resources, and uploads the AAR as the `nightwire-android-secure-store-aar` workflow artifact. It is still not a Unity Editor compile or Android player build. Unity Editor compilation, Play Mode testing, final manifest merge, and Android device/StrongBox verification require an actual Unity 6000.3.28f1 installation and device/toolchain execution.
 
@@ -94,7 +94,7 @@ See [episode library architecture](../docs/architecture/UNITY_EPISODE_LIBRARY_UI
 
 ## Manual Android APK build
 
-The repository includes a separate, manually triggered Unity Editor build workflow at `.github/workflows/android-apk.yml`. It uses GameCI Unity Builder v4 with the pinned Unity 6000.3.28f1 editor and exports an APK (not an AAB). The workflow is deliberately manual so ordinary source/engine CI runs do not consume Unity build minutes.
+The repository includes a separate, manually triggered Unity Editor build workflow at `.github/workflows/android-apk.yml`. It uses GameCI Unity Builder v4 with the pinned Unity 6000.3.28f1 editor and a project-owned build method to generate a development APK (not an AAB). The method explicitly prepares the generated scene and bundled sample archive, then enables `BuildOptions.Development` so the offline development provider and sample seeder are available in this test build. It is not a production build. The workflow is deliberately manual so ordinary source/engine CI runs do not consume Unity build minutes.
 
 For a Unity Personal license, configure these repository Actions secrets before running it:
 
@@ -110,3 +110,6 @@ The current workflow uses Unity's default Android signing configuration for a de
 Call presentation advances its subtitle/effect timeline from the actual AudioSource or VideoPlayer playback position, and pauses/resumes call media with the application lifecycle. Physical-device decoder synchronization remains a release verification item.
 
 The messenger now includes an episode-scoped contact directory with localized character names, statuses, and biographies. Contact browsing does not unlock conversations or alter story progress.
+
+
+The Android build method is in `Assets/Editor/NightwireAndroidBuild.cs`. It calls the editor bootstrapper explicitly before collecting enabled scenes, then builds `build/Android/NIGHTWIRE.apk` with development flags. The workflow allows generated scene, Panel Settings, and StreamingAssets files created by the bootstrapper during the build. A successful workflow still needs physical-device smoke testing.
