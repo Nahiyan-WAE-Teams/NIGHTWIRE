@@ -1456,9 +1456,11 @@ internal static class Program
         byte[] signature = key.SignData(payload, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
         string envelopeText = "{\"key_id\":\"release-2026\",\"algorithm\":\"ECDSA-P256-SHA256\",\"payload\":\"" +
             Convert.ToBase64String(payload) + "\",\"signature\":\"" + Convert.ToBase64String(signature) + "\"}";
+        using var nextKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var verifier = new ReleaseCatalogueVerifier(new[]
         {
-            new TrustedReleaseKey { KeyId = "release-2026", SubjectPublicKeyInfo = publicKey }
+            new TrustedReleaseKey { KeyId = "release-2026", SubjectPublicKeyInfo = publicKey },
+            new TrustedReleaseKey { KeyId = "release-2027", SubjectPublicKeyInfo = nextKey.ExportSubjectPublicKeyInfo() }
         });
         var verified = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow, 7);
         Assert(verified.Success && verified.Catalogue!.Releases.Count == 1 &&
@@ -1467,6 +1469,40 @@ internal static class Program
         var acceptance = new ReleaseCatalogueAcceptanceService(verifier, sequenceStore);
         var accepted = acceptance.Accept(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow);
         Assert(accepted.Success && sequenceStore.Sequence == 7, accepted.Error ?? "Accepted catalogue sequence was not persisted.");
+        var secondAcceptanceService = new ReleaseCatalogueAcceptanceService(verifier, sequenceStore);
+        var repeated = secondAcceptanceService.Accept(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow);
+        Assert(repeated.Success && sequenceStore.Sequence == 7,
+            repeated.Error ?? "A second acceptance-service instance could not safely re-accept the same current catalogue.");
+
+        string olderPayloadText = payloadText.Replace(@"""sequence"":7", @"""sequence"":6");
+        byte[] olderPayload = System.Text.Encoding.UTF8.GetBytes(olderPayloadText);
+        byte[] olderSignature = key.SignData(olderPayload, HashAlgorithmName.SHA256,
+            DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+        string olderEnvelope = JsonSerializer.Serialize(new
+        {
+            key_id = "release-2026",
+            algorithm = "ECDSA-P256-SHA256",
+            payload = Convert.ToBase64String(olderPayload),
+            signature = Convert.ToBase64String(olderSignature)
+        });
+        var staleFromSecondService = secondAcceptanceService.Accept(
+            System.Text.Encoding.UTF8.GetBytes(olderEnvelope), DateTime.UtcNow);
+        Assert(!staleFromSecondService.Success && staleFromSecondService.ErrorCode == "catalogue_rollback" &&
+            sequenceStore.Sequence == 7,
+            "A second acceptance-service instance bypassed the persisted sequence floor.");
+
+        byte[] rotatedSignature = nextKey.SignData(payload, HashAlgorithmName.SHA256,
+            DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+        string rotatedEnvelope = JsonSerializer.Serialize(new
+        {
+            key_id = "release-2027",
+            algorithm = "ECDSA-P256-SHA256",
+            payload = Convert.ToBase64String(payload),
+            signature = Convert.ToBase64String(rotatedSignature)
+        });
+        var rotatedKeyResult = verifier.Verify(System.Text.Encoding.UTF8.GetBytes(rotatedEnvelope), DateTime.UtcNow);
+        Assert(rotatedKeyResult.Success && rotatedKeyResult.Catalogue!.SigningKeyId == "release-2027",
+            rotatedKeyResult.Error ?? "Overlapping trusted-key rotation rejected the newly provisioned key.");
 
         var failingAcceptance = new ReleaseCatalogueAcceptanceService(verifier, new FailingReleaseSequenceStore());
         var storageFailure = failingAcceptance.Accept(System.Text.Encoding.UTF8.GetBytes(envelopeText), DateTime.UtcNow);
