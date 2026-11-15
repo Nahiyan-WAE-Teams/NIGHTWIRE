@@ -120,5 +120,5 @@ UI Toolkit USS transitions are documented for Unity 6.3 and support short change
 ## Separate CI status
 
 - Engine CI: portable runtime build, 62 runtime regression tests, validator build, sample-package validation, and 8 validator integration tests pass in the separate Engine CI workflow.
-- Game UI CI: runtime assembly staging, Unity project metadata, UXML parsing, stylesheet references, controller query-name contracts, assembly references, and 10 UI source regression tests pass in the separate Game UI workflow.
+- Game UI CI: runtime assembly staging, Unity project metadata, UXML parsing, stylesheet references, controller query-name contracts, assembly references, and 12 UI source regression tests pass in the separate Game UI workflow.
 - Game UI CI does not launch Unity Editor or build an Android player. Editor compilation, Play Mode tests, AAR build, and Android IL2CPP/device verification are still required.
