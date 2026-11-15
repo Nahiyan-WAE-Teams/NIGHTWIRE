@@ -28,16 +28,33 @@ def validate_project(require_staged_runtime: bool = False) -> list[str]:
     manifest_file = UNITY / "Packages" / "manifest.json"
     try:
         manifest = json.loads(_read(manifest_file))
-        if not isinstance(manifest.get("dependencies"), dict):
+        dependencies = manifest.get("dependencies")
+        if not isinstance(dependencies, dict):
             errors.append("Unity Packages/manifest.json must contain a dependencies object.")
+        else:
+            required_modules = {
+                "com.unity.modules.audio",
+                "com.unity.modules.uielements",
+                "com.unity.modules.video",
+            }
+            missing_modules = sorted(required_modules - set(dependencies))
+            if missing_modules:
+                errors.append("Unity package manifest is missing built-in modules: " + ", ".join(missing_modules))
     except (OSError, json.JSONDecodeError) as exc:
         errors.append(f"Unity package manifest is missing or invalid: {exc}")
 
     asmdef_file = UNITY / "Assets" / "Nightwire" / "Scripts" / "Nightwire.Unity.asmdef"
     try:
         asmdef = json.loads(_read(asmdef_file))
-        if "Nightwire.Runtime" not in asmdef.get("references", []):
-            errors.append("Nightwire.Unity.asmdef must reference Nightwire.Runtime.")
+        required_references = {
+            "UnityEngine.UIElementsModule",
+            "UnityEngine.VideoModule",
+            "UnityEngine.AudioModule",
+            "Unity.Purchasing",
+        }
+        missing_references = sorted(required_references - set(asmdef.get("references", [])))
+        if missing_references:
+            errors.append("Nightwire.Unity.asmdef is missing assembly references: " + ", ".join(missing_references))
     except (OSError, json.JSONDecodeError) as exc:
         errors.append(f"Unity assembly definition is missing or invalid: {exc}")
 
@@ -122,7 +139,7 @@ def main() -> int:
             print("FAIL:", error)
         return 1
     print("PASS: Unity project baseline and package manifest")
-    print("PASS: Runtime assembly reference and staging scripts")
+    print("PASS: Unity module/IAP assembly references and runtime staging scripts")
     print("PASS: UXML documents, controller selectors, and USS references")
     print("PASS: Unity editor scene bootstrapper and bundled demo integration")
     if args.require_staged_runtime:
