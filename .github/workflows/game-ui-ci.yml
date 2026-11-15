@@ -17,6 +17,7 @@ on:
       - "tools/prepare-unity-runtime.sh"
       - "tools/Prepare-UnityRuntime.ps1"
       - "tools/validate_unity_ui.py"
+      - "tools/validate_android_aar.py"
       - "tests/test_unity_ui.py"
       - ".github/workflows/game-ui-ci.yml"
   workflow_dispatch:
@@ -69,6 +70,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
