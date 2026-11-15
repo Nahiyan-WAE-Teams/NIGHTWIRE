@@ -382,6 +382,7 @@ namespace Nightwire.Unity.UI
                 return;
             }
 
+            StopVideoPlayback();
             EnsureAudioSource();
             if (string.Equals(activeAudioAssetId, assetId, StringComparison.Ordinal) && activeAudioClip != null)
             {
@@ -424,7 +425,7 @@ namespace Nightwire.Unity.UI
         private System.Collections.IEnumerator LoadAndPlayAudio(string assetId, Button button, Label status)
         {
             string path;
-            try { path = CacheVerifiedMediaAsset(assetId); }
+            try { path = CacheVerifiedMediaAsset(assetId, "audio"); }
             catch (Exception exception)
             {
                 status.text = "AUDIO UNAVAILABLE · " + exception.Message;
@@ -494,8 +495,9 @@ namespace Nightwire.Unity.UI
                 return;
             }
 
+            StopAudioPlayback();
             string path;
-            try { path = CacheVerifiedMediaAsset(assetId); }
+            try { path = CacheVerifiedMediaAsset(assetId, "video"); }
             catch (Exception exception)
             {
                 status.text = "VIDEO UNAVAILABLE · " + exception.Message;
@@ -533,17 +535,17 @@ namespace Nightwire.Unity.UI
             if (mediaVideoPlayer == null)
             {
                 mediaVideoPlayer = GetComponent<VideoPlayer>() ?? gameObject.AddComponent<VideoPlayer>();
-                mediaVideoPlayer.playOnAwake = false;
-                mediaVideoPlayer.isLooping = false;
-                mediaVideoPlayer.renderMode = VideoRenderMode.RenderTexture;
-                mediaVideoPlayer.targetTexture = videoRenderTexture;
-                mediaVideoPlayer.audioOutputMode = VideoAudioOutputMode.AudioSource;
-                mediaVideoPlayer.EnableAudioTrack(0, true);
-                mediaVideoPlayer.SetTargetAudioSource(0, mediaAudioSource);
                 mediaVideoPlayer.prepareCompleted += VideoPrepared;
                 mediaVideoPlayer.loopPointReached += VideoCompleted;
                 mediaVideoPlayer.errorReceived += VideoFailed;
             }
+            mediaVideoPlayer.playOnAwake = false;
+            mediaVideoPlayer.isLooping = false;
+            mediaVideoPlayer.renderMode = VideoRenderMode.RenderTexture;
+            mediaVideoPlayer.targetTexture = videoRenderTexture;
+            mediaVideoPlayer.audioOutputMode = VideoAudioOutputMode.AudioSource;
+            mediaVideoPlayer.EnableAudioTrack(0, true);
+            mediaVideoPlayer.SetTargetAudioSource(0, mediaAudioSource);
         }
 
         private void VideoPrepared(VideoPlayer player)
@@ -576,11 +578,13 @@ namespace Nightwire.Unity.UI
             if (activeVideoStatus != null) activeVideoStatus.text = "VIDEO PLAYBACK FAILED · " + message;
         }
 
-        private string CacheVerifiedMediaAsset(string assetId)
+        private string CacheVerifiedMediaAsset(string assetId, string expectedType)
         {
             if (session == null || session.Package == null ||
                 !session.Package.AssetsById.TryGetValue(assetId, out var metadata))
                 throw new InvalidOperationException("The media asset is not part of the active episode manifest.");
+            if (!string.Equals(metadata.Type, expectedType, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("The referenced asset type does not match the message type.");
 
             var opened = session.OpenAsset(assetId);
             if (!opened.Success || opened.Asset == null)
@@ -604,24 +608,35 @@ namespace Nightwire.Unity.UI
                 Directory.CreateDirectory(directory);
                 string destination = Path.Combine(directory, fileId + extension);
                 string temporary = destination + ".tmp";
-                using (var output = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
+                try
                 {
-                    var buffer = new byte[81920];
-                    long copied = 0;
-                    int read;
-                    while ((read = opened.Asset.Content.Read(buffer, 0, buffer.Length)) > 0)
+                    using (var output = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
                     {
-                        copied += read;
-                        if (copied > maximumInlineMediaBytes)
-                            throw new InvalidDataException("The media asset exceeded its playback size limit while being copied.");
-                        output.Write(buffer, 0, read);
+                        var buffer = new byte[81920];
+                        long copied = 0;
+                        int read;
+                        while ((read = opened.Asset.Content.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            copied += read;
+                            if (copied > maximumInlineMediaBytes)
+                                throw new InvalidDataException("The media asset exceeded its playback size limit while being copied.");
+                            output.Write(buffer, 0, read);
+                        }
+                        output.Flush();
                     }
-                    output.Flush();
-                }
 
-                if (File.Exists(destination)) File.Replace(temporary, destination, null);
-                else File.Move(temporary, destination);
-                return destination;
+                    if (File.Exists(destination)) File.Replace(temporary, destination, null);
+                    else File.Move(temporary, destination);
+                    return destination;
+                }
+                catch
+                {
+                    if (File.Exists(temporary))
+                    {
+                        try { File.Delete(temporary); } catch { }
+                    }
+                    throw;
+                }
             }
         }
 
@@ -640,7 +655,7 @@ namespace Nightwire.Unity.UI
             }
         }
 
-        private void StopMediaPlayback()
+        private void StopAudioPlayback()
         {
             if (audioLoadCoroutine != null)
             {
@@ -657,11 +672,20 @@ namespace Nightwire.Unity.UI
             activeAudioButton = null;
             activeAudioStatus = null;
             audioPaused = false;
+        }
 
+        private void StopVideoPlayback()
+        {
             if (mediaVideoPlayer != null) mediaVideoPlayer.Stop();
             activeVideoAssetId = null;
             activeVideoButton = null;
             activeVideoStatus = null;
+        }
+
+        private void StopMediaPlayback()
+        {
+            StopAudioPlayback();
+            StopVideoPlayback();
             if (videoRenderTexture != null)
             {
                 videoRenderTexture.Release();
