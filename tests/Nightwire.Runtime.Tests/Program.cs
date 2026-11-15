@@ -2077,6 +2077,13 @@ internal static class Program
                 "Installer accepted a package version that did not match the signed release.");
             Assert(File.Exists(marker) && File.ReadAllText(marker) == "keep-old-install",
                 "Rejected release replaced the previously installed episode.");
+
+            string invalidArchive = Path.Combine(root, "invalid-update.zip");
+            File.WriteAllText(invalidArchive, "not a ZIP archive");
+            var invalid = installer.InstallArchive(invalidArchive, installRoot, "nightwire.ep001");
+            Assert(!invalid.Success, "Installer accepted a corrupt replacement archive.");
+            Assert(File.Exists(marker) && File.ReadAllText(marker) == "keep-old-install",
+                "A corrupt replacement archive damaged the previously installed episode.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
