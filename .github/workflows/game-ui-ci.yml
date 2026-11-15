@@ -23,6 +23,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: nightwire-game-ui-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ui-source-validation:
     name: Unity UI source and runtime integration checks
