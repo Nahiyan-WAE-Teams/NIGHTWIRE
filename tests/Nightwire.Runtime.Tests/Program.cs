@@ -39,6 +39,7 @@ internal static class Program
         Run("conversation choices select the authored branch", ConversationRuntimeBranchesOnChoice, ref failures);
         Run("choice effects update story flags and relationship scores", ConversationChoiceEffectsPersist, ref failures);
         Run("save store round-trips player progress", SaveStoreRoundTripsProgress, ref failures);
+        Run("concurrent new-game creation cannot overwrite an episode save", SaveStoreSerializesConcurrentNewGameCreation, ref failures);
         Run("save store rejects a symlinked episode directory", SaveStoreRejectsSymlinkedEpisodeDirectory, ref failures);
         Run("save store rejects a symlinked ancestor of its root", SaveStoreRejectsSymlinkedRootAncestor, ref failures);
         Run("save store recovers from a corrupt primary using backup", SaveStoreRecoversBackup, ref failures);
@@ -425,6 +426,44 @@ internal static class Program
                 "Selected conversation option did not round-trip.");
             Assert(loaded.Notifications.Count == 1 && loaded.Notifications[0].NotificationId == "n1",
                 "Notifications did not round-trip.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void SaveStoreSerializesConcurrentNewGameCreation()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-save-new-race-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var firstStore = new SaveStore(root);
+            var secondStore = new SaveStore(root);
+            var firstState = CreateState();
+            firstState.RelationshipScores["anisha"] = 11;
+            var secondState = CreateState();
+            secondState.RelationshipScores["anisha"] = 22;
+            using var start = new ManualResetEventSlim(false);
+
+            Task<bool> first = Task.Run(() =>
+            {
+                start.Wait();
+                try { firstStore.SaveNew(firstState); return true; }
+                catch (SaveStoreException exception) when (exception.ErrorCode == "save_exists") { return false; }
+            });
+            Task<bool> second = Task.Run(() =>
+            {
+                start.Wait();
+                try { secondStore.SaveNew(secondState); return true; }
+                catch (SaveStoreException exception) when (exception.ErrorCode == "save_exists") { return false; }
+            });
+
+            start.Set();
+            Task.WaitAll(first, second);
+            Assert(first.Result != second.Result,
+                "Concurrent new-game creation did not admit exactly one initial save.");
+
+            int storedScore = firstStore.Load("nightwire.ep001", "1.0.0").State.RelationshipScores["anisha"];
+            Assert(storedScore == 11 || storedScore == 22,
+                "Concurrent new-game creation left an unexpected or overwritten save.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
