@@ -76,6 +76,7 @@ internal static class Program
         Run("installer startup recovery restores interrupted update backup", InstallerRecoveryRestoresPreviousInstall, ref failures);
         Run("installer rejects a symlinked ancestor of its install root", InstallerRejectsSymlinkedRootAncestor, ref failures);
         Run("installer rejects signed release identity mismatch before replacing existing content", InstallerRejectsReleaseIdentityMismatch, ref failures);
+        Run("release manager performs one-time install recovery before library access", ReleaseManagerRecoversBeforeLibraryAccess, ref failures);
         Run("release manager refreshes signed catalogue and installs offline episode", ReleaseManagerInstallsOfflineEpisode, ref failures);
         Run("release manager cancels active catalogue refresh safely on disposal", ReleaseManagerDisposalCancelsRefresh, ref failures);
         Run("release manager cancels active install and releases its lease on disposal", ReleaseManagerDisposalCancelsInstall, ref failures);
@@ -1678,6 +1679,53 @@ internal static class Program
             var afterShutdown = manager.InstallOrUpdateAsync("nightwire.ep001").GetAwaiter().GetResult();
             Assert(!afterShutdown.Success && afterShutdown.ErrorCode == "manager_disposed",
                 "Disposed manager accepted a new episode operation.");
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    private static void ReleaseManagerRecoversBeforeLibraryAccess()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-manager-recovery-" + Guid.NewGuid().ToString("N"));
+        string installRoot = Path.Combine(root, "installed");
+        Directory.CreateDirectory(installRoot);
+        try
+        {
+            string backup = Path.Combine(installRoot,
+                ".backup-nightwire.ep001-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(backup);
+            File.WriteAllText(Path.Combine(backup, "previous.marker"), "preserve");
+            string staging = Path.Combine(installRoot, ".install-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(staging);
+            File.WriteAllText(Path.Combine(staging, "partial.marker"), "discard");
+
+            var verifier = new ReleaseCatalogueVerifier(Array.Empty<TrustedReleaseKey>());
+            var acceptance = new ReleaseCatalogueAcceptanceService(verifier, new MemoryReleaseSequenceStore());
+            var manager = new EpisodeReleaseManager(new Uri("https://catalogue.example.test/releases.json"),
+                installRoot, Path.Combine(root, "downloads"),
+                new StubCatalogueTransport(Array.Empty<byte>()), acceptance,
+                new StubInstallLeaseProvider(), "1.0.0");
+
+            // Library discovery must recover even when the host omitted the explicit startup call.
+            var library = manager.GetLibrary();
+            string restored = Path.Combine(installRoot, "nightwire.ep001");
+            Assert(File.Exists(Path.Combine(restored, "previous.marker")),
+                "Library discovery ran before the interrupted backup was restored.");
+            Assert(!Directory.Exists(staging),
+                "Library discovery left an abandoned staging directory behind.");
+            Assert(library.Count == 1 && library[0].Status == EpisodeLibraryStatus.InstalledPackageInvalid,
+                "Recovered but invalid content was not represented as an invalid installed episode.");
+
+            var first = manager.RecoverAtStartup();
+            var second = manager.RecoverAtStartup();
+            Assert(first.RestoredEpisodeIds.Contains("nightwire.ep001") &&
+                second.RestoredEpisodeIds.Contains("nightwire.ep001"),
+                "Startup recovery was not cached as a single completed operation.");
+            Assert(File.Exists(Path.Combine(restored, "previous.marker")),
+                "Repeated startup recovery changed the restored installation.");
+            manager.Dispose();
         }
         finally
         {
