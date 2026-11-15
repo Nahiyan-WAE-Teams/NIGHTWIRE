@@ -456,3 +456,92 @@
 .inbox-conversation-preview { margin-top: 5px; color: #9da7bb; font-size: 10px; white-space: normal; }
 .inbox-conversation-state { color: #a58bd0; font-size: 8px; letter-spacing: 1px; }
 .inbox-empty { margin-top: 28px; color: #8f98ad; font-size: 11px; -unity-text-align: middle-center; }
+
+
+.contacts-overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    justify-content: center;
+    align-items: stretch;
+    padding: 18px;
+    background-color: rgba(3, 5, 13, 0.96);
+}
+.contacts-panel {
+    flex-grow: 1;
+    padding: 18px;
+    background-color: #0d1221;
+    border-width: 1px;
+    border-color: rgba(157, 139, 222, 0.42);
+    border-radius: 12px;
+}
+.contacts-heading-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+.contacts-heading {
+    color: #eee9ff;
+    font-size: 17px;
+    letter-spacing: 1.4px;
+    -unity-font-style: bold;
+}
+.contacts-subheading {
+    margin-top: 7px;
+    margin-bottom: 14px;
+    color: #7f8ca9;
+    font-size: 8px;
+    letter-spacing: 1px;
+}
+.contacts-list {
+    flex-grow: 1;
+}
+.contact-directory-card {
+    margin-bottom: 9px;
+    padding: 12px;
+    background-color: rgba(24, 31, 51, 0.94);
+    border-width: 1px;
+    border-color: rgba(83, 94, 128, 0.58);
+    border-radius: 9px;
+}
+.contact-directory-identity {
+    flex-direction: row;
+    align-items: center;
+}
+.contact-directory-avatar {
+    width: 42px;
+    height: 42px;
+    margin-right: 12px;
+    padding-top: 11px;
+    border-radius: 21px;
+    background-color: rgba(99, 73, 151, 0.72);
+    color: #eee7ff;
+    font-size: 16px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+.contact-directory-copy {
+    flex-grow: 1;
+}
+.contact-directory-name {
+    color: #f1edff;
+    font-size: 13px;
+    -unity-font-style: bold;
+}
+.contact-directory-status {
+    margin-top: 3px;
+    color: #b19bdd;
+    font-size: 8px;
+    letter-spacing: 0.7px;
+}
+.contact-directory-bio {
+    margin-top: 6px;
+    color: #aeb8ce;
+    font-size: 10px;
+    white-space: normal;
+}
+.contact-directory-card:hover {
+    background-color: rgba(39, 43, 69, 0.98);
+}
