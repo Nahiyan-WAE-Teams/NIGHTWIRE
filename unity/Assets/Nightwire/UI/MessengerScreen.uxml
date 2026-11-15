@@ -11,6 +11,7 @@
             </ui:VisualElement>
             <ui:Label name="contact-mark" text="NW" class="contact-mark" />
         </ui:VisualElement>
+        <ui:Label name="group-participants" class="group-participants" style="display: none;" />
         <ui:VisualElement class="conversation-divider">
             <ui:Label name="episode-title" text="THE FIRST SIGNAL" class="episode-kicker" />
             <ui:Label text="MESSAGES ARE STORED WITH YOUR EPISODE" class="archive-note" />
