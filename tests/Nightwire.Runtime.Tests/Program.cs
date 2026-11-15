@@ -81,6 +81,7 @@ internal static class Program
         Run("release manager refreshes signed catalogue and installs offline episode", ReleaseManagerInstallsOfflineEpisode, ref failures);
         Run("release manager cancels active catalogue refresh safely on disposal", ReleaseManagerDisposalCancelsRefresh, ref failures);
         Run("release manager cancels active install and releases its lease on disposal", ReleaseManagerDisposalCancelsInstall, ref failures);
+        Run("release managers serialize same-episode operations across instances", ReleaseManagersSerializeSharedEpisodeOperation, ref failures);
         Run("episode library presentation cancels refresh and suppresses events after disposal", LibraryPresentationDisposalCancelsRefresh, ref failures);
         Run("episode access gate excludes session and installer ownership", EpisodeAccessGateExcludesSessionAndInstall, ref failures);
         Run("episode access gate coordinates independent instances and case variants", EpisodeAccessGateCoordinatesInstances, ref failures);
@@ -1700,6 +1701,75 @@ internal static class Program
             var afterShutdown = manager.InstallOrUpdateAsync("nightwire.ep001").GetAwaiter().GetResult();
             Assert(!afterShutdown.Success && afterShutdown.ErrorCode == "manager_disposed",
                 "Disposed manager accepted a new episode operation.");
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    private static void ReleaseManagersSerializeSharedEpisodeOperation()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-manager-shared-operation-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            string issued = DateTime.UtcNow.AddMinutes(-1).ToString("o", CultureInfo.InvariantCulture);
+            string expires = DateTime.UtcNow.AddHours(1).ToString("o", CultureInfo.InvariantCulture);
+            string payloadText = "{\\"schema_version\\":1,\\"sequence\\":1,\\"issued_utc\\":\\"" + issued +
+                "\",\\"expires_utc\\":\\"" + expires +
+                "\",\\"releases\\":[{\\"episode_id\\":\\"nightwire.ep001\\",\\"episode_version\\":\\"1.0.0\\",\\"archive_url\\":\\"https://cdn.example.test/episode.zip\\",\\"archive_size_bytes\\":1,\\"archive_sha256\\":\\"" +
+                new string('a', 64) + "\",\\"minimum_runtime_version\\":\\"1.0.0\\"}]}";
+            byte[] payload = System.Text.Encoding.UTF8.GetBytes(payloadText);
+            byte[] signature = key.SignData(payload, HashAlgorithmName.SHA256,
+                DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+            string envelope = "{\\"key_id\\":\\"shared-operation\\",\\"algorithm\\":\\"ECDSA-P256-SHA256\\",\\"payload\\":\\"" +
+                Convert.ToBase64String(payload) + "\\",\\"signature\\":\\"" + Convert.ToBase64String(signature) + "\\"}";
+            var verifier = new ReleaseCatalogueVerifier(new[]
+            {
+                new TrustedReleaseKey { KeyId = "shared-operation", SubjectPublicKeyInfo = key.ExportSubjectPublicKeyInfo() }
+            });
+
+            var firstHandler = new CancellationBlockingHttpHandler();
+            var secondHandler = new CancellationBlockingHttpHandler();
+            using var firstClient = new HttpClient(firstHandler);
+            using var secondClient = new HttpClient(secondHandler);
+            using var firstDownloader = new EpisodePackageDownloader(client: firstClient);
+            using var secondDownloader = new EpisodePackageDownloader(client: secondClient);
+            var firstLeaseProvider = new TrackingInstallLeaseProvider();
+            var secondLeaseProvider = new TrackingInstallLeaseProvider();
+            string installRoot = Path.Combine(root, "installed");
+            string downloadRoot = Path.Combine(root, "downloads");
+            var firstManager = new EpisodeReleaseManager(new Uri("https://catalogue.example.test/releases.json"),
+                installRoot, downloadRoot, new StubCatalogueTransport(System.Text.Encoding.UTF8.GetBytes(envelope)),
+                new ReleaseCatalogueAcceptanceService(verifier, new MemoryReleaseSequenceStore()),
+                firstLeaseProvider, "1.0.0", firstDownloader);
+            var secondManager = new EpisodeReleaseManager(new Uri("https://catalogue.example.test/releases.json"),
+                installRoot, downloadRoot, new StubCatalogueTransport(System.Text.Encoding.UTF8.GetBytes(envelope)),
+                new ReleaseCatalogueAcceptanceService(verifier, new MemoryReleaseSequenceStore()),
+                secondLeaseProvider, "1.0.0", secondDownloader);
+
+            Assert(firstManager.RefreshCatalogueAsync(DateTime.UtcNow).GetAwaiter().GetResult().Success,
+                "First manager could not accept the signed release fixture.");
+            Assert(secondManager.RefreshCatalogueAsync(DateTime.UtcNow).GetAwaiter().GetResult().Success,
+                "Second manager could not accept the signed release fixture.");
+            Task<EpisodeManagerOperationResult> firstInstall = firstManager.InstallOrUpdateAsync("nightwire.ep001");
+            Assert(firstHandler.Started.Wait(TimeSpan.FromSeconds(5)), "First manager did not enter its download.");
+
+            var secondResult = secondManager.InstallOrUpdateAsync("nightwire.ep001").GetAwaiter().GetResult();
+            Assert(!secondResult.Success && secondResult.ErrorCode == "episode_operation_in_progress",
+                "A second manager was allowed to start the same episode operation.");
+            Assert(!secondHandler.Started.IsSet,
+                "Second manager entered the network download despite an active same-episode operation.");
+            Assert(secondLeaseProvider.AcquireCount == 0,
+                "Second manager acquired an episode lease despite the shared operation reservation.");
+
+            firstManager.Dispose();
+            var firstResult = firstInstall.GetAwaiter().GetResult();
+            Assert(!firstResult.Success && firstResult.ErrorCode == "episode_install_cancelled",
+                "First manager did not unwind its blocked download after shutdown.");
+            secondManager.Dispose();
         }
         finally
         {
