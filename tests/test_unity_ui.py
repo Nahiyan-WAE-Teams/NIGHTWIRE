@@ -72,6 +72,11 @@ class NightwireUnityUiTests(unittest.TestCase):
         self.assertNotIn("AudioType.AIFF", source)
         self.assertNotIn("AudioType.ACC", source)
 
+    def test_bundled_sample_seeder_is_disabled_in_release_players(self):
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/NightwireBundledEpisodeSeeder.cs").read_text(encoding="utf-8")
+        self.assertIn("#if !UNITY_EDITOR && !DEVELOPMENT_BUILD", source)
+        self.assertIn("bundled sample seeding is disabled in release players", source)
+
     def test_development_provider_does_not_refresh_remote_catalogue(self):
         source = (ROOT / "unity/Assets/Nightwire/Scripts/NightwireDevelopmentPlatformServices.cs").read_text(encoding="utf-8")
         self.assertIn("ShouldRefreshCatalogue => false", source)
