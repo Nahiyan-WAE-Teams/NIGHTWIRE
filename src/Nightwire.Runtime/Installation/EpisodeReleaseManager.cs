@@ -117,6 +117,7 @@ namespace Nightwire.Runtime.Installation
         private readonly Version _runtimeVersion;
         private readonly string _installRoot;
         private readonly string _downloadRoot;
+        private readonly string _downloadInstanceId = Guid.NewGuid().ToString("N");
         private readonly IReleaseCatalogueTransport _transport;
         private readonly ReleaseCatalogueAcceptanceService _acceptance;
         private readonly EpisodePackageDownloader _downloader;
@@ -354,7 +355,11 @@ namespace Nightwire.Runtime.Installation
                     return Failure("runtime_version_incompatible", "This episode requires a newer or unsupported runtime version.", episodeId);
 
                 // Downloader and installer validate every path ancestor before creating their roots.
-                archivePath = Path.Combine(_downloadRoot, episodeId + "-" + release.EpisodeVersion + ".zip");
+                // Each manager writes its cache into a private subdirectory. Managers may
+                // intentionally share a download root while targeting different install roots;
+                // their archive filenames must never collide in that configuration.
+                string managerDownloadRoot = Path.Combine(_downloadRoot, ".manager-" + _downloadInstanceId);
+                archivePath = Path.Combine(managerDownloadRoot, episodeId + "-" + release.EpisodeVersion + ".zip");
                 var download = await _downloader.DownloadReleaseAsync(release, archivePath, progress, operationToken)
                     .ConfigureAwait(false);
                 operationToken.ThrowIfCancellationRequested();
