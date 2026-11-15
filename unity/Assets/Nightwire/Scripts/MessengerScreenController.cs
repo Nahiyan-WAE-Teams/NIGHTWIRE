@@ -1700,8 +1700,9 @@ namespace Nightwire.Unity.UI
                 return;
 
             contactsList.Clear();
-            foreach (var entry in session.Package.CharacterProfiles.OrderBy(
-                pair => CharacterName(pair.Key), StringComparer.Ordinal))
+            foreach (var entry in session.Package.CharacterProfiles
+                .Where(pair => !string.Equals(pair.Key, "player", StringComparison.Ordinal))
+                .OrderBy(pair => CharacterName(pair.Key), StringComparer.Ordinal))
             {
                 string characterId = entry.Key;
                 var card = new Button();
