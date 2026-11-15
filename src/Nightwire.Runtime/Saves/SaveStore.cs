@@ -49,6 +49,9 @@ namespace Nightwire.Runtime.Saves
         private readonly SaveStoreOptions _options;
         private readonly Dictionary<string, IEpisodeProgressMigration> _migrations =
             new Dictionary<string, IEpisodeProgressMigration>(StringComparer.Ordinal);
+        private static readonly object EpisodeLockRegistryGate = new object();
+        private static readonly Dictionary<string, object> EpisodeLocks =
+            new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
         public SaveStore(string saveRoot, SaveStoreOptions? options = null)
         {
@@ -71,8 +74,11 @@ namespace Nightwire.Runtime.Saves
                 string.Equals(migration.FromEpisodeVersion, migration.ToEpisodeVersion, StringComparison.Ordinal))
                 throw new ArgumentException("Migration identity and distinct source/target versions are required.", nameof(migration));
             string key = MigrationKey(migration.EpisodeId, migration.FromEpisodeVersion);
-            if (_migrations.ContainsKey(key)) throw new InvalidOperationException("A migration already exists for this episode source version.");
-            _migrations.Add(key, migration);
+            lock (_migrations)
+            {
+                if (_migrations.ContainsKey(key)) throw new InvalidOperationException("A migration already exists for this episode source version.");
+                _migrations.Add(key, migration);
+            }
         }
 
         public string GetSavePath(string episodeId)
@@ -83,7 +89,31 @@ namespace Nightwire.Runtime.Saves
             return Path.Combine(episodeDirectory, "save.json");
         }
 
+        /// <summary>Writes progress while serializing all in-process access to this episode's save files.</summary>
         public void Save(EpisodeProgressState state)
+        {
+            if (state == null) throw new ArgumentNullException(nameof(state));
+            string path = GetSavePath(state.EpisodeId);
+            lock (GetEpisodeLock(path)) SaveCore(state);
+        }
+
+        /// <summary>Creates the first save only; a concurrent or existing save is never overwritten.</summary>
+        public void SaveNew(EpisodeProgressState state)
+        {
+            if (state == null) throw new ArgumentNullException(nameof(state));
+            string path = GetSavePath(state.EpisodeId);
+            lock (GetEpisodeLock(path))
+            {
+                EnsureNotLink(path, "primary save");
+                EnsureNotLink(path + ".bak", "backup save");
+                if (File.Exists(path) || File.Exists(path + ".bak"))
+                    throw new SaveStoreException("save_exists",
+                        "A save already exists for this episode. Resume it instead of overwriting player progress.");
+                SaveCore(state);
+            }
+        }
+
+        private void SaveCore(EpisodeProgressState state)
         {
             if (state == null) throw new ArgumentNullException(nameof(state));
             ValidateState(state);
@@ -160,6 +190,12 @@ namespace Nightwire.Runtime.Saves
         }
 
         public SaveLoadResult Load(string episodeId, string installedEpisodeVersion)
+        {
+            string path = GetSavePath(episodeId);
+            lock (GetEpisodeLock(path)) return LoadCore(episodeId, installedEpisodeVersion);
+        }
+
+        private SaveLoadResult LoadCore(string episodeId, string installedEpisodeVersion)
         {
             if (string.IsNullOrWhiteSpace(installedEpisodeVersion))
                 throw new ArgumentException("Installed episode version is required.", nameof(installedEpisodeVersion));
@@ -281,7 +317,10 @@ namespace Nightwire.Runtime.Saves
             {
                 if (!visited.Add(state.EpisodeVersion))
                     throw new SaveStoreException("migration_cycle", "Episode save migration contains a version cycle.");
-                if (!_migrations.TryGetValue(MigrationKey(state.EpisodeId, state.EpisodeVersion), out var migration))
+                IEpisodeProgressMigration? migration;
+                lock (_migrations)
+                    _migrations.TryGetValue(MigrationKey(state.EpisodeId, state.EpisodeVersion), out migration);
+                if (migration == null)
                     throw new SaveStoreException("migration_required",
                         $"Save is for episode version '{state.EpisodeVersion}', but '{targetVersion}' is installed. An explicit migration is required.");
                 if (!string.Equals(migration.EpisodeId, state.EpisodeId, StringComparison.Ordinal) ||
@@ -399,6 +438,20 @@ namespace Nightwire.Runtime.Saves
                 if (string.IsNullOrEmpty(parent) || string.Equals(parent, current, StringComparison.Ordinal))
                     break;
                 current = parent;
+            }
+        }
+
+        private static object GetEpisodeLock(string savePath)
+        {
+            string key = Path.GetFullPath(savePath);
+            lock (EpisodeLockRegistryGate)
+            {
+                if (!EpisodeLocks.TryGetValue(key, out var episodeLock))
+                {
+                    episodeLock = new object();
+                    EpisodeLocks.Add(key, episodeLock);
+                }
+                return episodeLock;
             }
         }
 
