@@ -56,3 +56,10 @@ Inline image textures are cached for the duration of the screen session and dest
 - Complete Unity project, scenes, Panel Settings, and verified device build.
 
 These are separate presentation features. The episode package/runtime contract remains the source of story data and does not require a new app release for content using already-supported message types.
+
+
+## Social feed and evidence tabs
+
+The messenger presentation exposes three in-session tabs: Messages, Social Feed, and Evidence. The social feed is rendered from verified `CharacterPosts` in the loaded episode package, localizes author/body/comment keys, and resolves image attachments through the same unlocked-asset resolver used by chat messages. It does not fetch external social content.
+
+The Evidence tab enumerates only assets explicitly unlocked in player progress. Images use the verified image cache; audio/video use the bounded verified-media playback path; text, Markdown, and JSON documents may be previewed only after opening the manifest-verified asset and enforcing a 1 MiB preview limit. Other document formats (including PDF and office documents) remain identified as verified archive attachments rather than being rendered as if a viewer existed. All authored episode files remain immutable.
