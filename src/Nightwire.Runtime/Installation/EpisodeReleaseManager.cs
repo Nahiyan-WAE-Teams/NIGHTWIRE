@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Nightwire.Runtime.Loading;
@@ -443,7 +444,9 @@ namespace Nightwire.Runtime.Installation
             string canonicalRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(installRoot));
             if (Path.DirectorySeparatorChar == '\\\\')
                 canonicalRoot = canonicalRoot.ToUpperInvariant();
-            byte[] identity = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonicalRoot));
+            byte[] identity;
+            using (var sha = SHA256.Create())
+                identity = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(canonicalRoot));
             var builder = new System.Text.StringBuilder(identity.Length * 2);
             foreach (byte value in identity) builder.Append(value.ToString("x2", System.Globalization.CultureInfo.InvariantCulture));
             return Path.Combine(downloadRoot, ".library-" + builder);
