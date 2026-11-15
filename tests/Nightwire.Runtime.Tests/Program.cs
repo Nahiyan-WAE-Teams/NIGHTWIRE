@@ -730,6 +730,8 @@ internal static class Program
             int notifications = 0;
             coordinator.SessionClosed += () => throw new InvalidOperationException("Observer failure must be isolated.");
             coordinator.SessionClosed += () => notifications++;
+            RuntimeSessionResult? observerCheckpoint = null;
+            coordinator.SessionClosed += () => observerCheckpoint = coordinator.SaveNow();
 
             // Force the next persistence operation to fail after the session has become active.
             options.MaximumSaveBytes = 1;
@@ -739,6 +741,9 @@ internal static class Program
                 "The controlled save failure was not reported.");
             Assert(!coordinator.IsActive, "A failed save did not close the runtime session.");
             Assert(notifications == 1, "A failed save must notify hosts exactly once.");
+            Assert(observerCheckpoint != null && !observerCheckpoint.Success &&
+                observerCheckpoint.ErrorCode == "session_not_active",
+                "A close observer re-entered the coordinator and checkpointed a session that was already closed.");
             coordinator.CloseSession();
             Assert(notifications == 1, "Closing an already inactive session emitted another notification.");
         }
