@@ -82,6 +82,7 @@ internal static class Program
         Run("release manager cancels active catalogue refresh safely on disposal", ReleaseManagerDisposalCancelsRefresh, ref failures);
         Run("release manager cancels active install and releases its lease on disposal", ReleaseManagerDisposalCancelsInstall, ref failures);
         Run("release managers serialize same-episode operations across instances", ReleaseManagersSerializeSharedEpisodeOperation, ref failures);
+        Run("release managers isolate download caches when sharing a download root", ReleaseManagersIsolateSharedDownloadRoot, ref failures);
         Run("episode library presentation cancels refresh and suppresses events after disposal", LibraryPresentationDisposalCancelsRefresh, ref failures);
         Run("episode access gate excludes session and installer ownership", EpisodeAccessGateExcludesSessionAndInstall, ref failures);
         Run("episode access gate coordinates independent instances and case variants", EpisodeAccessGateCoordinatesInstances, ref failures);
@@ -1809,6 +1810,78 @@ internal static class Program
         }
         finally
         {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    private static void ReleaseManagersIsolateSharedDownloadRoot()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-manager-download-isolation-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        EpisodeReleaseManager? firstManager = null;
+        EpisodeReleaseManager? secondManager = null;
+        try
+        {
+            using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            string issued = DateTime.UtcNow.AddMinutes(-1).ToString("o", CultureInfo.InvariantCulture);
+            string expires = DateTime.UtcNow.AddHours(1).ToString("o", CultureInfo.InvariantCulture);
+            string payloadText = "{\\"schema_version\\":1,\\"sequence\\":1,\\"issued_utc\\":\\"" + issued +
+                "\",\\"expires_utc\\":\\"" + expires +
+                "\",\\"releases\\":[{\\"episode_id\\":\\"nightwire.ep001\\",\\"episode_version\\":\\"1.0.0\\",\\"archive_url\\":\\"https://cdn.example.test/episode.zip\\",\\"archive_size_bytes\\":1,\\"archive_sha256\\":\\"" +
+                new string('a', 64) + "\",\\"minimum_runtime_version\\":\\"1.0.0\\"}]}";
+            byte[] payload = System.Text.Encoding.UTF8.GetBytes(payloadText);
+            byte[] signature = key.SignData(payload, HashAlgorithmName.SHA256,
+                DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+            string envelope = JsonSerializer.Serialize(new
+            {
+                key_id = "download-isolation",
+                algorithm = "ECDSA-P256-SHA256",
+                payload = Convert.ToBase64String(payload),
+                signature = Convert.ToBase64String(signature)
+            });
+            var verifier = new ReleaseCatalogueVerifier(new[]
+            {
+                new TrustedReleaseKey { KeyId = "download-isolation", SubjectPublicKeyInfo = key.ExportSubjectPublicKeyInfo() }
+            });
+            var firstHandler = new CancellationBlockingHttpHandler();
+            var secondHandler = new CancellationBlockingHttpHandler();
+            using var firstClient = new HttpClient(firstHandler);
+            using var secondClient = new HttpClient(secondHandler);
+            using var firstDownloader = new EpisodePackageDownloader(client: firstClient);
+            using var secondDownloader = new EpisodePackageDownloader(client: secondClient);
+            string sharedDownloadRoot = Path.Combine(root, "downloads");
+            firstManager = new EpisodeReleaseManager(new Uri("https://catalogue.example.test/releases.json"),
+                Path.Combine(root, "install-a"), sharedDownloadRoot,
+                new StubCatalogueTransport(System.Text.Encoding.UTF8.GetBytes(envelope)),
+                new ReleaseCatalogueAcceptanceService(verifier, new MemoryReleaseSequenceStore()),
+                new StubInstallLeaseProvider(), "1.0.0", firstDownloader);
+            secondManager = new EpisodeReleaseManager(new Uri("https://catalogue.example.test/releases.json"),
+                Path.Combine(root, "install-b"), sharedDownloadRoot,
+                new StubCatalogueTransport(System.Text.Encoding.UTF8.GetBytes(envelope)),
+                new ReleaseCatalogueAcceptanceService(verifier, new MemoryReleaseSequenceStore()),
+                new StubInstallLeaseProvider(), "1.0.0", secondDownloader);
+
+            Assert(firstManager.RefreshCatalogueAsync(DateTime.UtcNow).GetAwaiter().GetResult().Success,
+                "First manager could not accept its release fixture.");
+            Assert(secondManager.RefreshCatalogueAsync(DateTime.UtcNow).GetAwaiter().GetResult().Success,
+                "Second manager could not accept its release fixture.");
+            Task<EpisodeManagerOperationResult> first = firstManager.InstallOrUpdateAsync("nightwire.ep001");
+            Task<EpisodeManagerOperationResult> second = secondManager.InstallOrUpdateAsync("nightwire.ep001");
+            Assert(Task.WaitAll(new[] { firstHandler.Started, secondHandler.Started }, TimeSpan.FromSeconds(5)),
+                "Managers sharing a download root did not start independent downloads.");
+            firstManager.Dispose();
+            secondManager.Dispose();
+            Assert(first.GetAwaiter().GetResult().ErrorCode == "episode_install_cancelled" &&
+                second.GetAwaiter().GetResult().ErrorCode == "episode_install_cancelled",
+                "Disposing managers did not cancel both isolated downloads.");
+            string[] managerDirectories = Directory.GetDirectories(sharedDownloadRoot, ".manager-*", SearchOption.TopDirectoryOnly);
+            Assert(managerDirectories.Length == 2 && !string.Equals(managerDirectories[0], managerDirectories[1], StringComparison.Ordinal),
+                "Managers did not receive distinct download cache directories.");
+        }
+        finally
+        {
+            firstManager?.Dispose();
+            secondManager?.Dispose();
             if (Directory.Exists(root)) Directory.Delete(root, true);
         }
     }
