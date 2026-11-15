@@ -42,7 +42,7 @@ These versions follow Unity's official 6000.3 compatibility tables. The editor p
 - `Assets/Nightwire/UI/EpisodeLibraryView.uxml` and `.uss` — dark episode archive.
 - `Assets/Nightwire/UI/MessengerScreen.uxml` and `.uss` — conversation interface, message bubbles, image previews, and choice dock.
 - `Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` — archive presentation adapter.
-- `Assets/Nightwire/Scripts/MessengerScreenController.cs` — package-driven text, choices, verified images, and verified audio/video playback.
+- `Assets/Nightwire/Scripts/MessengerScreenController.cs` — package-driven text, choices, localized character profile overlay, verified images, and verified audio/video playback.
 - `Assets/Nightwire/Scripts/NightwireApplicationRoot.cs` — composition root, startup recovery, and session lifecycle.
 - `Assets/Nightwire/Scripts/EpisodeSessionHost.cs` — resume/new-session selection and per-episode session lease.
 - `Assets/Nightwire/Scripts/AndroidNightwirePlatformServices.cs` — production Android release configuration and StrongBox bridge.
@@ -66,7 +66,7 @@ The Episode 001 story package now includes three character profiles (Anisha, Raf
 The following presentation features are not complete yet:
 
 - Prerecorded call screen, synchronized subtitles, and visual effects.
-- Document viewer, character profiles, social feed, and media gallery.
+- Document viewer, social feed, and media gallery.
 - Group-chat-specific participant layout.
 - Player language settings and free-form replies.
 
