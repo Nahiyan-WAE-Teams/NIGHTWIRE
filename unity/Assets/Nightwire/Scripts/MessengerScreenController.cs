@@ -447,8 +447,16 @@ namespace Nightwire.Unity.UI
                 yield break;
             }
 
+            if (!TryGetAudioType(path, out var audioType))
+            {
+                status.text = "UNSUPPORTED AUDIO FORMAT · USE MP3, WAV, OR OGG";
+                button.SetEnabled(true);
+                audioLoadCoroutine = null;
+                yield break;
+            }
+
             string url = new Uri(path).AbsoluteUri;
-            using (var request = UnityWebRequestMultimedia.GetAudioClip(url, GetAudioType(path)))
+            using (var request = UnityWebRequestMultimedia.GetAudioClip(url, audioType))
             {
                 request.timeout = 60;
                 yield return request.SendWebRequest();
@@ -653,18 +661,22 @@ namespace Nightwire.Unity.UI
             }
         }
 
-        private static AudioType GetAudioType(string path)
+        private static bool TryGetAudioType(string path, out AudioType audioType)
         {
             switch (Path.GetExtension(path).ToLowerInvariant())
             {
-                case ".mp3": return AudioType.MPEG;
-                case ".wav": return AudioType.WAV;
-                case ".ogg": return AudioType.OGGVORBIS;
-                case ".aif":
-                case ".aiff": return AudioType.AIFF;
-                case ".m4a":
-                case ".aac": return AudioType.ACC;
-                default: return AudioType.UNKNOWN;
+                case ".mp3":
+                    audioType = AudioType.MPEG;
+                    return true;
+                case ".wav":
+                    audioType = AudioType.WAV;
+                    return true;
+                case ".ogg":
+                    audioType = AudioType.OGGVORBIS;
+                    return true;
+                default:
+                    audioType = AudioType.UNKNOWN;
+                    return false;
             }
         }
 
