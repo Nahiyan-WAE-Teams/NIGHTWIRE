@@ -68,15 +68,11 @@ namespace Nightwire.Runtime.Sessions
         {
             if (IsActive) return Fail("session_already_active", "Close the current session before starting another episode.");
             if (package == null) throw new ArgumentNullException(nameof(package));
-            string savePath = _saveStore.GetSavePath(package.Descriptor.EpisodeId);
-            if (File.Exists(savePath) || File.Exists(savePath + ".bak"))
-                return Fail("save_exists", "A save already exists for this episode. Resume it instead of overwriting player progress.");
-
             var state = NewProgress(package);
             var story = _storyEngine.ProcessTrigger(package.RuntimeDefinition, state,
                 new StoryTrigger { Type = StoryTriggerType.EpisodeStarted });
             if (!story.Success) return Fail("entry_event_failed", story.Error ?? "Episode entry event failed.");
-            try { _saveStore.Save(state); }
+            try { _saveStore.SaveNew(state); }
             catch (SaveStoreException exception) { return Fail(exception.ErrorCode, exception.Message); }
 
             Package = package;
