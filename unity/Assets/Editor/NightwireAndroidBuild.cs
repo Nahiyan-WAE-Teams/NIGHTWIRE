@@ -34,6 +34,7 @@ namespace Nightwire.Unity.Editor
                 scenes = scenes,
                 locationPathName = outputPath,
                 target = BuildTarget.Android,
+                targetGroup = BuildTargetGroup.Android,
                 options = BuildOptions.Development | BuildOptions.CompressWithLz4
             };
 
