@@ -81,7 +81,7 @@ Unity In-App Purchasing 5.5.0 is pinned in `Packages/manifest.json`. `NightwireI
 ## Separate CI pipelines
 
 - **Engine CI** builds the portable runtime and validator, validates the sample episode, and runs the 62 runtime regression tests plus validator integration tests.
-- **Game UI CI** stages the runtime assemblies and checks Unity project metadata, UXML parsing, controller-to-UXML named-element contracts, stylesheet references, assembly references, verified audio/video integration contracts, and 17 UI source regression tests.
+- **Game UI CI** stages the runtime assemblies and checks Unity project metadata, UXML parsing, controller-to-UXML named-element contracts, stylesheet references, assembly references, verified audio/video integration contracts, and 18 UI source regression tests.
 
 Game UI CI stages the runtime assemblies, validates UI source contracts, builds the Android StrongBox secure-store AAR with JDK 17 / Gradle 9.3.1 / Android SDK 36, verifies its JNI class and backup-exclusion resources, and uploads the AAR as the `nightwire-android-secure-store-aar` workflow artifact. It is still not a Unity Editor compile or Android player build. Unity Editor compilation, Play Mode testing, final manifest merge, and Android device/StrongBox verification require an actual Unity 6000.3.28f1 installation and device/toolchain execution.
 
