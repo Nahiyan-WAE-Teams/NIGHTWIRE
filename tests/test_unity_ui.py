@@ -105,6 +105,16 @@ class NightwireUnityUiTests(unittest.TestCase):
         self.assertIn("if (!fulfilled)", source)
         self.assertIn("The transaction remains pending", source)
 
+    def test_minigame_screen_supports_all_schema_types_and_runtime_actions(self):
+        uxml = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uxml").read_text(encoding="utf-8")
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
+        for token in ("minigame-entry-button", "minigame-screen", "minigame-challenge-content", "minigame-continue-button"):
+            with self.subTest(token=token):
+                self.assertIn(token, uxml)
+        for token in ("StartMinigame", "SubmitSequence", "SubmitFrequency", "MatchEvidence", "AdvanceMinigameTime", "sequence_reconstruction", "frequency_tuning", "evidence_matching"):
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+        self.assertIn("PendingMinigameId", source)
     def test_prerecorded_call_ui_has_subtitles_effects_and_verified_media(self):
         uxml = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uxml").read_text(encoding="utf-8")
         source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
