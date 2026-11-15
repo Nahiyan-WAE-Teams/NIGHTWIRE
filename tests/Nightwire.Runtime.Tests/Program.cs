@@ -468,7 +468,7 @@ internal static class Program
             Assert(first.Result != second.Result,
                 "Concurrent new-game creation did not admit exactly one initial save.");
 
-            int storedScore = firstStore.Load("nightwire.ep001", "1.0.0").State.RelationshipScores["anisha"];
+            long storedScore = firstStore.Load("nightwire.ep001", "1.0.0").State.RelationshipScores["anisha"];
             Assert(storedScore == 11 || storedScore == 22,
                 "Concurrent new-game creation left an unexpected or overwritten save.");
         }
@@ -1066,30 +1066,39 @@ internal static class Program
 
     private static LoadedEpisodePackage CreateAssetTestPackage(string root, string content)
     {
-        Directory.CreateDirectory(Path.Combine(root, "Media"));
+        string packageRoot = Path.Combine(root, "package");
+        CopyDirectory(Path.Combine(FindRepositoryRoot(), "examples", "Episode_001"), packageRoot);
+
         string relativePath = "Media/image.bin";
-        string fullPath = Path.Combine(root, "Media", "image.bin");
+        string fullPath = Path.Combine(packageRoot, "Media", "image.bin");
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         byte[] bytes = System.Text.Encoding.UTF8.GetBytes(content);
         File.WriteAllBytes(fullPath, bytes);
         using var sha = SHA256.Create();
         string digest = BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", string.Empty).ToLowerInvariant();
 
-        var package = new LoadedEpisodePackage
+        string manifestPath = Path.Combine(packageRoot, "manifest.json");
+        var manifest = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(manifestPath))!.AsObject();
+        manifest["files"]!.AsArray().Add(new System.Text.Json.Nodes.JsonObject
         {
-            RootDirectory = root,
-            Descriptor = new EpisodePackageDescriptor { EpisodeId = "nightwire.ep001", EpisodeVersion = "1.0.0" }
-        };
-        package.Manifest.Files.Add(new EpisodeManifestFile
-        {
-            Path = relativePath, Kind = "media", SizeBytes = bytes.Length, Sha256 = digest
+            ["path"] = relativePath,
+            ["kind"] = "media",
+            ["size_bytes"] = bytes.Length,
+            ["sha256"] = digest
         });
-        var asset = new EpisodeManifestAsset
+        manifest["assets"]!.AsArray().Add(new System.Text.Json.Nodes.JsonObject
         {
-            AssetId = "asset.test", Type = "image", Path = relativePath, MimeType = "image/png"
-        };
-        package.Manifest.Assets.Add(asset);
-        package.AssetsById.Add(asset.AssetId, asset);
-        return package;
+            ["asset_id"] = "asset.test",
+            ["type"] = "image",
+            ["path"] = relativePath,
+            ["mime_type"] = "image/png"
+        });
+        File.WriteAllText(manifestPath, manifest.ToJsonString(new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true
+        }));
+
+        return new EpisodePackageLoader().Load(packageRoot);
     }
 
 
@@ -1438,9 +1447,12 @@ internal static class Program
     private sealed class StubHttpHandler : HttpMessageHandler
     {
         private readonly byte[] _payload;
+        private int _requestCount;
+        public int RequestCount => Volatile.Read(ref _requestCount);
         public StubHttpHandler(byte[] payload) { _payload = payload; }
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            Interlocked.Increment(ref _requestCount);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new ByteArrayContent(_payload),
@@ -1823,7 +1835,7 @@ internal static class Program
             var secondResult = secondManager.InstallOrUpdateAsync("nightwire.ep001").GetAwaiter().GetResult();
             Assert(!secondResult.Success && secondResult.ErrorCode == "episode_operation_in_progress",
                 "A second manager was allowed to start the same episode operation.");
-            Assert(!secondHandler.Started.IsSet,
+            Assert(!secondHandler.Started.IsCompleted,
                 "Second manager entered the network download despite an active same-episode operation.");
             Assert(secondLeaseProvider.AcquireCount == 0,
                 "Second manager acquired an episode lease despite the shared operation reservation.");
