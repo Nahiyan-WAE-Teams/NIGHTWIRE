@@ -63,11 +63,12 @@ The Episode 001 story package now includes three character profiles (Anisha, Raf
 - Episode-authored social feed with localized post bodies, character names, comments, and verified image attachments.
 - Evidence library listing only unlocked manifest assets, with image/audio/video playback and bounded UTF-8 text/Markdown/JSON previews; other document formats remain archive-only.
 - Playback of unlocked, manifest-verified audio (MP3/WAV/OGG) and video attachments, copied to a bounded temporary cache and controlled in-message; unsupported audio formats are rejected rather than guessed.
+- Prerecorded audio/video call presentation driven by the runtime timeline, including localized timed subtitles, speaker focus, allowlisted visual-effect cues, resumable elapsed position, and automatic call-completion story triggers.
 - Offline installation of the bundled Episode 001 sample.
 
 The following presentation features are not complete yet:
 
-- Prerecorded call screen, synchronized subtitles, and visual effects.
+- Full call recording authoring/QA tooling and real-device synchronization validation.
 - Full document viewer for PDF/office formats, plus advanced searchable media gallery filters.
 - Group conversations identify the group channel, show a localized participant roster, and retain sender names on individual message bubbles.
 - Player language settings and free-form replies.
