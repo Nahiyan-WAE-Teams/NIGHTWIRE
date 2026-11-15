@@ -53,7 +53,7 @@ class NightwireUnityUiTests(unittest.TestCase):
         self.assertIn("powershell.exe", script)
         self.assertIn("dotnet-install.ps1", powershell)
         self.assertIn('-Channel "10.0"', powershell)
-        self.assertIn("dotnet publish", powershell)
+        self.assertIn("publish $Project", powershell)
 
     def test_editor_bootstrapper_generates_scene_and_bundled_episode(self):
         source = (ROOT / "unity/Assets/Editor/NightwireProjectBootstrapper.cs").read_text(encoding="utf-8")
