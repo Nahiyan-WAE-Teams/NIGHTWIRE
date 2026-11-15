@@ -136,6 +136,7 @@ namespace Nightwire.Unity.UI
         {
             UpdateMediaPlayback();
             UpdateCallPlayback();
+            if (!string.IsNullOrEmpty(activeCallId)) return;
             if (!bound || session == null || !session.IsActive || session.Progress == null)
                 return;
 
@@ -673,6 +674,7 @@ namespace Nightwire.Unity.UI
                 !string.Equals(session.Progress.PendingCallId, callId, StringComparison.Ordinal) ||
                 !session.Package.Calls.TryGetValue(callId, out var definition))
             { SetStatus("THIS CALL IS NOT CURRENTLY AVAILABLE."); return; }
+            StopMediaPlayback();
             var started = session.StartCallPlayback(callId);
             if (!started.Success || started.CallTimeline == null) { SetStatus(started.Error ?? "CALL COULD NOT START."); return; }
             StopCallMedia();
