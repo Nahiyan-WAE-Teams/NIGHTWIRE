@@ -60,7 +60,7 @@ The sample vertical slice supports:
 - Timed, localized text conversations.
 - Authored branching choices and relationship/story-flag effects.
 - Inline previews of unlocked, manifest-verified images.
-- Playback of unlocked, manifest-verified audio and video attachments, copied to a bounded temporary cache and controlled in-message.
+- Playback of unlocked, manifest-verified audio (MP3/WAV/OGG) and video attachments, copied to a bounded temporary cache and controlled in-message; unsupported audio formats are rejected rather than guessed.
 - Offline installation of the bundled Episode 001 sample.
 
 The following presentation features are not complete yet:
