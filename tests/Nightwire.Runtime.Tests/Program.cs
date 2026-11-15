@@ -1302,13 +1302,18 @@ internal static class Program
         Directory.CreateDirectory(root);
         try
         {
-            using var client = new HttpClient(new StubHttpHandler(payload));
+            var handler = new StubHttpHandler(payload);
+            using var client = new HttpClient(handler);
             using var downloader = new EpisodePackageDownloader(client: client);
             string target = Path.Combine(root, "episode.zip");
             var result = downloader.DownloadAsync(new Uri("https://cdn.example.test/episode.zip"), target, digest)
                 .GetAwaiter().GetResult();
             Assert(result.Success && result.Sha256 == digest && File.ReadAllBytes(target).SequenceEqual(payload),
                 result.Error ?? "Verified download failed.");
+            var cached = downloader.DownloadAsync(new Uri("https://cdn.example.test/episode.zip"), target,
+                digest, expectedSizeBytes: payload.LongLength).GetAwaiter().GetResult();
+            Assert(cached.Success && handler.RequestCount == 1,
+                "A previously verified signed archive was downloaded again instead of reusing the cache.");
             var bad = downloader.DownloadAsync(new Uri("https://cdn.example.test/episode.zip"), target, new string('0', 64))
                 .GetAwaiter().GetResult();
             Assert(!bad.Success && bad.ErrorCode == "download_hash_mismatch", "Incorrect trusted hash was accepted.");
