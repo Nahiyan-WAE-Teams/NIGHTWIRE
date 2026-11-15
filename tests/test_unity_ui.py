@@ -105,7 +105,7 @@ class NightwireUnityUiTests(unittest.TestCase):
         for token in ("contact-directory-card", "contact-directory-avatar", "contact-directory-bio"):
             with self.subTest(token=token):
                 self.assertIn(token, uss)
-        for token in ("ShowContactDirectory", "RenderContactDirectory", "ShowContactProfile(characterId)",
+        for token in ("ShowContactDirectory", "contactsList.Clear()", "ShowContactProfile(characterId)",
                       'CharacterProfiles.Where(pair => !string.Equals(pair.Key, "player", StringComparison.Ordinal))',
                       'Localize(ReadString(entry.Value, "bio_key")'):
             with self.subTest(token=token):
