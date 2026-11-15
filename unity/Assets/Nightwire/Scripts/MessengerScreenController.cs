@@ -37,6 +37,13 @@ namespace Nightwire.Unity.UI
         private Label responseHeading;
         private Label conversationStatus;
         private Button backButton;
+        private Button profileOpenButton;
+        private Button profileCloseButton;
+        private VisualElement profileOverlay;
+        private Label profileName;
+        private Label profileStatus;
+        private Label profileBio;
+        private string activeContactId;
         private string locale;
         private string activeConversationId;
         private bool bound;
@@ -150,16 +157,26 @@ namespace Nightwire.Unity.UI
             responseHeading = root?.Q<Label>("response-heading");
             conversationStatus = root?.Q<Label>("conversation-status");
             backButton = root?.Q<Button>("back-button");
+            profileOpenButton = root?.Q<Button>("profile-open-button");
+            profileCloseButton = root?.Q<Button>("profile-close-button");
+            profileOverlay = root?.Q<VisualElement>("profile-overlay");
+            profileName = root?.Q<Label>("profile-name");
+            profileStatus = root?.Q<Label>("profile-status");
+            profileBio = root?.Q<Label>("profile-bio");
 
             if (root == null || messageList == null || contactName == null || contactStatus == null ||
                 episodeTitle == null || typingIndicator == null || choiceList == null ||
-                responseHeading == null || conversationStatus == null || backButton == null)
+                responseHeading == null || conversationStatus == null || backButton == null ||
+                profileOpenButton == null || profileCloseButton == null || profileOverlay == null ||
+                profileName == null || profileStatus == null || profileBio == null)
             {
                 Debug.LogError("NIGHTWIRE messenger UXML is missing a required named element.", this);
                 return;
             }
 
             backButton.clicked += BackClicked;
+            profileOpenButton.clicked += ShowContactProfile;
+            profileCloseButton.clicked += HideContactProfile;
             bound = true;
             ActivateCurrentConversation();
             RenderConversation();
@@ -174,6 +191,10 @@ namespace Nightwire.Unity.UI
         {
             if (bound && backButton != null)
                 backButton.clicked -= BackClicked;
+            if (bound && profileOpenButton != null)
+                profileOpenButton.clicked -= ShowContactProfile;
+            if (bound && profileCloseButton != null)
+                profileCloseButton.clicked -= HideContactProfile;
             bound = false;
             session = null;
             sessionHost = null;
@@ -187,6 +208,13 @@ namespace Nightwire.Unity.UI
             responseHeading = null;
             conversationStatus = null;
             backButton = null;
+            profileOpenButton = null;
+            profileCloseButton = null;
+            profileOverlay = null;
+            profileName = null;
+            profileStatus = null;
+            profileBio = null;
+            activeContactId = null;
             activeConversationId = null;
             StopMediaPlayback();
             ClearImageCache();
@@ -235,6 +263,7 @@ namespace Nightwire.Unity.UI
                 }
 
                 string otherParticipant = FindOtherParticipant(conversation);
+                activeContactId = otherParticipant;
                 contactName.text = CharacterName(otherParticipant);
                 contactStatus.text = CharacterStatus(otherParticipant);
                 var progress = session.Progress.ConversationProgress.TryGetValue(conversationId, out var current)
@@ -838,6 +867,25 @@ namespace Nightwire.Unity.UI
                 }
             }
             return "nightwire";
+        }
+
+        private void ShowContactProfile()
+        {
+            if (profileOverlay == null || session?.Package == null ||
+                string.IsNullOrEmpty(activeContactId) ||
+                !session.Package.CharacterProfiles.TryGetValue(activeContactId, out var profile))
+                return;
+
+            profileName.text = CharacterName(activeContactId);
+            profileStatus.text = CharacterStatus(activeContactId);
+            profileBio.text = Localize(ReadString(profile, "bio_key"), "No profile information available.");
+            profileOverlay.style.display = DisplayStyle.Flex;
+        }
+
+        private void HideContactProfile()
+        {
+            if (profileOverlay != null)
+                profileOverlay.style.display = DisplayStyle.None;
         }
 
         private string CharacterName(string characterId)
