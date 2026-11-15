@@ -69,7 +69,7 @@ The following presentation features are not complete yet:
 
 - Prerecorded call screen, synchronized subtitles, and visual effects.
 - Full document viewer for PDF/office formats, plus advanced searchable media gallery filters.
-- Group-chat-specific participant layout.
+- Group conversations identify the group channel, show a localized participant roster, and retain sender names on individual message bubbles.
 - Player language settings and free-form replies.
 
 The episode engine already has data contracts and runtime support for several of these content types; their Unity presentation is still outstanding. Do not mistake the existence of the runtime contract for a finished screen.
