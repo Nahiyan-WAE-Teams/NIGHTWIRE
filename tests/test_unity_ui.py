@@ -50,6 +50,17 @@ class NightwireUnityUiTests(unittest.TestCase):
         self.assertIn("Episode_001.zip", source)
         self.assertIn("EditorBuildSettings.scenes", source)
 
+    def test_android_ci_build_creates_development_apk_and_prepares_scene(self):
+        build = (ROOT / "unity/Assets/Editor/NightwireAndroidBuild.cs").read_text(encoding="utf-8")
+        bootstrap = (ROOT / "unity/Assets/Editor/NightwireProjectBootstrapper.cs").read_text(encoding="utf-8")
+        workflow = (ROOT / ".github/workflows/android-apk.yml").read_text(encoding="utf-8")
+        self.assertIn("NightwireProjectBootstrapper.PrepareForBuild()", build)
+        self.assertIn("BuildOptions.Development", build)
+        self.assertIn('"NIGHTWIRE.apk"', build)
+        self.assertIn("public static void PrepareForBuild()", bootstrap)
+        self.assertIn("Nightwire.Unity.Editor.NightwireAndroidBuild.Build", workflow)
+        self.assertIn("androidExportType: androidPackage", workflow)
+
     def test_messenger_has_audio_and_video_playback_handlers(self):
         source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
         for token in ("AddAudioAttachment", "AddVideoAttachment", "VideoPlayer", "UnityWebRequestMultimedia"):
