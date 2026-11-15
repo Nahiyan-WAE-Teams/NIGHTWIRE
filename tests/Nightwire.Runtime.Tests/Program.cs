@@ -1760,15 +1760,35 @@ internal static class Program
             using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
             string issued = DateTime.UtcNow.AddMinutes(-1).ToString("o", CultureInfo.InvariantCulture);
             string expires = DateTime.UtcNow.AddHours(1).ToString("o", CultureInfo.InvariantCulture);
-            string payloadText = "{\\"schema_version\\":1,\\"sequence\\":1,\\"issued_utc\\":\\"" + issued +
-                "\",\\"expires_utc\\":\\"" + expires +
-                "\",\\"releases\\":[{\\"episode_id\\":\\"nightwire.ep001\\",\\"episode_version\\":\\"1.0.0\\",\\"archive_url\\":\\"https://cdn.example.test/episode.zip\\",\\"archive_size_bytes\\":1,\\"archive_sha256\\":\\"" +
-                new string('a', 64) + "\",\\"minimum_runtime_version\\":\\"1.0.0\\"}]}";
+            string payloadText = JsonSerializer.Serialize(new
+            {
+                schema_version = 1,
+                sequence = 1,
+                issued_utc = issued,
+                expires_utc = expires,
+                releases = new[]
+                {
+                    new
+                    {
+                        episode_id = "nightwire.ep001",
+                        episode_version = "1.0.0",
+                        archive_url = "https://cdn.example.test/episode.zip",
+                        archive_size_bytes = 1,
+                        archive_sha256 = new string('a', 64),
+                        minimum_runtime_version = "1.0.0"
+                    }
+                }
+            });
             byte[] payload = System.Text.Encoding.UTF8.GetBytes(payloadText);
             byte[] signature = key.SignData(payload, HashAlgorithmName.SHA256,
                 DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
-            string envelope = "{\\"key_id\\":\\"shared-operation\\",\\"algorithm\\":\\"ECDSA-P256-SHA256\\",\\"payload\\":\\"" +
-                Convert.ToBase64String(payload) + "\\",\\"signature\\":\\"" + Convert.ToBase64String(signature) + "\\"}";
+            string envelope = JsonSerializer.Serialize(new
+            {
+                key_id = "shared-operation",
+                algorithm = "ECDSA-P256-SHA256",
+                payload = Convert.ToBase64String(payload),
+                signature = Convert.ToBase64String(signature)
+            });
             var verifier = new ReleaseCatalogueVerifier(new[]
             {
                 new TrustedReleaseKey { KeyId = "shared-operation", SubjectPublicKeyInfo = key.ExportSubjectPublicKeyInfo() }
