@@ -29,6 +29,21 @@ namespace Nightwire.Unity.Editor
             EditorApplication.delayCall += Bootstrap;
         }
 
+        public static void PrepareForBuild()
+        {
+            EnsureFolders();
+            EnsureBundledEpisodeArchive();
+            EnsurePanelSettings();
+            EnsureScene();
+            ConfigurePlayerSettings();
+            AssetDatabase.Refresh();
+
+            if (!File.Exists(ScenePath))
+                throw new InvalidOperationException("NIGHTWIRE bootstrap did not generate the required Android build scene.");
+            if (!EditorBuildSettings.scenes.Any(scene => scene.path == ScenePath && scene.enabled))
+                throw new InvalidOperationException("NIGHTWIRE main scene is not enabled in Editor Build Settings.");
+        }
+
         private static void Bootstrap()
         {
             try
