@@ -7,6 +7,7 @@
             <ui:VisualElement class="contact-block">
                 <ui:Label name="contact-name" text="NIGHTWIRE CONTACT" class="contact-name" />
                 <ui:Label name="contact-status" text="LOCAL STORY CHANNEL · EPISODE CONTENT" class="contact-status" />
+                <ui:Button name="profile-open-button" text="VIEW PROFILE" class="profile-open-button" />
             </ui:VisualElement>
             <ui:Label name="contact-mark" text="NW" class="contact-mark" />
         </ui:VisualElement>
@@ -23,6 +24,14 @@
             <ui:Label name="response-heading" text="STORY RESPONSE" class="response-heading" />
             <ui:VisualElement name="choice-list" class="choice-list" />
             <ui:Label name="conversation-status" text="Waiting for the next transmission…" class="conversation-status" />
+        </ui:VisualElement>
+        <ui:VisualElement name="profile-overlay" class="profile-overlay" style="display: none;">
+            <ui:VisualElement class="profile-card">
+                <ui:Button name="profile-close-button" text="CLOSE" class="profile-close-button" />
+                <ui:Label name="profile-name" text="CONTACT" class="profile-name" />
+                <ui:Label name="profile-status" text="OFFLINE" class="profile-status" />
+                <ui:Label name="profile-bio" text="No profile information available." class="profile-bio" />
+            </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>
