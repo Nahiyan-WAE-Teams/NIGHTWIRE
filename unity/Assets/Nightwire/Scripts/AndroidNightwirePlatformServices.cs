@@ -22,6 +22,8 @@ namespace Nightwire.Unity
         [SerializeField] private string sequenceNamespace = "production";
         [SerializeField] private PublicKeyEntry[] trustedKeys = Array.Empty<PublicKeyEntry>();
 
+        public override bool ShouldRefreshCatalogue => true;
+
         public override Uri CatalogueUri
         {
             get
