@@ -105,6 +105,14 @@ class NightwireUnityUiTests(unittest.TestCase):
         self.assertIn("if (!fulfilled)", source)
         self.assertIn("The transaction remains pending", source)
 
+    def test_group_conversations_render_a_participant_roster(self):
+        uxml = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uxml").read_text(encoding="utf-8")
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
+        self.assertIn('name="group-participants"', uxml)
+        self.assertIn("FindOtherParticipants", source)
+        self.assertIn('contactName.text = "GROUP CHAT"', source)
+        self.assertIn('string.Join("  ·  ", otherParticipants.Select(CharacterName))', source)
+
     def test_messenger_exposes_messages_social_feed_and_evidence_tabs(self):
         uxml = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uxml").read_text(encoding="utf-8")
         source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
