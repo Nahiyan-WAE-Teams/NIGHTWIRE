@@ -16,7 +16,7 @@ namespace Nightwire.Runtime.Installation
     {
         private readonly ReleaseCatalogueVerifier _verifier;
         private readonly IReleaseCatalogueSequenceStore _sequenceStore;
-        private readonly object _gate = new object();
+        private static readonly object AcceptanceGate = new object();
 
         public ReleaseCatalogueAcceptanceService(ReleaseCatalogueVerifier verifier,
             IReleaseCatalogueSequenceStore sequenceStore)
@@ -26,12 +26,12 @@ namespace Nightwire.Runtime.Installation
         }
 
         /// <summary>
-        /// Verifies first, then advances the persisted sequence. Calls must be serialized with
-        /// installation/catalogue refresh operations by the host across process boundaries.
+        /// Verifies first, then advances the persisted sequence. A process-wide gate serializes
+        /// all acceptance-service instances in this process; the host must coordinate other processes.
         /// </summary>
         public ReleaseCatalogueResult Accept(byte[] envelopeBytes, DateTime utcNow)
         {
-            lock (_gate)
+            lock (AcceptanceGate)
             {
                 try
                 {
@@ -47,8 +47,9 @@ namespace Nightwire.Runtime.Installation
                     {
                         _sequenceStore.SaveHighestAcceptedSequence(result.Catalogue.Sequence);
                         long persisted = _sequenceStore.LoadHighestAcceptedSequence();
-                        if (persisted < result.Catalogue.Sequence)
-                            return Failure("sequence_store_not_durable", "Accepted catalogue sequence was not durably persisted.");
+                        if (persisted != result.Catalogue.Sequence)
+                            return Failure("sequence_store_not_durable",
+                                "Persisted release catalogue sequence does not exactly match the accepted sequence.");
                     }
                     return result;
                 }
