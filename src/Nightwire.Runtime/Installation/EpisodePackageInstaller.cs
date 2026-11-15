@@ -191,6 +191,45 @@ namespace Nightwire.Runtime.Installation
                 }
             }
 
+            // A crash can occur after a valid backup has been moved into place but
+            // before its quarantined invalid predecessor is deleted. Only remove that
+            // quarantine after independently validating the active destination.
+            foreach (string quarantine in Directory.GetDirectories(root, ".invalid-*", SearchOption.TopDirectoryOnly))
+            {
+                string name = Path.GetFileName(quarantine);
+                if (name.Length <= 41 || !name.StartsWith(".invalid-", StringComparison.Ordinal)) continue;
+                string suffix = name.Substring(name.Length - 33);
+                if (suffix[0] != '-' || !Guid.TryParseExact(suffix.Substring(1), "N", out _)) continue;
+                string episodeId = name.Substring(9, name.Length - 9 - 33);
+                try { EnsureSafeEpisodeId(episodeId); }
+                catch { continue; }
+
+                try
+                {
+                    if ((File.GetAttributes(quarantine) & FileAttributes.ReparsePoint) != 0) continue;
+                    string destination = Path.Combine(root, episodeId);
+                    if (!Directory.Exists(destination) ||
+                        (File.GetAttributes(destination) & FileAttributes.ReparsePoint) != 0)
+                    {
+                        warnings.Add("Retained invalid-install quarantine because no safe active destination exists for '" + episodeId + "'.");
+                        continue;
+                    }
+
+                    LoadedEpisodePackage active = _loader.Load(destination);
+                    if (!string.Equals(active.Descriptor.EpisodeId, episodeId, StringComparison.Ordinal))
+                    {
+                        warnings.Add("Retained invalid-install quarantine because the active destination identity does not match '" + episodeId + "'.");
+                        continue;
+                    }
+
+                    Directory.Delete(quarantine, true);
+                }
+                catch (Exception exception)
+                {
+                    warnings.Add("Could not clean recovered invalid-install quarantine for '" + episodeId + "': " + exception.Message);
+                }
+            }
+
             return new EpisodeInstallRecoveryResult
             {
                 RestoredEpisodeIds = restored.AsReadOnly(),
