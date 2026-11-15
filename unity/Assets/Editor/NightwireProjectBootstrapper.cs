@@ -131,12 +131,14 @@ namespace Nightwire.Unity.Editor
             var platformServices = applicationObject.AddComponent<NightwireDevelopmentPlatformServices>();
             var episodeSeeder = applicationObject.AddComponent<NightwireBundledEpisodeSeeder>();
             var applicationRoot = applicationObject.AddComponent<NightwireApplicationRoot>();
+            applicationObject.AddComponent<NightwireAtmosphereController>();
 
             var messengerObject = new GameObject("NIGHTWIRE Messenger");
             var messengerDocument = messengerObject.AddComponent<UIDocument>();
             messengerDocument.panelSettings = panel;
             messengerDocument.visualTreeAsset = messengerTree;
             var messengerView = messengerObject.AddComponent<MessengerScreenController>();
+            messengerObject.AddComponent<NightwireAtmosphereController>();
 
             var serialized = new SerializedObject(applicationRoot);
             serialized.FindProperty("libraryView").objectReferenceValue = libraryView;
