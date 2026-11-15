@@ -1,48 +1,82 @@
-# NIGHTWIRE Unity presentation integration
+# NIGHTWIRE Unity project
 
-Status: the episode archive and first episode-driven messenger screen have UI Toolkit source and controllers; this directory is **not yet a complete Unity project**.
+The repository now contains a Unity 6.3 project scaffold, an editor-generated main scene, the episode archive and messenger UI Toolkit screens, an offline sample-episode bootstrap, and a separate Game UI source CI pipeline.
 
-## Canonical episode archive screen
+**Pinned editor:** Unity 6000.3.28f1. Do not use earlier 6000.3 patches; this is the patched LTS baseline selected after reviewing Unity's November 2026 security update.
 
-Use these files as the single UI implementation:
+## First-time setup
 
-- `Assets/Nightwire/UI/EpisodeLibraryView.uxml` — episode archive hierarchy and controls.
-- `Assets/Nightwire/UI/MessengerScreen.uxml` — conversation screen hierarchy.
-- `Assets/Nightwire/UI/EpisodeLibraryView.uss` — responsive dark archive styling.
-- `Assets/Nightwire/UI/MessengerScreen.uss` — message bubbles, incoming/outgoing alignment, media preview, and choice styling.
-- `Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` — binds the archive visual tree to the presentation model.
-- `Assets/Nightwire/Scripts/MessengerScreenController.cs` — renders package-driven conversations, localized text, choices, and verified inline image assets.
-- `Assets/Nightwire/Scripts/NightwireApplicationRoot.cs` — composes release services, storage paths, library presentation, startup recovery, and session lifecycle.
-- `Assets/Nightwire/Scripts/EpisodeSessionHost.cs` — owns resume/new-session selection and the per-episode session lease.
-- `Assets/Nightwire/Scripts/INightwirePlatformServices.cs` — platform provider contract.
-- `Assets/Nightwire/Scripts/AndroidNightwirePlatformServices.cs` — Android provider for HTTPS catalogue configuration, app-provisioned public keys, and the StrongBox sequence-store bridge.
-- `Assets/Nightwire/Scripts/Nightwire.Unity.asmdef` — Unity presentation assembly boundary referencing `Nightwire.Runtime`.
+1. From the repository root, run `tools/prepare-unity-runtime.sh` (macOS/Linux) or `tools/Prepare-UnityRuntime.ps1` (Windows). This publishes the portable .NET Standard 2.1 runtime and stages `Nightwire.Runtime.dll`, its resolved dependencies, and `link.xml` into `unity/Assets/Plugins/Nightwire/`.
+2. Open the `unity/` folder as a project in Unity **6000.3.28f1**.
+3. The editor bootstrapper creates `NightwirePanelSettings.asset`, generates `NightwireMain.unity`, adds it to Build Settings, and packages `examples/Episode_001` into `Assets/StreamingAssets/Nightwire/Episode_001.zip`.
+4. Select the generated `NightwireMain` scene and press Play. The bundled sample episode is installed into the app's persistent episode library on first launch. It is an offline development seed; it does not use the remote signed-catalogue path.
+5. Keep the generated scene and Panel Settings asset under version control after Unity has imported them and created their `.meta` files.
 
-The view is backed by the UI-neutral `EpisodeLibraryPresentation` adapter in `src/Nightwire.Runtime/Installation/EpisodeLibraryPresentation.cs`. The same file contains `EpisodeAccessCoordinator`, the atomic per-episode gate shared by session starts and installs.
+The editor bootstrapper uses `NightwireDevelopmentPlatformServices`. This provider is deliberately offline, uses a local development sequence file, and is disabled in non-development players. It is for the sample scene only.
 
-The archive screen supports signed catalogue refresh, installed/offline and downloadable states, update availability, download progress, cancellation, and a `PlayEpisodeRequested` event. The messenger screen advances the portable conversation runtime, displays only delivered messages, marks them read, renders localized story choices, and previews unlocked manifest-verified images. The back-to-archive action saves and closes the session before releasing its lease. The composition root owns the runtime services and the presentation model; the view does not own keys, network transport, storage, or saves.
+## Production Android configuration
 
-## Importing the portable runtime
+Before creating a production Android build:
 
-The runtime core currently lives at `../src/Nightwire.Runtime` and targets .NET Standard 2.1. Before importing this UI source into a Unity 6.3 LTS project:
+- Replace `NightwireDevelopmentPlatformServices` on the application root with `AndroidNightwirePlatformServices`.
+- Configure the HTTPS release-catalogue URL and app-provisioned ECDSA P-256 public keys.
+- Build `unity/Android/NightwireSecureStore` as an AAR and import it under `Assets/Plugins/Android/`.
+- Preserve the StrongBox backup exclusions from the AAR manifest in the final merged Unity manifest.
+- Use Android API 28+ and a StrongBox-capable device. Unsupported devices fail closed; there is no plaintext/software-key fallback.
+- Keep the bundled sample seeder as a development-only feature or remove its component from the production scene. Production episode delivery must use the signed release catalogue and verified downloader/installer.
+- Do not ship the development provider or an unsigned local episode seed as the production content-delivery mechanism.
 
-1. Run `tools/prepare-unity-runtime.sh` (macOS/Linux) or `tools/Prepare-UnityRuntime.ps1` (Windows) from the repository root. The script runs `dotnet publish` for .NET Standard 2.1 and stages the runtime plus copied NuGet dependency assemblies and a linker-preservation file into `unity/Assets/Plugins/Nightwire/`.
-2. Import the staged `unity/Assets/Plugins/Nightwire/` folder into the Unity project and confirm the assemblies are enabled for Editor and Android.
-3. Import the `Assets/Nightwire/UI` and `Assets/Nightwire/Scripts` folders from this repository into the Unity project.
-4. Create a Panel Settings asset and a GameObject with a `UIDocument` component. Assign `EpisodeLibraryView.uxml` as its Source Asset and the Panel Settings asset.
-5. Assign `EpisodeLibraryView.uss` to the UXML document's Style Sheets list in UI Builder or the Inspector.
-6. Attach `EpisodeLibraryViewController` to the same GameObject.
-7. Attach `AndroidNightwirePlatformServices` for Android. Configure the HTTPS catalogue URL and trusted ECDSA P-256 public-key entries in the Inspector. Build `unity/Android/NightwireSecureStore` as an AAR and import it under `Assets/Plugins/Android/`. This provider requires Android API 28+ and StrongBox; unsupported devices fail closed. There is deliberately no plaintext/software-key fallback.
-8. Attach `NightwireApplicationRoot`, assign the library view and platform provider, and set the runtime version. The root creates the release verifier/manager, save store, shared access coordinator, session host, and presentation model. It calls `RecoverAtStartup()` before refreshing the catalogue or allowing episode sessions.
-9. Add a second `UIDocument` GameObject for `MessengerScreen.uxml`, assign `MessengerScreen.uss`, and attach `MessengerScreenController`. Assign it to `NightwireApplicationRoot` alongside the archive view. The root hides the messenger until an episode opens.
-10. The root binds `EpisodeLibraryViewController` and handles `PlayEpisodeRequested`. `EpisodeSessionHost` acquires the shared session lease, resumes an existing save (including backup-only saves), or starts a new session only when no save exists. On success the root shows the messenger and hides the archive. The messenger back action saves/closes the session, releases the lease, and returns to the archive.
+## Unity and Android toolchain
 
-The host should resume an existing save or start a new session only when no save exists. The UI deliberately does not overwrite or reset player progress.
+- Unity Editor: **6000.3.28f1**.
+- Gradle: **9.3.1**.
+- Android Gradle Plugin: **9.1.1**.
+- Android SDK Build Tools: **36.0.0**.
+- Android NDK: **r27c**.
+- Android JDK: **17**.
 
-## Dependency and platform gates
+These versions follow Unity's official 6000.3 compatibility tables. The editor patch also includes the November 2026 security fixes.
 
-The portable runtime references `System.Text.Json 10.0.15` through its .NET project. Unity's .NET Standard 2.1 API profile does not automatically restore arbitrary NuGet package dependencies from the .csproj. The repository now includes PowerShell and shell staging scripts that use `dotnet publish` to copy the resolved DLL dependency set and generate `link.xml`. This is a repeatable packaging step, not proof of Unity compatibility; compile and verify under Unity Mono and Android IL2CPP, including JSON reflection and cryptography.
+## UI source layout
 
-The repository now contains an Android StrongBox-backed sequence-store implementation and Unity provider bridge. It rotates a StrongBox AES-GCM key on each accepted sequence and deletes the previous key before committing the new record, so replaying an older preferences snapshot should fail closed. This depends on the device's StrongBox security implementation; it is not protection against a fully compromised/rooted OS, and server-side sequence enforcement remains recommended. The AAR has not been built or device-tested. The repository still does not contain a complete Unity project, `ProjectSettings`, a scene, a Panel Settings asset, or verified runtime import. These are integration sources, not a claim that an Editor scene has run.
+- `Assets/Nightwire/UI/EpisodeLibraryView.uxml` and `.uss` — dark episode archive.
+- `Assets/Nightwire/UI/MessengerScreen.uxml` and `.uss` — conversation interface, message bubbles, image previews, and choice dock.
+- `Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` — archive presentation adapter.
+- `Assets/Nightwire/Scripts/MessengerScreenController.cs` — package-driven text, choices, and verified inline image assets.
+- `Assets/Nightwire/Scripts/NightwireApplicationRoot.cs` — composition root, startup recovery, and session lifecycle.
+- `Assets/Nightwire/Scripts/EpisodeSessionHost.cs` — resume/new-session selection and per-episode session lease.
+- `Assets/Nightwire/Scripts/AndroidNightwirePlatformServices.cs` — production Android release configuration and StrongBox bridge.
+- `Assets/Nightwire/Scripts/NightwireDevelopmentPlatformServices.cs` — offline development-only provider.
+- `Assets/Nightwire/Scripts/NightwireBundledEpisodeSeeder.cs` — first-run sample episode installer.
+- `Assets/Editor/NightwireProjectBootstrapper.cs` — generates the initial scene, panel settings, and bundled sample archive.
+- `Assets/Nightwire/Scripts/Nightwire.Unity.asmdef` — presentation assembly boundary referencing `Nightwire.Runtime`.
 
-See [the detailed episode library integration guide](../docs/architecture/UNITY_EPISODE_LIBRARY_UI.md) and [messenger screen architecture](../docs/architecture/MESSENGER_SCREEN.md) and [Android StrongBox store build/test notes](Android/NightwireSecureStore/README.md). Unity Editor compilation, AAR build, play-mode tests, and Android device verification remain pending.
+## Current playable scope and remaining UI work
+
+The sample vertical slice supports:
+
+- Episode library presentation and installed/offline episode discovery.
+- Episode session start/resume and save-backed return to archive.
+- Timed, localized text conversations.
+- Authored branching choices and relationship/story-flag effects.
+- Inline previews of unlocked, manifest-verified images.
+- Offline installation of the bundled Episode 001 sample.
+
+The following presentation features are not complete yet:
+
+- Audio and video message playback.
+- Prerecorded call screen, synchronized subtitles, and visual effects.
+- Document viewer, character profiles, social feed, and media gallery.
+- Group-chat-specific participant layout.
+- Player language settings and free-form replies.
+
+The episode engine already has data contracts and runtime support for several of these content types; their Unity presentation is still outstanding. Do not mistake the existence of the runtime contract for a finished screen.
+
+## Separate CI pipelines
+
+- **Engine CI** builds the portable runtime and validator, validates the sample episode, and runs the 62 runtime regression tests plus validator integration tests.
+- **Game UI CI** stages the runtime assemblies and checks Unity project metadata, UXML parsing, controller-to-UXML named-element contracts, stylesheet references, assembly references, and UI source tests.
+
+Game UI CI is currently a source/integration validation pipeline, not a Unity Editor compile or Android player build. Unity Editor compilation, Play Mode testing, AAR build, and Android device verification still require an actual Unity 6000.3.28f1 installation and device/toolchain execution.
+
+See [episode library architecture](../docs/architecture/UNITY_EPISODE_LIBRARY_UI.md), [messenger architecture](../docs/architecture/MESSENGER_SCREEN.md), and [Android StrongBox notes](Android/NightwireSecureStore/README.md).
