@@ -17,7 +17,9 @@ if (-not $HasNet10Sdk) {
     $Installer = Join-Path $env:TEMP "nightwire-dotnet-install.ps1"
     Invoke-WebRequest -Uri "https://dot.net/v1/dotnet-install.ps1" -OutFile $Installer
     & $Installer -Channel "10.0" -InstallDir $SdkInstall -NoPath
-    if ($LASTEXITCODE -ne 0) { throw "Installing the .NET 10 SDK failed with exit code $LASTEXITCODE" }
+    if (-not (Test-Path (Join-Path $SdkInstall "dotnet.exe"))) {
+        throw "Installing the .NET 10 SDK failed; dotnet.exe was not created."
+    }
     $env:DOTNET_ROOT = $SdkInstall
     $env:PATH = "$SdkInstall;$SdkInstall\tools;$env:PATH"
     $Dotnet = Join-Path $SdkInstall "dotnet.exe"
