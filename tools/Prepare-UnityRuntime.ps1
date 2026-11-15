@@ -8,7 +8,7 @@ $DotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
 $HasNet10Sdk = $false
 if ($null -ne $DotnetCommand) {
     $InstalledSdks = & $DotnetCommand.Source --list-sdks 2>$null
-    $HasNet10Sdk = @($InstalledSdks | Where-Object { $_ -match '^10\\.' }).Count -gt 0
+    $HasNet10Sdk = @($InstalledSdks | Where-Object { $_ -match '^10\.' }).Count -gt 0
 }
 if (-not $HasNet10Sdk) {
     # Unity Build Automation Windows images do not guarantee a preinstalled .NET SDK.
