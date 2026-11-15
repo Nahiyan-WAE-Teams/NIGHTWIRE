@@ -37,6 +37,7 @@ namespace Nightwire.Runtime.Sessions
         private readonly ConversationRuntime _conversationRuntime;
         private readonly CallRuntime _callRuntime = new CallRuntime();
         private readonly MinigameRuntime _minigameRuntime = new MinigameRuntime();
+        private readonly object _sessionGate = new object();
 
         public LoadedEpisodePackage? Package { get; private set; }
         public EpisodeProgressState? Progress { get; private set; }
@@ -125,7 +126,7 @@ namespace Nightwire.Runtime.Sessions
             if (!TryContext(out var package, out var state, out var failure)) return failure!;
             var operation = _conversationRuntime.BeginConversation(package, state, conversationId);
             if (!operation.Success) return Fail("conversation_begin_failed", operation.Error ?? "Could not begin conversation.");
-            return Persist(Success());
+            return Persist(Success(), state);
         }
 
         public RuntimeSessionResult AdvanceConversation(double elapsedSeconds)
@@ -142,7 +143,7 @@ namespace Nightwire.Runtime.Sessions
             // The host persists partial delay progress on pause/checkpoint through SaveNow().
             if (operation.NewlyDeliveredMessageIds.Count == 0 && !operation.YieldedAtSafetyLimit)
                 return result;
-            return Persist(result);
+            return Persist(result, state);
         }
 
         public RuntimeSessionResult MarkMessageRead(string messageId)
@@ -152,7 +153,7 @@ namespace Nightwire.Runtime.Sessions
             if (!operation.Success) return Fail("message_read_failed", operation.Error ?? "Could not mark message read.");
             var result = Success();
             foreach (var story in operation.StoryResults) AddStory(result, story);
-            return Persist(result);
+            return Persist(result, state);
         }
 
         public RuntimeSessionResult SelectChoice(string optionId)
@@ -162,7 +163,7 @@ namespace Nightwire.Runtime.Sessions
             if (!operation.Success) return Fail("choice_failed", operation.Error ?? "Could not select choice.");
             var result = Success();
             foreach (var story in operation.StoryResults) AddStory(result, story);
-            return Persist(result);
+            return Persist(result, state);
         }
 
         public RuntimeSessionResult StartCallPlayback(string callId)
@@ -171,7 +172,7 @@ namespace Nightwire.Runtime.Sessions
             var playback = _callRuntime.Start(package, state, callId);
             if (!playback.Success) return Fail("call_start_failed", playback.Error ?? "Could not start call.");
             var result = Success(); result.CallTimeline = playback;
-            return Persist(result);
+            return Persist(result, state);
         }
 
         public RuntimeSessionResult AdvanceCallPlayback(string callId, long elapsedMilliseconds, string locale)
@@ -187,7 +188,7 @@ namespace Nightwire.Runtime.Sessions
                 if (!story.Success) return Fail("call_completion_event_failed", story.Error ?? "Call completion event failed.");
                 state.PendingCallId = null; AddStory(result, story);
             }
-            return Persist(result);
+            return Persist(result, state);
         }
 
         public RuntimeSessionResult StartMinigame(string minigameId)
@@ -196,7 +197,7 @@ namespace Nightwire.Runtime.Sessions
             var game = _minigameRuntime.Start(package, state, minigameId);
             if (!game.Success) return Fail("minigame_start_failed", game.Error ?? "Could not start minigame.");
             var result = Success(); result.Minigame = game;
-            return Persist(result);
+            return Persist(result, state);
         }
 
         public RuntimeSessionResult SubmitSequence(string minigameId, IReadOnlyList<string> sequence)
@@ -224,7 +225,7 @@ namespace Nightwire.Runtime.Sessions
             if (!game.Success) return Fail("minigame_time_failed", game.Error ?? "Could not advance minigame.");
             var result = Success(); result.Minigame = game;
             if (game.AttemptsExhausted) state.PendingMinigameId = null;
-            return Persist(result);
+            return Persist(result, state);
         }
 
         private RuntimeSessionResult HandleMinigameResult(LoadedEpisodePackage package, EpisodeProgressState state,
@@ -240,7 +241,7 @@ namespace Nightwire.Runtime.Sessions
                 state.PendingMinigameId = null; AddStory(result, story);
             }
             else if (game.AttemptsExhausted) state.PendingMinigameId = null;
-            return Persist(result);
+            return Persist(result, state);
         }
 
         public RuntimeSessionResult EndCall(string callId)
@@ -277,7 +278,7 @@ namespace Nightwire.Runtime.Sessions
         public RuntimeSessionResult SaveNow()
         {
             if (!TryContext(out _, out var state, out var failure)) return failure!;
-            return Persist(Success());
+            return Persist(Success(), state);
         }
 
         /// <summary>Raised after the runtime has cleared its active package and progress.</summary>
@@ -285,14 +286,18 @@ namespace Nightwire.Runtime.Sessions
 
         public void CloseSession()
         {
-            bool wasActive = IsActive;
-            Package = null;
-            Progress = null;
-            if (!wasActive) return;
+            Action? handlers;
+            lock (_sessionGate)
+            {
+                bool wasActive = Package != null || Progress != null;
+                Package = null;
+                Progress = null;
+                if (!wasActive) return;
+                handlers = SessionClosed;
+            }
 
             // A host may own an exclusive episode-installation lease for this session.
-            // One faulty observer must not prevent the runtime from completing shutdown.
-            var handlers = SessionClosed;
+            // Notify only after the state gate is released; one faulty observer cannot block shutdown.
             if (handlers == null) return;
             foreach (Action handler in handlers.GetInvocationList())
             {
@@ -307,23 +312,33 @@ namespace Nightwire.Runtime.Sessions
             if (!story.Success) return Fail("story_event_failed", story.Error ?? "Story event processing failed.");
             var result = Success();
             AddStory(result, story);
-            return Persist(result);
+            return Persist(result, state);
         }
 
-        private RuntimeSessionResult Persist(RuntimeSessionResult result)
+        private RuntimeSessionResult Persist(RuntimeSessionResult result, EpisodeProgressState state)
         {
-            try { _saveStore.Save(Progress!); }
-            catch (SaveStoreException exception)
+            lock (_sessionGate)
             {
-                CloseSession();
-                return Fail(exception.ErrorCode, exception.Message);
+                // Never save a captured state after this coordinator has closed or switched sessions.
+                if (Package == null || !ReferenceEquals(Progress, state))
+                    return Fail("session_not_active", "The episode session closed before this progress checkpoint could be committed.");
+
+                try
+                {
+                    _saveStore.Save(state);
+                    return result;
+                }
+                catch (SaveStoreException exception)
+                {
+                    CloseSession();
+                    return Fail(exception.ErrorCode, exception.Message);
+                }
+                catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+                {
+                    CloseSession();
+                    return Fail("save_write_failed", exception.Message);
+                }
             }
-            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
-            {
-                CloseSession();
-                return Fail("save_write_failed", exception.Message);
-            }
-            return result;
         }
 
         private bool TryContext(out LoadedEpisodePackage package, out EpisodeProgressState state, out RuntimeSessionResult? failure)
