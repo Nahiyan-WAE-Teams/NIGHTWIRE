@@ -53,7 +53,7 @@ These versions follow Unity's official 6000.3 compatibility tables. The editor p
 
 ## Current playable scope and remaining UI work
 
-The sample vertical slice supports:
+The Episode 001 story package now includes three character profiles (Anisha, Rafi, and Mira), three linked conversations, branching relationship choices, story flags, and a concluding investigation notification. The playable UI vertical slice supports:
 
 - Episode library presentation and installed/offline episode discovery.\n- Three layered, procedurally generated fog banks drifting at different speeds behind the interface; no external fog asset or network download is required.
 - Episode session start/resume and save-backed return to archive.
@@ -74,12 +74,12 @@ The episode engine already has data contracts and runtime support for several of
 
 ## Monetization baseline
 
-Unity In-App Purchasing 5.5.0 is pinned in `Packages/manifest.json`. The product-first economy and production release gates are documented in [monetization and store setup](../docs/monetization/ECONOMY_AND_STORE.md). The package dependency does not mean live purchases are configured: Play Console products, server-side receipt verification, refund handling, and any rewarded-ad provider still need setup and end-to-end testing.
+Unity In-App Purchasing 5.5.0 is pinned in `Packages/manifest.json`. `NightwireIapService` uses the IAP 5.5 `PurchasingController` and local product catalogue. It deliberately disables purchase initiation until a production `INightwirePurchaseFulfillment` provider is assigned; pending orders are not confirmed unless the trusted provider reports durable verification and fulfillment. No client-side purchase success or currency grant is fabricated. The product-first economy and production release gates are documented in [monetization and store setup](../docs/monetization/ECONOMY_AND_STORE.md). Play Console products, the trusted backend verifier/ledger, refund handling, and any rewarded-ad provider still need configuration and end-to-end testing.
 
 ## Separate CI pipelines
 
 - **Engine CI** builds the portable runtime and validator, validates the sample episode, and runs the 62 runtime regression tests plus validator integration tests.
-- **Game UI CI** stages the runtime assemblies and checks Unity project metadata, UXML parsing, controller-to-UXML named-element contracts, stylesheet references, assembly references, verified audio/video integration contracts, and 13 UI source regression tests.
+- **Game UI CI** stages the runtime assemblies and checks Unity project metadata, UXML parsing, controller-to-UXML named-element contracts, stylesheet references, assembly references, verified audio/video integration contracts, and 14 UI source regression tests.
 
 Game UI CI stages the runtime assemblies, validates UI source contracts, builds the Android StrongBox secure-store AAR with JDK 17 / Gradle 9.3.1 / Android SDK 36, verifies its JNI class and backup-exclusion resources, and uploads the AAR as the `nightwire-android-secure-store-aar` workflow artifact. It is still not a Unity Editor compile or Android player build. Unity Editor compilation, Play Mode testing, final manifest merge, and Android device/StrongBox verification require an actual Unity 6000.3.28f1 installation and device/toolchain execution.
 
