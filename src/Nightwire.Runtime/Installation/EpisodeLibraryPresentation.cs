@@ -18,9 +18,9 @@ namespace Nightwire.Runtime.Installation
             public bool InstallActive;
         }
 
-        private readonly object _gate = new object();
-        private readonly Dictionary<string, AccessState> _states =
-            new Dictionary<string, AccessState>(StringComparer.Ordinal);
+        private static readonly object Gate = new object();
+        private static readonly Dictionary<string, AccessState> States =
+            new Dictionary<string, AccessState>(StringComparer.OrdinalIgnoreCase);
 
         public bool TryAcquireSessionLease(string episodeId, out IDisposable? lease)
         {
@@ -36,12 +36,12 @@ namespace Nightwire.Runtime.Installation
         {
             lease = null;
             if (string.IsNullOrWhiteSpace(episodeId)) return false;
-            lock (_gate)
+            lock (Gate)
             {
-                if (!_states.TryGetValue(episodeId, out var state))
+                if (!States.TryGetValue(episodeId, out var state))
                 {
                     state = new AccessState();
-                    _states.Add(episodeId, state);
+                    States.Add(episodeId, state);
                 }
 
                 if (state.SessionActive || state.InstallActive) return false;
@@ -54,12 +54,12 @@ namespace Nightwire.Runtime.Installation
 
         private void Release(string episodeId, bool session)
         {
-            lock (_gate)
+            lock (Gate)
             {
-                if (!_states.TryGetValue(episodeId, out var state)) return;
+                if (!States.TryGetValue(episodeId, out var state)) return;
                 if (session) state.SessionActive = false;
                 else state.InstallActive = false;
-                if (!state.SessionActive && !state.InstallActive) _states.Remove(episodeId);
+                if (!state.SessionActive && !state.InstallActive) States.Remove(episodeId);
             }
         }
 
