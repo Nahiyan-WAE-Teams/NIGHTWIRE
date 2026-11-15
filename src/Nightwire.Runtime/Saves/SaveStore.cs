@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Nightwire.Runtime.Domain;
+using Nightwire.Runtime.IO;
 
 namespace Nightwire.Runtime.Saves
 {
@@ -172,14 +173,14 @@ namespace Nightwire.Runtime.Saves
                     }
                     EnsureNotLink(backupTemp, "temporary backup save");
                     EnsureNotLink(backup, "backup save");
-                    File.Move(backupTemp, backup, true);
+                    RuntimeFileSystem.MoveFileReplacing(backupTemp, backup);
                 }
 
                 // Commit the new primary last. Until this rename succeeds, the old primary
                 // remains authoritative and the previous backup remains available.
                 EnsureNotLink(temp, "temporary save");
                 EnsureNotLink(path, "primary save");
-                File.Move(temp, path, true);
+                RuntimeFileSystem.MoveFileReplacing(temp, path);
             }
             catch (Exception exception) when (!(exception is SaveStoreException))
             {
@@ -294,7 +295,7 @@ namespace Nightwire.Runtime.Saves
                 }
                 EnsureNotLink(restoreTemp, "temporary backup restore save");
                 EnsureNotLink(primaryPath, "primary save");
-                File.Move(restoreTemp, primaryPath, true);
+                RuntimeFileSystem.MoveFileReplacing(restoreTemp, primaryPath);
             }
             catch (SaveStoreException)
             {
