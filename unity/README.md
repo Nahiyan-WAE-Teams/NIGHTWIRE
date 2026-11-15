@@ -42,7 +42,7 @@ These versions follow Unity's official 6000.3 compatibility tables. The editor p
 - `Assets/Nightwire/UI/EpisodeLibraryView.uxml` and `.uss` — dark episode archive.
 - `Assets/Nightwire/UI/MessengerScreen.uxml` and `.uss` — conversation interface, message bubbles, image previews, and choice dock.
 - `Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` — archive presentation adapter.
-- `Assets/Nightwire/Scripts/MessengerScreenController.cs` — package-driven text, choices, localized character profile overlay, verified images, and verified audio/video playback.
+- `Assets/Nightwire/Scripts/MessengerScreenController.cs` — package-driven text, choices, localized character profiles, episode social feed, unlocked evidence library, bounded text-document previews, verified images, and verified audio/video playback.
 - `Assets/Nightwire/Scripts/NightwireApplicationRoot.cs` — composition root, startup recovery, and session lifecycle.
 - `Assets/Nightwire/Scripts/EpisodeSessionHost.cs` — resume/new-session selection and per-episode session lease.
 - `Assets/Nightwire/Scripts/AndroidNightwirePlatformServices.cs` — production Android release configuration and StrongBox bridge.
@@ -60,13 +60,15 @@ The Episode 001 story package now includes three character profiles (Anisha, Raf
 - Timed, localized text conversations.
 - Authored branching choices and relationship/story-flag effects.
 - Inline previews of unlocked, manifest-verified images.
+- Episode-authored social feed with localized post bodies, character names, comments, and verified image attachments.
+- Evidence library listing only unlocked manifest assets, with image/audio/video playback and bounded UTF-8 text/Markdown/JSON previews; other document formats remain archive-only.
 - Playback of unlocked, manifest-verified audio (MP3/WAV/OGG) and video attachments, copied to a bounded temporary cache and controlled in-message; unsupported audio formats are rejected rather than guessed.
 - Offline installation of the bundled Episode 001 sample.
 
 The following presentation features are not complete yet:
 
 - Prerecorded call screen, synchronized subtitles, and visual effects.
-- Document viewer, social feed, and media gallery.
+- Full document viewer for PDF/office formats, plus advanced searchable media gallery filters.
 - Group-chat-specific participant layout.
 - Player language settings and free-form replies.
 
@@ -79,7 +81,7 @@ Unity In-App Purchasing 5.5.0 is pinned in `Packages/manifest.json`. `NightwireI
 ## Separate CI pipelines
 
 - **Engine CI** builds the portable runtime and validator, validates the sample episode, and runs the 62 runtime regression tests plus validator integration tests.
-- **Game UI CI** stages the runtime assemblies and checks Unity project metadata, UXML parsing, controller-to-UXML named-element contracts, stylesheet references, assembly references, verified audio/video integration contracts, and 15 UI source regression tests.
+- **Game UI CI** stages the runtime assemblies and checks Unity project metadata, UXML parsing, controller-to-UXML named-element contracts, stylesheet references, assembly references, verified audio/video integration contracts, and 17 UI source regression tests.
 
 Game UI CI stages the runtime assemblies, validates UI source contracts, builds the Android StrongBox secure-store AAR with JDK 17 / Gradle 9.3.1 / Android SDK 36, verifies its JNI class and backup-exclusion resources, and uploads the AAR as the `nightwire-android-secure-store-aar` workflow artifact. It is still not a Unity Editor compile or Android player build. Unity Editor compilation, Play Mode testing, final manifest merge, and Android device/StrongBox verification require an actual Unity 6000.3.28f1 installation and device/toolchain execution.
 
