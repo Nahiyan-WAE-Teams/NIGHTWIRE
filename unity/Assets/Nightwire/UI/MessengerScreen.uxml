@@ -9,6 +9,7 @@
                 <ui:Label name="contact-name" text="NIGHTWIRE CONTACT" class="contact-name" />
                 <ui:Label name="contact-status" text="LOCAL STORY CHANNEL · EPISODE CONTENT" class="contact-status" />
                 <ui:Button name="profile-open-button" text="VIEW PROFILE" class="profile-open-button" />
+                <ui:Button name="contacts-open-button" text="CONTACTS" class="profile-open-button" />
             </ui:VisualElement>
             <ui:Label name="contact-mark" text="NW" class="contact-mark" />
         </ui:VisualElement>
@@ -65,6 +66,16 @@
             </ui:VisualElement>
             <ui:Label text="OPENED CONVERSATIONS · EPISODE LOCAL" class="inbox-subtitle" />
             <ui:ScrollView name="conversation-inbox-list" class="conversation-inbox-list" />
+        </ui:VisualElement>
+        <ui:VisualElement name="contacts-overlay" class="contacts-overlay" style="display: none;">
+            <ui:VisualElement class="contacts-panel">
+                <ui:VisualElement class="contacts-heading-row">
+                    <ui:Label text="CONTACT DIRECTORY" class="contacts-heading" />
+                    <ui:Button name="contacts-close-button" text="CLOSE" class="profile-close-button" />
+                </ui:VisualElement>
+                <ui:Label text="PEOPLE CONNECTED TO THIS EPISODE" class="contacts-subheading" />
+                <ui:ScrollView name="contacts-list" class="contacts-list" />
+            </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="profile-overlay" class="profile-overlay" style="display: none;">
             <ui:VisualElement class="profile-card">
