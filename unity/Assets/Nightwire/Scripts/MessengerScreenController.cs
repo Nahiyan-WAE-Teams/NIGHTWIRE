@@ -100,6 +100,9 @@ namespace Nightwire.Unity.UI
         private bool callMediaReady;
         private double callTickAccumulatorSeconds;
         private float callEffectRemainingSeconds;
+        private long callLastMediaPositionMilliseconds;
+        private bool callUsesVideo;
+        private bool callPausedForApp;
         private AudioSource callAudioSource;
         private AudioClip callAudioClip;
         private Coroutine callAudioLoadCoroutine;
@@ -743,6 +746,9 @@ namespace Nightwire.Unity.UI
             activeCallId = callId;
             callMediaReady = false;
             callTickAccumulatorSeconds = 0;
+            callLastMediaPositionMilliseconds = Math.Max(0, started.CallTimeline.ElapsedMilliseconds);
+            callUsesVideo = string.Equals(ReadString(definition, "mode"), "video", StringComparison.Ordinal);
+            callPausedForApp = false;
             callScreen.style.display = DisplayStyle.Flex;
             callKicker.text = "INCOMING TRANSMISSION · " + ReadString(definition, "mode").ToUpperInvariant();
             callContact.text = CallParticipantName(definition);
@@ -804,6 +810,8 @@ namespace Nightwire.Unity.UI
                 callAudioSource.clip = callAudioClip;
                 callAudioSource.time = Mathf.Clamp(elapsedMilliseconds / 1000f, 0f, Mathf.Max(0f, callAudioClip.length - 0.05f));
                 callAudioSource.Play(); callAudioAvatar.style.display = DisplayStyle.Flex; callVideoSurface.style.display = DisplayStyle.None;
+                callLastMediaPositionMilliseconds = Math.Max(0, (long)Math.Round(callAudioSource.time * 1000.0));
+                callTickAccumulatorSeconds = 0;
                 callMediaReady = true; callStatus.text = "CONNECTED · AUDIO TRANSMISSION"; callAudioLoadCoroutine = null;
             }
         }
@@ -834,7 +842,10 @@ namespace Nightwire.Unity.UI
             if (player != callVideoPlayer || string.IsNullOrEmpty(activeCallId) || session?.Progress == null) return;
             long elapsed = session.Progress.CallProgress.TryGetValue(activeCallId, out var progress) ? progress.ElapsedMilliseconds : 0;
             if (player.length > 0) player.time = Math.Min(elapsed / 1000.0, Math.Max(0, player.length - 0.05));
-            player.Play(); callMediaReady = true; callStatus.text = "CONNECTED · VIDEO TRANSMISSION";
+            player.Play();
+            callLastMediaPositionMilliseconds = Math.Max(0, (long)Math.Round(player.time * 1000.0));
+            callTickAccumulatorSeconds = 0;
+            callMediaReady = true; callStatus.text = "CONNECTED · VIDEO TRANSMISSION";
         }
 
         private void CallVideoFailed(VideoPlayer player, string message)
@@ -845,7 +856,7 @@ namespace Nightwire.Unity.UI
 
         private void UpdateCallPlayback()
         {
-            if (string.IsNullOrEmpty(activeCallId) || !callMediaReady || session == null || session.Progress == null) return;
+            if (string.IsNullOrEmpty(activeCallId) || !callMediaReady || callPausedForApp || session == null || session.Progress == null) return;
             callEffectRemainingSeconds -= Time.unscaledDeltaTime;
             if (callEffectRemainingSeconds <= 0 && callEffectOverlay != null)
             {
@@ -855,7 +866,14 @@ namespace Nightwire.Unity.UI
                 callEffectOverlay.RemoveFromClassList("call-effect-static_burst");
                 callEffectOverlay.RemoveFromClassList("call-effect-audio_distortion");
             }
-            callTickAccumulatorSeconds += Time.unscaledDeltaTime; if (callTickAccumulatorSeconds < 1.0) return;
+            long mediaPositionMilliseconds = callUsesVideo && callVideoPlayer != null
+                ? Math.Max(0, (long)Math.Round(callVideoPlayer.time * 1000.0))
+                : callAudioSource != null ? Math.Max(0, (long)Math.Round(callAudioSource.time * 1000.0))
+                : callLastMediaPositionMilliseconds;
+            if (mediaPositionMilliseconds >= callLastMediaPositionMilliseconds)
+                callTickAccumulatorSeconds += (mediaPositionMilliseconds - callLastMediaPositionMilliseconds) / 1000.0;
+            callLastMediaPositionMilliseconds = mediaPositionMilliseconds;
+            if (callTickAccumulatorSeconds < 1.0) return;
             long tickMilliseconds = (long)(callTickAccumulatorSeconds * 1000.0); callTickAccumulatorSeconds -= tickMilliseconds / 1000.0;
             var result = session.AdvanceCallPlayback(activeCallId, tickMilliseconds, locale);
             if (!result.Success || result.CallTimeline == null) { FailCallMedia(result.Error ?? "CALL TIMELINE FAILED."); return; }
@@ -902,7 +920,27 @@ namespace Nightwire.Unity.UI
             if (callVideoPlayer != null) callVideoPlayer.Stop();
             if (callVideoTexture != null) { callVideoTexture.Release(); Destroy(callVideoTexture); callVideoTexture = null; }
             callMediaReady = false; callTickAccumulatorSeconds = 0; callEffectRemainingSeconds = 0;
+            callLastMediaPositionMilliseconds = 0; callUsesVideo = false; callPausedForApp = false;
         }
+
+        private void OnApplicationPause(bool paused)
+        {
+            if (string.IsNullOrEmpty(activeCallId) || !callMediaReady || callPausedForApp == paused)
+                return;
+
+            callPausedForApp = paused;
+            if (callUsesVideo && callVideoPlayer != null)
+            {
+                if (paused) callVideoPlayer.Pause();
+                else callVideoPlayer.Play();
+            }
+            else if (callAudioSource != null)
+            {
+                if (paused) callAudioSource.Pause();
+                else callAudioSource.UnPause();
+            }
+        }
+
         private void StartPendingMinigame()
         {
             if (session?.Progress == null || session.Package == null || string.IsNullOrEmpty(session.Progress.PendingMinigameId)) return;
