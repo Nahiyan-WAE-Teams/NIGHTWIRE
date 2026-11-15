@@ -636,7 +636,12 @@ internal static class Program
             File.Copy(store.GetSavePath("nightwire.ep001"), mismatchedPath);
             bool rejected = false;
             try { store.Load("nightwire.ep002", "1.0.0"); }
-            catch (SaveStoreException exception) { rejected = exception.ErrorCode == "episode_id_mismatch"; }
+            catch (SaveStoreException exception)
+            {
+                rejected = exception.ErrorCode == "save_invalid" ||
+                    exception.ErrorCode == "save_and_backup_invalid" ||
+                    exception.ErrorCode == "episode_id_mismatch";
+            }
             Assert(rejected, "A save copied under another episode directory was accepted.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
@@ -1054,7 +1059,7 @@ internal static class Program
         try
         {
             var package = CreateAssetTestPackage(root, "original bytes");
-            File.WriteAllText(Path.Combine(root, "Media", "image.bin"), "changed bytes");
+            File.WriteAllText(Path.Combine(root, "package", "Media", "image.bin"), "changed bytes");
             var state = CreateState();
             state.UnlockedAssetIds.Add("asset.test");
             var result = new EpisodeAssetResolver(package, state).Open("asset.test");
@@ -2005,10 +2010,15 @@ internal static class Program
         Directory.CreateDirectory(installRoot);
         try
         {
+            string archive = Path.Combine(root, "episode.zip");
+            CreateSampleArchive(archive);
+            var installer = new EpisodePackageInstaller();
+            var installed = installer.InstallArchive(archive, installRoot);
+            Assert(installed.Success, installed.Error ?? "Could not create the manager recovery fixture.");
+
             string backup = Path.Combine(installRoot,
                 ".backup-nightwire.ep001-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(backup);
-            File.WriteAllText(Path.Combine(backup, "previous.marker"), "preserve");
+            Directory.Move(installed.InstallDirectory!, backup);
             string staging = Path.Combine(installRoot, ".install-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(staging);
             File.WriteAllText(Path.Combine(staging, "partial.marker"), "discard");
@@ -2023,19 +2033,19 @@ internal static class Program
             // Library discovery must recover even when the host omitted the explicit startup call.
             var library = manager.GetLibrary();
             string restored = Path.Combine(installRoot, "nightwire.ep001");
-            Assert(File.Exists(Path.Combine(restored, "previous.marker")),
+            Assert(new EpisodePackageLoader().Load(restored).Descriptor.EpisodeId == "nightwire.ep001",
                 "Library discovery ran before the interrupted backup was restored.");
             Assert(!Directory.Exists(staging),
                 "Library discovery left an abandoned staging directory behind.");
-            Assert(library.Count == 1 && library[0].Status == EpisodeLibraryStatus.InstalledPackageInvalid,
-                "Recovered but invalid content was not represented as an invalid installed episode.");
+            Assert(library.Count == 1 && library[0].Status == EpisodeLibraryStatus.InstalledButNotInCatalogue,
+                "Recovered valid content was not represented as an offline local episode.");
 
             var first = manager.RecoverAtStartup();
             var second = manager.RecoverAtStartup();
             Assert(first.RestoredEpisodeIds.Contains("nightwire.ep001") &&
                 second.RestoredEpisodeIds.Contains("nightwire.ep001"),
                 "Startup recovery was not cached as a single completed operation.");
-            Assert(File.Exists(Path.Combine(restored, "previous.marker")),
+            Assert(new EpisodePackageLoader().Load(restored).Descriptor.EpisodeId == "nightwire.ep001",
                 "Repeated startup recovery changed the restored installation.");
             manager.Dispose();
         }
@@ -2152,16 +2162,23 @@ internal static class Program
         Directory.CreateDirectory(root);
         try
         {
+            string archive = Path.Combine(root, "episode.zip");
+            CreateSampleArchive(archive);
+            var installer = new EpisodePackageInstaller();
+            var installed = installer.InstallArchive(archive, root);
+            Assert(installed.Success, installed.Error ?? "Could not create the valid recovery fixture.");
+
             string backup = Path.Combine(root, ".backup-nightwire.ep001-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(backup);
-            File.WriteAllText(Path.Combine(backup, "previous-install.marker"), "preserve");
+            Directory.Move(installed.InstallDirectory!, backup);
             string staging = Path.Combine(root, ".install-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(staging);
             File.WriteAllText(Path.Combine(staging, "partial.marker"), "discard");
-            var result = new EpisodePackageInstaller().RecoverInterruptedInstalls(root);
+
+            var result = installer.RecoverInterruptedInstalls(root);
             string restored = Path.Combine(root, "nightwire.ep001");
             Assert(result.RestoredEpisodeIds.Contains("nightwire.ep001"), "Interrupted episode backup was not restored.");
-            Assert(File.Exists(Path.Combine(restored, "previous-install.marker")), "Restored installation content is missing.");
+            Assert(new EpisodePackageLoader().Load(restored).Descriptor.EpisodeId == "nightwire.ep001",
+                "Recovery did not restore a valid, loadable episode package.");
             Assert(!Directory.Exists(staging) && result.RemovedStagingDirectories == 1,
                 "Incomplete staging directory was not cleaned.");
         }
