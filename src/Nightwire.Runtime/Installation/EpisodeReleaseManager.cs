@@ -250,6 +250,12 @@ namespace Nightwire.Runtime.Installation
         public IReadOnlyList<EpisodeLibraryEntry> GetLibrary()
         {
             RecoverAtStartup();
+            lock (EpisodePackageInstaller.GetInstallRootLock(_installRoot))
+                return GetLibraryCore();
+        }
+
+        private IReadOnlyList<EpisodeLibraryEntry> GetLibraryCore()
+        {
             VerifiedReleaseCatalogue? catalogue;
             lock (_gate) catalogue = _catalogue;
             var releases = catalogue?.Releases.ToDictionary(x => x.EpisodeId, StringComparer.Ordinal)
