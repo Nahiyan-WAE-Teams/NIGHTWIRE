@@ -34,6 +34,8 @@ Use an append-only economy ledger on the trusted service for production. The cli
 ## Technical integration
 
 - Unity In-App Purchasing package: `com.unity.purchasing@5.5.0`, the released package listed for Unity 6000.3.
+- `NightwireIapService` uses the IAP 5.5 `PurchasingController`, a local `CatalogProvider`, and the four declared NIGHTWIRE product IDs. It fetches store metadata and localized prices; it does not hardcode regional price strings.
+- Purchase initiation is gated on an injected `INightwirePurchaseFulfillment` implementation. The provider must verify the pending order with a trusted backend, apply the entitlement/credit ledger idempotently, and return success only after durable fulfillment. The client confirms the store order only after that success. Without the provider, purchase buttons must remain unavailable and no local grant is permitted.
 - Configure products in Unity IAP / store dashboards and use the localized store price returned by the store.
 - Verify purchase receipts server-side before granting entitlements or consumable credits. Process transaction IDs idempotently.
 - Acknowledge/consume purchases only after verification and successful entitlement processing, following the store's current requirements.
@@ -49,7 +51,7 @@ The Unity package dependency is only the SDK baseline. A live monetization launc
 - Verified package name and signed application build.
 - Store receipt verification endpoint and secure credentials.
 - Idempotent entitlement/credit ledger and refund/revocation handling.
-- Restore purchases and pending transaction tests.
+- Restore purchases and pending transaction tests, including backend entitlement reconciliation for previously confirmed orders.
 - Rewarded-ad provider, consent/privacy configuration, and completion verification (if ads are enabled).
 - Internal Play testing with successful, cancelled, pending, refunded, and offline purchase scenarios.
 
