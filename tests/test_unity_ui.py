@@ -95,6 +95,22 @@ class NightwireUnityUiTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, source)
 
+    def test_contact_directory_lists_episode_profiles_and_opens_profile_detail(self):
+        uxml = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uxml").read_text(encoding="utf-8")
+        uss = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uss").read_text(encoding="utf-8")
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
+        for token in ("contacts-open-button", "contacts-overlay", "contacts-close-button", "contacts-list"):
+            with self.subTest(token=token):
+                self.assertIn(token, uxml)
+        for token in ("contact-directory-card", "contact-directory-avatar", "contact-directory-bio"):
+            with self.subTest(token=token):
+                self.assertIn(token, uss)
+        for token in ("ShowContactDirectory", "RenderContactDirectory", "ShowContactProfile(characterId)",
+                      'CharacterProfiles.Where(pair => !string.Equals(pair.Key, "player", StringComparison.Ordinal))',
+                      'Localize(ReadString(entry.Value, "bio_key")'):
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+
     def test_iap_service_uses_iap_55_and_requires_server_fulfillment(self):
         source = (ROOT / "unity/Assets/Nightwire/Scripts/NightwireIapService.cs").read_text(encoding="utf-8")
         for token in ("PurchasingController", "CatalogProvider", "OnPurchasePending", "ConfirmPurchase",
