@@ -47,7 +47,7 @@ These versions follow Unity's official 6000.3 compatibility tables. The editor p
 - `Assets/Nightwire/Scripts/EpisodeSessionHost.cs` — resume/new-session selection and per-episode session lease.
 - `Assets/Nightwire/Scripts/AndroidNightwirePlatformServices.cs` — production Android release configuration and StrongBox bridge.
 - `Assets/Nightwire/Scripts/NightwireDevelopmentPlatformServices.cs` — offline development-only provider.
-- `Assets/Nightwire/Scripts/NightwireBundledEpisodeSeeder.cs` — first-run sample episode installer.
+- `Assets/Nightwire/Scripts/NightwireBundledEpisodeSeeder.cs` — first-run sample episode installer.\n- `Assets/Nightwire/Scripts/NightwireAtmosphereController.cs` — three procedural fog layers that drift independently across both archive and messenger screens.
 - `Assets/Editor/NightwireProjectBootstrapper.cs` — generates the initial scene, panel settings, and bundled sample archive.
 - `Assets/Nightwire/Scripts/Nightwire.Unity.asmdef` — presentation assembly boundary referencing `Nightwire.Runtime`.
 
@@ -55,7 +55,7 @@ These versions follow Unity's official 6000.3 compatibility tables. The editor p
 
 The sample vertical slice supports:
 
-- Episode library presentation and installed/offline episode discovery.
+- Episode library presentation and installed/offline episode discovery.\n- Three layered, procedurally generated fog banks drifting at different speeds behind the interface; no external fog asset or network download is required.
 - Episode session start/resume and save-backed return to archive.
 - Timed, localized text conversations.
 - Authored branching choices and relationship/story-flag effects.
