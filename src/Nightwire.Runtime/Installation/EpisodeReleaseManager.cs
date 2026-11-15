@@ -442,7 +442,7 @@ namespace Nightwire.Runtime.Installation
         private static string GetDownloadCacheDirectory(string installRoot, string downloadRoot)
         {
             string canonicalRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(installRoot));
-            if (Path.DirectorySeparatorChar == '\\\\')
+            if (Path.DirectorySeparatorChar == '\\')
                 canonicalRoot = canonicalRoot.ToUpperInvariant();
             byte[] identity;
             using (var sha = SHA256.Create())
