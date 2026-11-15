@@ -652,7 +652,7 @@ internal static class Program
             store.Save(CreateState());
             string path = store.GetSavePath("nightwire.ep001");
             string json = File.ReadAllText(path);
-            json = json.Replace("\\"episodeVersion\\":\\"1.0.0\\"", "\\"episodeVersion\\":\\"1.1.0\\"");
+            json = json.Replace("\"episodeVersion\":\"1.0.0\"", "\"episodeVersion\":\"1.1.0\"");
             File.WriteAllText(path, json);
             bool rejected = false;
             try { store.Load("nightwire.ep001", "1.1.0"); }
