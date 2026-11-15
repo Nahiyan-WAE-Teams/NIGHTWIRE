@@ -4,13 +4,25 @@ $Project = Join-Path $Root "src/Nightwire.Runtime/Nightwire.Runtime.csproj"
 $Publish = Join-Path $Root ".nightwire-unity-publish"
 $Destination = Join-Path $Root "unity/Assets/Plugins/Nightwire"
 
-if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-    throw ".NET SDK is required to stage the Unity runtime."
+$DotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
+if ($null -eq $DotnetCommand) {
+    # Unity Build Automation Windows images do not guarantee a preinstalled .NET SDK.
+    # Bootstrap the supported .NET 10 SDK into the builder user's profile.
+    $SdkInstall = Join-Path $env:USERPROFILE ".dotnet"
+    $Installer = Join-Path $env:TEMP "nightwire-dotnet-install.ps1"
+    Invoke-WebRequest -Uri "https://dot.net/v1/dotnet-install.ps1" -OutFile $Installer
+    & $Installer -Channel "10.0" -InstallDir $SdkInstall -NoPath
+    if ($LASTEXITCODE -ne 0) { throw "Installing the .NET 10 SDK failed with exit code $LASTEXITCODE" }
+    $env:DOTNET_ROOT = $SdkInstall
+    $env:PATH = "$SdkInstall;$SdkInstall\tools;$env:PATH"
+    $Dotnet = Join-Path $SdkInstall "dotnet.exe"
+} else {
+    $Dotnet = $DotnetCommand.Source
 }
 
 if (Test-Path $Publish) { Remove-Item $Publish -Recurse -Force }
-dotnet publish $Project --configuration Release --framework netstandard2.1 --output $Publish -p:CopyLocalLockFileAssemblies=true
-if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE" }
+& $Dotnet publish $Project --configuration Release --framework netstandard2.1 --output $Publish -p:CopyLocalLockFileAssemblies=true
+if ($LASTEXITCODE -ne 0) { throw "Nightwire.Runtime publish failed with exit code $LASTEXITCODE" }
 
 New-Item -ItemType Directory -Force -Path $Destination | Out-Null
 Get-ChildItem $Destination -Filter "*.dll" -File -ErrorAction SilentlyContinue | Remove-Item -Force
@@ -23,5 +35,4 @@ $Entries = $Assemblies | ForEach-Object {
 }
 $LinkXml = @('<?xml version="1.0" encoding="utf-8"?>', '<linker>') + $Entries + @('</linker>')
 Set-Content -Path (Join-Path $Destination "link.xml") -Value $LinkXml -Encoding UTF8
-Write-Host "Staged $($Assemblies.Count) assemblies in unity/Assets/Plugins/Nightwire."
-Write-Host "Review plugin platform settings, then compile Editor and Android IL2CPP before release."
+Write-Host "Staged $($Assemblies.Count) runtime/dependency assemblies in unity/Assets/Plugins/Nightwire."
