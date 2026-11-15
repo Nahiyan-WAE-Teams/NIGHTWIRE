@@ -80,7 +80,7 @@ The loader does not authenticate who published a package. A future installer mus
 - Session-level conversation ticks update partial delay in memory and write a save only when a message delivery boundary is crossed; the host calls `SaveNow` on lifecycle checkpoints to persist partial delay. This avoids disk writes every rendered frame.
 - The runtime does not implement free-form player replies, live networking, or presentation/typing animations. UI code can render typing indicators using the same authored delay information without changing story state.
 
-The host should use the versioned `SaveStore` described below. Unity lifecycle integration and cloud synchronization are not yet implemented.
+The host should use the versioned `SaveStore` described below. Unity lifecycle callbacks are implemented by the host adapter, not this portable assembly; they cannot guarantee a final checkpoint if the operating system terminates the process without delivering a callback. Cloud synchronization is not implemented.
 
 
 ## Versioned save store
@@ -107,8 +107,9 @@ The temporary-file and rename sequence improves recovery from process interrupti
 - Conversation begin/read/choice operations are coordinated and saved after successful mutations. Conversation advance ticks keep partial delay in memory and save on delivery boundaries; hosts checkpoint with `SaveNow` on pause/close. The host receives newly delivered message IDs and typed story commands to render.
 - Call and minigame completion APIs verify the matching pending activity before routing the corresponding story trigger.
 - `ProcessExternalTrigger` supports future host-owned gameplay events without allowing episode-authored arbitrary code.
-- `SaveNow` is available for host lifecycle checkpoints; `CloseSession` releases the active package/progress references.
-- The coordinator is single-session and synchronous. The Unity host should serialize calls on its game thread, invoke `SaveNow` at appropriate lifecycle boundaries, and render returned commands. Downloading, archive extraction, media playback, UI, background scheduling, and cloud synchronization remain outside this assembly.
+- `SaveNow` is the explicit checkpoint operation; `CloseSession` clears the active package/progress references and deliberately does not save.
+- Checkpoint/close ordering is guarded by the coordinator's session gate. A checkpoint commits only if its captured progress object is still the active session; if closure wins first, the stale checkpoint is rejected. If a synchronous save has already entered the commit gate, it completes before closure can clear the session. Failed persistence clears the session under that same gate, then notifies observers outside the gate.
+- The coordinator is single-session and synchronous. The Unity host must serialize all session mutations on its game thread. Its lifecycle adapter checkpoints on application pause and saves before normal close/quit; the host must not rely on a close notification to save. Abrupt process termination may occur without a lifecycle callback, so the runtime also checkpoints after meaningful story mutations. Downloading, archive extraction, media playback, UI, background scheduling, and cloud synchronization remain outside this assembly.
 
 The runtime test harness now includes session start, entry-event dispatch, resume of conversation progress, and overwrite protection cases. These tests are authored but have not been executed in this environment.
 
