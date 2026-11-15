@@ -107,6 +107,7 @@ namespace Nightwire.Unity.UI
         private long callLastMediaPositionMilliseconds;
         private bool callUsesVideo;
         private bool callPausedForApp;
+        private bool applicationPaused;
         private AudioSource callAudioSource;
         private AudioClip callAudioClip;
         private Coroutine callAudioLoadCoroutine;
@@ -767,7 +768,7 @@ namespace Nightwire.Unity.UI
             callTickAccumulatorSeconds = 0;
             callLastMediaPositionMilliseconds = Math.Max(0, started.CallTimeline.ElapsedMilliseconds);
             callUsesVideo = string.Equals(ReadString(definition, "mode"), "video", StringComparison.Ordinal);
-            callPausedForApp = false;
+            callPausedForApp = applicationPaused;
             callScreen.style.display = DisplayStyle.Flex;
             callKicker.text = "INCOMING TRANSMISSION · " + ReadString(definition, "mode").ToUpperInvariant();
             callContact.text = CallParticipantName(definition);
@@ -829,7 +830,10 @@ namespace Nightwire.Unity.UI
                 if (callAudioClip != null) Destroy(callAudioClip); callAudioClip = clip;
                 callAudioSource.clip = callAudioClip;
                 callAudioSource.time = Mathf.Clamp(elapsedMilliseconds / 1000f, 0f, Mathf.Max(0f, callAudioClip.length - 0.05f));
-                callAudioSource.Play(); callAudioAvatar.style.display = DisplayStyle.Flex; callVideoSurface.style.display = DisplayStyle.None;
+                callAudioSource.Play();
+                if (applicationPaused) callAudioSource.Pause();
+                callPausedForApp = applicationPaused;
+                callAudioAvatar.style.display = DisplayStyle.Flex; callVideoSurface.style.display = DisplayStyle.None;
                 callLastMediaPositionMilliseconds = Math.Max(0, (long)Math.Round(callAudioSource.time * 1000.0));
                 callTickAccumulatorSeconds = 0;
                 callMediaReady = true; callStatus.text = "CONNECTED · AUDIO TRANSMISSION"; callAudioLoadCoroutine = null;
@@ -863,6 +867,8 @@ namespace Nightwire.Unity.UI
             long elapsed = session.Progress.CallProgress.TryGetValue(activeCallId, out var progress) ? progress.ElapsedMilliseconds : 0;
             if (player.length > 0) player.time = Math.Min(elapsed / 1000.0, Math.Max(0, player.length - 0.05));
             player.Play();
+            if (applicationPaused) player.Pause();
+            callPausedForApp = applicationPaused;
             callLastMediaPositionMilliseconds = Math.Max(0, (long)Math.Round(player.time * 1000.0));
             callTickAccumulatorSeconds = 0;
             callMediaReady = true; callStatus.text = "CONNECTED · VIDEO TRANSMISSION";
@@ -945,10 +951,14 @@ namespace Nightwire.Unity.UI
 
         private void OnApplicationPause(bool paused)
         {
-            if (string.IsNullOrEmpty(activeCallId) || !callMediaReady || callPausedForApp == paused)
+            applicationPaused = paused;
+            if (string.IsNullOrEmpty(activeCallId) || callPausedForApp == paused)
                 return;
 
             callPausedForApp = paused;
+            if (!callMediaReady)
+                return;
+
             if (callUsesVideo && callVideoPlayer != null)
             {
                 if (paused) callVideoPlayer.Pause();
