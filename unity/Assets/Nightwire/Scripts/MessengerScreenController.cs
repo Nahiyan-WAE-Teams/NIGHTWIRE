@@ -51,6 +51,17 @@ namespace Nightwire.Unity.UI
         private Label profileName;
         private Label profileStatus;
         private Label profileBio;
+        private VisualElement callScreen;
+        private Label callKicker;
+        private Label callContact;
+        private Image callVideoSurface;
+        private Label callAudioAvatar;
+        private Label callEffectOverlay;
+        private Label callSpeaker;
+        private Label callSubtitle;
+        private Label callTimer;
+        private Label callStatus;
+        private Button callRetryButton;
         private string activeContactId;
         private string locale;
         private string activeConversationId;
@@ -69,6 +80,15 @@ namespace Nightwire.Unity.UI
         private string activeVideoAssetId;
         private Button activeVideoButton;
         private Label activeVideoStatus;
+        private string activeCallId;
+        private bool callMediaReady;
+        private double callTickAccumulatorSeconds;
+        private float callEffectRemainingSeconds;
+        private AudioSource callAudioSource;
+        private AudioClip callAudioClip;
+        private Coroutine callAudioLoadCoroutine;
+        private VideoPlayer callVideoPlayer;
+        private RenderTexture callVideoTexture;
 
         public event Action CloseRequested;
 
@@ -115,6 +135,7 @@ namespace Nightwire.Unity.UI
         private void Update()
         {
             UpdateMediaPlayback();
+            UpdateCallPlayback();
             if (!bound || session == null || !session.IsActive || session.Progress == null)
                 return;
 
@@ -178,6 +199,17 @@ namespace Nightwire.Unity.UI
             profileName = root?.Q<Label>("profile-name");
             profileStatus = root?.Q<Label>("profile-status");
             profileBio = root?.Q<Label>("profile-bio");
+            callScreen = root?.Q<VisualElement>("call-screen");
+            callKicker = root?.Q<Label>("call-kicker");
+            callContact = root?.Q<Label>("call-contact");
+            callVideoSurface = root?.Q<Image>("call-video-surface");
+            callAudioAvatar = root?.Q<Label>("call-audio-avatar");
+            callEffectOverlay = root?.Q<Label>("call-effect-overlay");
+            callSpeaker = root?.Q<Label>("call-speaker");
+            callSubtitle = root?.Q<Label>("call-subtitle");
+            callTimer = root?.Q<Label>("call-timer");
+            callStatus = root?.Q<Label>("call-status");
+            callRetryButton = root?.Q<Button>("call-retry-button");
 
             if (root == null || messageList == null || socialFeedList == null || evidenceList == null ||
                 responseDock == null || messagesTabButton == null || feedTabButton == null ||
@@ -186,7 +218,11 @@ namespace Nightwire.Unity.UI
                 episodeTitle == null || typingIndicator == null || choiceList == null ||
                 responseHeading == null || conversationStatus == null || backButton == null ||
                 profileOpenButton == null || profileCloseButton == null || profileOverlay == null ||
-                profileName == null || profileStatus == null || profileBio == null)
+                profileName == null || profileStatus == null || profileBio == null ||
+                callScreen == null || callKicker == null || callContact == null ||
+                callVideoSurface == null || callAudioAvatar == null || callEffectOverlay == null ||
+                callSpeaker == null || callSubtitle == null || callTimer == null ||
+                callStatus == null || callRetryButton == null)
             {
                 Debug.LogError("NIGHTWIRE messenger UXML is missing a required named element.", this);
                 return;
@@ -198,6 +234,7 @@ namespace Nightwire.Unity.UI
             evidenceTabButton.clicked += ShowEvidenceTab;
             profileOpenButton.clicked += ShowContactProfile;
             profileCloseButton.clicked += HideContactProfile;
+            callRetryButton.clicked += RetryCallMedia;
             bound = true;
             ShowMessagesTab();
             ActivateCurrentConversation();
@@ -223,6 +260,8 @@ namespace Nightwire.Unity.UI
                 profileOpenButton.clicked -= ShowContactProfile;
             if (bound && profileCloseButton != null)
                 profileCloseButton.clicked -= HideContactProfile;
+            if (bound && callRetryButton != null)
+                callRetryButton.clicked -= RetryCallMedia;
             bound = false;
             session = null;
             sessionHost = null;
@@ -249,9 +288,21 @@ namespace Nightwire.Unity.UI
             profileName = null;
             profileStatus = null;
             profileBio = null;
+            callScreen = null;
+            callKicker = null;
+            callContact = null;
+            callVideoSurface = null;
+            callAudioAvatar = null;
+            callEffectOverlay = null;
+            callSpeaker = null;
+            callSubtitle = null;
+            callTimer = null;
+            callStatus = null;
+            callRetryButton = null;
             activeContactId = null;
             activeConversationId = null;
             StopMediaPlayback();
+            StopCallMedia();
             ClearImageCache();
         }
 
@@ -589,9 +640,16 @@ namespace Nightwire.Unity.UI
             }
             else if (type == "call_invitation")
             {
-                var call = new Label("INCOMING CALL · " + ReadString(message, "call_id"));
+                string callId = ReadString(message, "call_id");
+                var call = new Label("INCOMING CALL · " + callId);
                 call.AddToClassList("message-media-note");
                 bubble.Add(call);
+                var answer = new Button { text = "ANSWER CALL" };
+                answer.AddToClassList("message-media-control");
+                answer.SetEnabled(session?.Progress != null &&
+                    string.Equals(session.Progress.PendingCallId, callId, StringComparison.Ordinal));
+                answer.clicked += () => StartCallPresentation(callId);
+                bubble.Add(answer);
             }
 
             if (text.Length == 0 && type != "image" && type != "audio" && type != "video" &&
@@ -609,6 +667,178 @@ namespace Nightwire.Unity.UI
             return row;
         }
 
+        private void StartCallPresentation(string callId)
+        {
+            if (session == null || session.Package == null || session.Progress == null ||
+                !string.Equals(session.Progress.PendingCallId, callId, StringComparison.Ordinal) ||
+                !session.Package.Calls.TryGetValue(callId, out var definition))
+            { SetStatus("THIS CALL IS NOT CURRENTLY AVAILABLE."); return; }
+            var started = session.StartCallPlayback(callId);
+            if (!started.Success || started.CallTimeline == null) { SetStatus(started.Error ?? "CALL COULD NOT START."); return; }
+            StopCallMedia();
+            activeCallId = callId;
+            callMediaReady = false;
+            callTickAccumulatorSeconds = 0;
+            callScreen.style.display = DisplayStyle.Flex;
+            callKicker.text = "INCOMING TRANSMISSION · " + ReadString(definition, "mode").ToUpperInvariant();
+            callContact.text = CallParticipantName(definition);
+            callSpeaker.text = string.Empty; callSubtitle.text = string.Empty;
+            callTimer.text = FormatCallTime(started.CallTimeline.ElapsedMilliseconds);
+            callStatus.text = "VERIFYING ORIGINAL CALL MEDIA…"; callEffectOverlay.text = string.Empty;
+            callRetryButton.style.display = DisplayStyle.None;
+            BeginCallMedia(definition, started.CallTimeline.ElapsedMilliseconds);
+        }
+
+        private string CallParticipantName(JsonElement definition)
+        {
+            if (definition.TryGetProperty("participants", out var participants) && participants.ValueKind == JsonValueKind.Array)
+                foreach (var participant in participants.EnumerateArray())
+                    if (participant.ValueKind == JsonValueKind.String)
+                    { string id = participant.GetString() ?? string.Empty; if (id.Length > 0 && id != "player") return CharacterName(id); }
+            return "UNKNOWN CALLER";
+        }
+
+        private void RetryCallMedia()
+        {
+            if (string.IsNullOrEmpty(activeCallId) || session?.Package == null || !session.Package.Calls.TryGetValue(activeCallId, out var definition)) return;
+            StopCallMedia(); callScreen.style.display = DisplayStyle.Flex; callRetryButton.style.display = DisplayStyle.None;
+            callStatus.text = "RETRYING VERIFIED MEDIA…";
+            long elapsed = session.Progress != null && session.Progress.CallProgress.TryGetValue(activeCallId, out var progress) ? progress.ElapsedMilliseconds : 0;
+            BeginCallMedia(definition, elapsed);
+        }
+
+        private void BeginCallMedia(JsonElement definition, long elapsedMilliseconds)
+        {
+            if (!definition.TryGetProperty("media", out var media) || media.ValueKind != JsonValueKind.Object) { FailCallMedia("CALL MEDIA METADATA IS MISSING."); return; }
+            string mode = ReadString(definition, "mode");
+            string assetId = ReadString(media, mode == "video" ? "video_asset_id" : "audio_asset_id");
+            string expectedType = mode == "video" ? "video" : "audio";
+            if (assetId.Length == 0) { FailCallMedia("CALL MEDIA REFERENCE IS MISSING."); return; }
+            string path;
+            try { path = CacheVerifiedMediaAsset(assetId, expectedType); }
+            catch (Exception exception) { FailCallMedia("CALL MEDIA UNAVAILABLE · " + exception.Message); return; }
+            if (mode == "video")
+            {
+                EnsureCallVideoPlayer(); callVideoSurface.image = callVideoTexture;
+                callVideoSurface.style.display = DisplayStyle.Flex; callAudioAvatar.style.display = DisplayStyle.None;
+                callVideoPlayer.url = new Uri(path).AbsoluteUri; callVideoPlayer.Prepare(); callStatus.text = "PREPARING VIDEO CALL…"; return;
+            }
+            if (!TryGetAudioType(path, out var audioType)) { FailCallMedia("UNSUPPORTED CALL AUDIO · USE MP3, WAV, OR OGG."); return; }
+            EnsureCallAudioSource(); callAudioLoadCoroutine = StartCoroutine(LoadCallAudio(path, audioType, elapsedMilliseconds));
+        }
+
+        private System.Collections.IEnumerator LoadCallAudio(string path, AudioType audioType, long elapsedMilliseconds)
+        {
+            using (var request = UnityWebRequestMultimedia.GetAudioClip(new Uri(path).AbsoluteUri, audioType))
+            {
+                request.timeout = 60; yield return request.SendWebRequest();
+                if (string.IsNullOrEmpty(activeCallId)) yield break;
+                if (request.result != UnityWebRequest.Result.Success) { FailCallMedia("CALL AUDIO DECODE FAILED · " + request.error); yield break; }
+                var clip = DownloadHandlerAudioClip.GetContent(request);
+                if (clip == null) { FailCallMedia("CALL AUDIO DECODE FAILED."); yield break; }
+                if (callAudioClip != null) Destroy(callAudioClip); callAudioClip = clip;
+                callAudioSource.clip = callAudioClip;
+                callAudioSource.time = Mathf.Clamp(elapsedMilliseconds / 1000f, 0f, Mathf.Max(0f, callAudioClip.length - 0.05f));
+                callAudioSource.Play(); callAudioAvatar.style.display = DisplayStyle.Flex; callVideoSurface.style.display = DisplayStyle.None;
+                callMediaReady = true; callStatus.text = "CONNECTED · AUDIO TRANSMISSION"; callAudioLoadCoroutine = null;
+            }
+        }
+
+        private void EnsureCallAudioSource()
+        {
+            if (callAudioSource == null) callAudioSource = GetComponent<AudioSource>() ?? gameObject.AddComponent<AudioSource>();
+            callAudioSource.playOnAwake = false; callAudioSource.loop = false;
+        }
+
+        private void EnsureCallVideoPlayer()
+        {
+            EnsureCallAudioSource();
+            if (callVideoTexture == null) { callVideoTexture = new RenderTexture(960, 540, 0, RenderTextureFormat.ARGB32); callVideoTexture.Create(); }
+            if (callVideoPlayer == null)
+            {
+                callVideoPlayer = gameObject.AddComponent<VideoPlayer>();
+                callVideoPlayer.prepareCompleted += CallVideoPrepared; callVideoPlayer.errorReceived += CallVideoFailed;
+            }
+            callVideoPlayer.playOnAwake = false; callVideoPlayer.isLooping = false;
+            callVideoPlayer.renderMode = VideoRenderMode.RenderTexture; callVideoPlayer.targetTexture = callVideoTexture;
+            callVideoPlayer.audioOutputMode = VideoAudioOutputMode.AudioSource; callVideoPlayer.EnableAudioTrack(0, true);
+            callVideoPlayer.SetTargetAudioSource(0, callAudioSource);
+        }
+
+        private void CallVideoPrepared(VideoPlayer player)
+        {
+            if (player != callVideoPlayer || string.IsNullOrEmpty(activeCallId) || session?.Progress == null) return;
+            long elapsed = session.Progress.CallProgress.TryGetValue(activeCallId, out var progress) ? progress.ElapsedMilliseconds : 0;
+            if (player.length > 0) player.time = Math.Min(elapsed / 1000.0, Math.Max(0, player.length - 0.05));
+            player.Play(); callMediaReady = true; callStatus.text = "CONNECTED · VIDEO TRANSMISSION";
+        }
+
+        private void CallVideoFailed(VideoPlayer player, string message)
+        { if (player == callVideoPlayer && !string.IsNullOrEmpty(activeCallId)) FailCallMedia("CALL VIDEO FAILED · " + message); }
+
+        private void FailCallMedia(string message)
+        { callMediaReady = false; if (callStatus != null) callStatus.text = message; if (callRetryButton != null) callRetryButton.style.display = DisplayStyle.Flex; }
+
+        private void UpdateCallPlayback()
+        {
+            if (string.IsNullOrEmpty(activeCallId) || !callMediaReady || session == null || session.Progress == null) return;
+            callEffectRemainingSeconds -= Time.unscaledDeltaTime;
+            if (callEffectRemainingSeconds <= 0 && callEffectOverlay != null)
+            {
+                callEffectOverlay.text = string.Empty;
+                callEffectOverlay.RemoveFromClassList("call-effect-signal_glitch");
+                callEffectOverlay.RemoveFromClassList("call-effect-screen_flicker");
+                callEffectOverlay.RemoveFromClassList("call-effect-static_burst");
+                callEffectOverlay.RemoveFromClassList("call-effect-audio_distortion");
+            }
+            callTickAccumulatorSeconds += Time.unscaledDeltaTime; if (callTickAccumulatorSeconds < 1.0) return;
+            long tickMilliseconds = (long)(callTickAccumulatorSeconds * 1000.0); callTickAccumulatorSeconds -= tickMilliseconds / 1000.0;
+            var result = session.AdvanceCallPlayback(activeCallId, tickMilliseconds, locale);
+            if (!result.Success || result.CallTimeline == null) { FailCallMedia(result.Error ?? "CALL TIMELINE FAILED."); return; }
+            callTimer.text = FormatCallTime(result.CallTimeline.ElapsedMilliseconds);
+            foreach (var subtitle in result.CallTimeline.Subtitles)
+            {
+                string speakerId = ReadString(subtitle, "speaker_id");
+                callSpeaker.text = speakerId.Length > 0 ? CharacterName(speakerId) : string.Empty;
+                callSubtitle.text = Localize(ReadString(subtitle, "text_key"), string.Empty);
+            }
+            foreach (var cue in result.CallTimeline.Cues) ApplyCallCue(cue);
+            if (result.CallTimeline.Completed)
+            {
+                callStatus.text = "TRANSMISSION COMPLETE"; callScreen.style.display = DisplayStyle.None;
+                StopCallMedia(); activeCallId = null; RenderConversation();
+            }
+        }
+
+        private void ApplyCallCue(JsonElement cue)
+        {
+            string type = ReadString(cue, "type");
+            if (type == "speaker_focus") { callSpeaker.text = CharacterName(ReadString(cue, "speaker_id")); return; }
+            if (type == "overlay_text") { callEffectOverlay.text = Localize(ReadString(cue, "text_key"), string.Empty); callEffectRemainingSeconds = 2.0f; return; }
+            if (type == "visual_effect")
+            {
+                string effect = ReadString(cue, "effect");
+                callEffectOverlay.RemoveFromClassList("call-effect-signal_glitch");
+                callEffectOverlay.RemoveFromClassList("call-effect-screen_flicker");
+                callEffectOverlay.RemoveFromClassList("call-effect-static_burst");
+                callEffectOverlay.RemoveFromClassList("call-effect-audio_distortion");
+                callEffectOverlay.AddToClassList("call-effect-" + effect);
+                callEffectOverlay.text = effect.Replace('_', ' ').ToUpperInvariant(); callEffectRemainingSeconds = 0.65f;
+            }
+        }
+
+        private static string FormatCallTime(long milliseconds)
+        { long seconds = Math.Max(0, milliseconds / 1000); return (seconds / 60).ToString("00") + ":" + (seconds % 60).ToString("00"); }
+
+        private void StopCallMedia()
+        {
+            if (callAudioLoadCoroutine != null) { StopCoroutine(callAudioLoadCoroutine); callAudioLoadCoroutine = null; }
+            if (callAudioSource != null) callAudioSource.Stop();
+            if (callAudioClip != null) { Destroy(callAudioClip); callAudioClip = null; }
+            if (callVideoPlayer != null) callVideoPlayer.Stop();
+            if (callVideoTexture != null) { callVideoTexture.Release(); Destroy(callVideoTexture); callVideoTexture = null; }
+            callMediaReady = false; callTickAccumulatorSeconds = 0; callEffectRemainingSeconds = 0;
+        }
         private void UpdateMediaPlayback()
         {
             if (activeAudioAssetId != null && !audioPaused && mediaAudioSource != null &&
