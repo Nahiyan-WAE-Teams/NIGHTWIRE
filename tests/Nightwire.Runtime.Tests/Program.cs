@@ -42,6 +42,7 @@ internal static class Program
         Run("save store rejects a symlinked episode directory", SaveStoreRejectsSymlinkedEpisodeDirectory, ref failures);
         Run("save store rejects a symlinked ancestor of its root", SaveStoreRejectsSymlinkedRootAncestor, ref failures);
         Run("save store recovers from a corrupt primary using backup", SaveStoreRecoversBackup, ref failures);
+        Run("save store rejects a linked backup publication temporary file", SaveStoreRejectsLinkedBackupTemporaryFile, ref failures);
         Run("save store rejects a linked backup-restore temporary file", SaveStoreRejectsLinkedRestoreTemporaryFile, ref failures);
         Run("save store rejects a different episode identity", SaveStoreRejectsEpisodeMismatch, ref failures);
         Run("save store detects episode-version metadata tampering", SaveStoreRejectsMetadataTampering, ref failures);
@@ -502,6 +503,43 @@ internal static class Program
             Assert(!secondLoad.RecoveredFromBackup, "Restored primary save was still treated as corrupt.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static void SaveStoreRejectsLinkedBackupTemporaryFile()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-save-backup-link-" + Guid.NewGuid().ToString("N"));
+        string outside = Path.Combine(Path.GetTempPath(), "nightwire-save-backup-outside-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new SaveStore(root);
+            var first = CreateState();
+            first.RelationshipScores["anisha"] = 1;
+            store.Save(first);
+
+            string primary = store.GetSavePath("nightwire.ep001");
+            string backupTemporary = primary + ".bak.tmp";
+            File.WriteAllText(outside, "must-not-be-overwritten");
+            File.CreateSymbolicLink(backupTemporary, outside);
+
+            var second = CreateState();
+            second.RelationshipScores["anisha"] = 2;
+            bool rejected = false;
+            try { store.Save(second); }
+            catch (SaveStoreException exception) { rejected = exception.ErrorCode == "save_path_unsafe"; }
+
+            Assert(rejected, "Save accepted a linked backup publication temporary path.");
+            Assert(File.ReadAllText(outside) == "must-not-be-overwritten",
+                "Save wrote through the linked backup temporary path.");
+            Assert(store.Load("nightwire.ep001", "1.0.0").State.RelationshipScores["anisha"] == 1,
+                "A rejected backup publication changed the committed primary save.");
+        }
+        finally
+        {
+            string backupTemporary = Path.Combine(root, "nightwire.ep001", "save.json.bak.tmp");
+            if (File.Exists(backupTemporary)) File.Delete(backupTemporary);
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+            if (File.Exists(outside)) File.Delete(outside);
+        }
     }
 
     private static void SaveStoreRejectsLinkedRestoreTemporaryFile()
