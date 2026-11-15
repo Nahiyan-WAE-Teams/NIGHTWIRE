@@ -8,6 +8,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Nightwire.Runtime.Loading;
+using Nightwire.Runtime.IO;
 
 namespace Nightwire.Runtime.Installation
 {
