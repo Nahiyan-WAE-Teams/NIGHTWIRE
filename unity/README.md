@@ -42,7 +42,7 @@ These versions follow Unity's official 6000.3 compatibility tables. The editor p
 - `Assets/Nightwire/UI/EpisodeLibraryView.uxml` and `.uss` — dark episode archive.
 - `Assets/Nightwire/UI/MessengerScreen.uxml` and `.uss` — conversation interface, message bubbles, image previews, and choice dock.
 - `Assets/Nightwire/Scripts/EpisodeLibraryViewController.cs` — archive presentation adapter.
-- `Assets/Nightwire/Scripts/MessengerScreenController.cs` — package-driven text, choices, and verified inline image assets.
+- `Assets/Nightwire/Scripts/MessengerScreenController.cs` — package-driven text, choices, verified images, and verified audio/video playback.
 - `Assets/Nightwire/Scripts/NightwireApplicationRoot.cs` — composition root, startup recovery, and session lifecycle.
 - `Assets/Nightwire/Scripts/EpisodeSessionHost.cs` — resume/new-session selection and per-episode session lease.
 - `Assets/Nightwire/Scripts/AndroidNightwirePlatformServices.cs` — production Android release configuration and StrongBox bridge.
@@ -60,11 +60,11 @@ The sample vertical slice supports:
 - Timed, localized text conversations.
 - Authored branching choices and relationship/story-flag effects.
 - Inline previews of unlocked, manifest-verified images.
+- Playback of unlocked, manifest-verified audio and video attachments, copied to a bounded temporary cache and controlled in-message.
 - Offline installation of the bundled Episode 001 sample.
 
 The following presentation features are not complete yet:
 
-- Audio and video message playback.
 - Prerecorded call screen, synchronized subtitles, and visual effects.
 - Document viewer, character profiles, social feed, and media gallery.
 - Group-chat-specific participant layout.
