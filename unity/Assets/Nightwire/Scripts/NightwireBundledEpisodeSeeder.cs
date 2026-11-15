@@ -20,15 +20,14 @@ namespace Nightwire.Unity
 
         public IEnumerator EnsureInstalled(Action<bool> completed)
         {
-            bool success = false;
             string dataRoot = Path.Combine(Application.persistentDataPath, "Nightwire");
             string installRoot = Path.Combine(dataRoot, "Episodes");
             string downloadRoot = Path.Combine(dataRoot, "Downloads");
             string destination = Path.Combine(installRoot, episodeId);
+            var installer = new EpisodePackageInstaller();
 
             try
             {
-                var installer = new EpisodePackageInstaller();
                 installer.RecoverInterruptedInstalls(installRoot);
                 if (Directory.Exists(destination))
                 {
@@ -38,7 +37,6 @@ namespace Nightwire.Unity
                         if (string.Equals(existing.Descriptor.EpisodeId, episodeId, StringComparison.Ordinal) &&
                             string.Equals(existing.Descriptor.EpisodeVersion, episodeVersion, StringComparison.Ordinal))
                         {
-                            success = true;
                             completed?.Invoke(true);
                             yield break;
                         }
@@ -48,48 +46,48 @@ namespace Nightwire.Unity
                         Debug.LogWarning("NIGHTWIRE bundled episode will repair an invalid local copy: " + exception.Message, this);
                     }
                 }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+                completed?.Invoke(false);
+                yield break;
+            }
 
-                string archiveUrl = Path.Combine(Application.streamingAssetsPath, "Nightwire", "Episode_001.zip")
-                    .Replace('\\', '/');
-                using (var request = UnityWebRequest.Get(archiveUrl))
+            string archiveUrl = Path.Combine(Application.streamingAssetsPath, "Nightwire", "Episode_001.zip")
+                .Replace('\\', '/');
+            using (var request = UnityWebRequest.Get(archiveUrl))
+            {
+                request.timeout = 60;
+                yield return request.SendWebRequest();
+                if (request.result != UnityWebRequest.Result.Success)
                 {
-                    request.timeout = 60;
-                    yield return request.SendWebRequest();
-                    if (request.result != UnityWebRequest.Result.Success)
-                    {
-                        Debug.LogError("NIGHTWIRE bundled episode could not be read: " + request.error, this);
-                        completed?.Invoke(false);
-                        yield break;
-                    }
+                    Debug.LogError("NIGHTWIRE bundled episode could not be read: " + request.error, this);
+                    completed?.Invoke(false);
+                    yield break;
+                }
 
+                try
+                {
                     byte[] archiveBytes = request.downloadHandler.data;
                     if (archiveBytes == null || archiveBytes.Length == 0 ||
                         archiveBytes.LongLength > maximumBundledArchiveBytes)
-                    {
-                        Debug.LogError("NIGHTWIRE bundled episode archive is empty or exceeds its configured size limit.", this);
-                        completed?.Invoke(false);
-                        yield break;
-                    }
+                        throw new InvalidDataException("Bundled episode archive is empty or exceeds its configured size limit.");
 
                     Directory.CreateDirectory(downloadRoot);
                     string archivePath = Path.Combine(downloadRoot, "bundled-episode-001.zip");
                     File.WriteAllBytes(archivePath, archiveBytes);
                     var result = installer.InstallArchive(archivePath, installRoot, episodeId, episodeVersion);
                     if (!result.Success)
-                    {
-                        Debug.LogError("NIGHTWIRE bundled episode installation failed: " + result.Error, this);
-                        completed?.Invoke(false);
-                        yield break;
-                    }
-                    success = true;
+                        throw new InvalidDataException("Bundled episode installation failed: " + result.Error);
+                    completed?.Invoke(true);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception, this);
+                    completed?.Invoke(false);
                 }
             }
-            catch (Exception exception)
-            {
-                Debug.LogException(exception, this);
-            }
-
-            completed?.Invoke(success);
         }
     }
 }
