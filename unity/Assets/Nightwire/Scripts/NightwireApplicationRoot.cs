@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.IO;
 using System.Linq;
 using Nightwire.Runtime.Installation;
@@ -17,6 +18,7 @@ namespace Nightwire.Unity
         [SerializeField] private EpisodeLibraryViewController libraryView;
         [SerializeField] private Nightwire.Unity.UI.MessengerScreenController messengerView;
         [SerializeField] private NightwirePlatformServicesBehaviour platformServices;
+        [SerializeField] private NightwireBundledEpisodeSeeder bundledEpisodeSeeder;
         [SerializeField] private string runtimeVersion = "0.1.0";
 
         private HttpReleaseCatalogueTransport catalogueTransport;
@@ -29,12 +31,6 @@ namespace Nightwire.Unity
 
         public EpisodeLibraryPresentation Library => libraryPresentation;
         public EpisodeSessionHost Sessions => sessionHost;
-
-        private void Awake()
-        {
-            if (!Initialize())
-                enabled = false;
-        }
 
         private bool Initialize()
         {
@@ -96,19 +92,39 @@ namespace Nightwire.Unity
             }
         }
 
-        private async void Start()
+        private IEnumerator Start()
         {
-            if (!initialized || libraryPresentation == null) return;
-            try
+            if (bundledEpisodeSeeder == null)
+                bundledEpisodeSeeder = FindObjectOfType<NightwireBundledEpisodeSeeder>();
+
+            if (bundledEpisodeSeeder != null)
             {
-                var result = await libraryPresentation.RefreshAsync(DateTime.UtcNow);
-                if (!result.Success)
-                    Debug.LogWarning("NIGHTWIRE release catalogue is unavailable; installed episodes remain accessible offline. " + result.Error, this);
+                bool seeded = false;
+                yield return bundledEpisodeSeeder.EnsureInstalled(result => seeded = result);
+                if (!seeded)
+                    Debug.LogWarning("NIGHTWIRE bundled demo episode was not installed. The library will still open for locally installed episodes.", this);
             }
-            catch (Exception exception)
+
+            if (!Initialize())
             {
-                if (this != null) Debug.LogException(exception, this);
+                enabled = false;
+                yield break;
             }
+
+            libraryPresentation.ReloadInstalledLibrary();
+            if (platformServices == null || !platformServices.ShouldRefreshCatalogue)
+                yield break;
+
+            var refreshTask = libraryPresentation.RefreshAsync(DateTime.UtcNow);
+            while (!refreshTask.IsCompleted)
+                yield return null;
+
+            if (refreshTask.IsFaulted)
+                Debug.LogException(refreshTask.Exception, this);
+            else if (refreshTask.IsCanceled)
+                Debug.LogWarning("NIGHTWIRE release catalogue refresh was cancelled.", this);
+            else if (!refreshTask.Result.Success)
+                Debug.LogWarning("NIGHTWIRE release catalogue is unavailable; installed episodes remain accessible offline. " + refreshTask.Result.Error, this);
         }
 
         private void PlayEpisodeRequested(string episodeId)
