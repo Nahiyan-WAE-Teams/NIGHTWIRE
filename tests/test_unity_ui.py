@@ -50,6 +50,19 @@ class NightwireUnityUiTests(unittest.TestCase):
         self.assertIn("Episode_001.zip", source)
         self.assertIn("EditorBuildSettings.scenes", source)
 
+    def test_messenger_has_audio_and_video_playback_handlers(self):
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
+        for token in ("AddAudioAttachment", "AddVideoAttachment", "VideoPlayer", "UnityWebRequestMultimedia"):
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+
+    def test_media_playback_uses_manifest_verified_typed_assets(self):
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
+        self.assertIn('CacheVerifiedMediaAsset(assetId, "audio")', source)
+        self.assertIn('CacheVerifiedMediaAsset(assetId, "video")', source)
+        self.assertIn("session.OpenAsset(assetId)", source)
+        self.assertIn("maximumInlineMediaBytes", source)
+
     def test_development_provider_does_not_refresh_remote_catalogue(self):
         source = (ROOT / "unity/Assets/Nightwire/Scripts/NightwireDevelopmentPlatformServices.cs").read_text(encoding="utf-8")
         self.assertIn("ShouldRefreshCatalogue => false", source)
