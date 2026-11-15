@@ -89,3 +89,8 @@ When a story event sets PendingMinigameId, the messenger exposes an investigatio
 ## Conversation inbox
 
 The header's CHATS action opens an episode-local inbox. It lists only conversation IDs that already have player progress, so it cannot expose or start story threads before the episode's authored events have opened them. Each row shows the participant/group identity, latest delivered message preview, unread count, and completion/choice state. Selecting a row switches the runtime's active conversation with `BeginConversation`; each thread's delivery timers, read receipts, selected choices, and branching state remain in its own persisted `ConversationProgressState`. This is a thread switcher for already-opened conversations, not a general contact directory or an unlock bypass.
+
+
+## Call playback clock and application lifecycle
+
+Prerecorded call subtitle/cue progression is driven by the active Unity media player's playback position rather than an independent wall-clock accumulator. Audio uses the decoded AudioSource position; video uses VideoPlayer.time. This keeps authored timeline events aligned with the media clock when decoding stalls or playback cadence varies. When Android backgrounds the application during an active call, the presentation pauses the media player and stops advancing the call timeline; on resume it continues from the same playback position. This remains subject to device-specific decoder behavior and must be verified on physical Android devices.
