@@ -62,8 +62,10 @@ namespace Nightwire.Unity
                 yield break;
             }
 
-            string archiveUrl = Path.Combine(Application.streamingAssetsPath, "Nightwire", "Episode_001.zip")
-                .Replace('\\', '/');
+            string archivePath = Path.Combine(Application.streamingAssetsPath, "Nightwire", "Episode_001.zip");
+            string archiveUrl = archivePath.StartsWith("jar:", StringComparison.OrdinalIgnoreCase)
+                ? archivePath
+                : new Uri(archivePath).AbsoluteUri;
             using (var request = UnityWebRequest.Get(archiveUrl))
             {
                 request.timeout = 60;
