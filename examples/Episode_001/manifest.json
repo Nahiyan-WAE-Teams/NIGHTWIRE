@@ -23,8 +23,8 @@
     {
       "path": "Characters/Mira/Conversations/day01.json",
       "kind": "conversation",
-      "size_bytes": 1791,
-      "sha256": "91e2c64bf2a58b9ce418370204f253989661dc15e4343273ee75c2ead69cb02f"
+      "size_bytes": 1783,
+      "sha256": "9e0ad423ece7f61e00af1eaeaa81b365ae58756d405625cd2645afeed4a6a306"
     },
     {
       "path": "Characters/Mira/profile.json",
@@ -35,8 +35,8 @@
     {
       "path": "Characters/Rafi/Conversations/day01.json",
       "kind": "conversation",
-      "size_bytes": 1793,
-      "sha256": "e4c0dfc8e66e0652471cccf9405b1b49e20b51e992f367eac96f9d2617a96902"
+      "size_bytes": 1787,
+      "sha256": "16d25d9d13728a4ada331bf624671998727d9a5c2b9decb0f56b2a9495f3756a"
     },
     {
       "path": "Characters/Rafi/profile.json",
