@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using Nightwire.Runtime.IO;
 
 namespace Nightwire.Runtime.Installation
 {
@@ -145,7 +146,7 @@ namespace Nightwire.Runtime.Installation
                     !string.Equals(digest, expectedSha256, StringComparison.OrdinalIgnoreCase))
                     return Error("download_hash_mismatch", "Downloaded archive does not match the trusted release SHA-256.");
 
-                File.Move(temporary, destination, true);
+                RuntimeFileSystem.MoveFileReplacing(temporary, destination);
                 temporary = null;
                 return new EpisodeDownloadResult
                 {
