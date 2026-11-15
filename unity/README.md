@@ -108,16 +108,17 @@ See [episode library architecture](../docs/architecture/UNITY_EPISODE_LIBRARY_UI
 
 The repository includes a separate, manually triggered Unity Editor build workflow at `.github/workflows/android-apk.yml`. It uses GameCI Unity Builder v4 with the pinned Unity 6000.3.28f1 editor and a project-owned build method to generate a development APK (not an AAB). The method explicitly prepares the generated scene and bundled sample archive, then enables `BuildOptions.Development` so the offline development provider and sample seeder are available in this test build. It is not a production build. The workflow is deliberately manual so ordinary source/engine CI runs do not consume Unity build minutes.
 
-For a Unity Personal license, first obtain a CI-compatible `.ulf` license:
+For a Unity Personal license, GameCI currently requires a Unity Hub-generated `.ulf` license file. The older GameCI activation-file action is unmaintained, and the former `.alf` manual activation route is no longer a supported Personal-license setup.
 
-1. Open **Actions → NIGHTWIRE Unity License Activation → Run workflow**.
-2. Download the `NIGHTWIRE-Unity-Activation-Request` artifact from that run and extract its `.alf` file.
-3. Submit the `.alf` file through Unity's manual activation portal at https://license.unity3d.com/ and download the returned `.ulf` license file.
-4. In **Settings → Secrets and variables → Actions**, add `UNITY_LICENSE` with the complete `.ulf` file contents, `UNITY_EMAIL` with the Unity account email, and `UNITY_PASSWORD` with the account password.
+Unity Personal activation must be completed in Unity Hub on a supported desktop:
 
-The local `UnityEntitlementLicense.xml` named-user entitlement file is not the `.ulf` payload expected by the standard GameCI Personal-license flow. Do not upload that XML as `UNITY_LICENSE`, and never commit license material or credentials.
+1. In Unity Hub, sign in to the Unity account and open **Preferences → Licenses → Add → Get a free Personal license**.
+2. Confirm Unity Hub creates the license file. GameCI documents the usual locations as `C:\\ProgramData\\Unity\\Unity_lic.ulf` on Windows, `/Library/Application Support/Unity/Unity_lic.ulf` on macOS, and `~/.local/share/unity3d/Unity/Unity_lic.ulf` on Linux.
+3. In **Settings → Secrets and variables → Actions**, add `UNITY_LICENSE` with the complete `.ulf` file contents, `UNITY_EMAIL` with the Unity account email, and `UNITY_PASSWORD` with the account password.
 
-After the three Actions secrets are configured, open **Actions → NIGHTWIRE Android APK → Run workflow**. A successful run uploads the `nightwire-android-apk` artifact. Do not commit license material or credentials. The first build is also an integration check: Unity must import the project, run the editor bootstrapper, compile all scripts/packages, generate the initial scene, and produce the Android player successfully.
+The `UnityEntitlementLicense.xml` named-user entitlement file is not the `.ulf` file expected by this GameCI workflow. Do not rename it or paste it into `UNITY_LICENSE`. Never commit license material or credentials.
+
+**Important:** the available license file in this setup is the XML entitlement file, not a Unity Hub-generated `.ulf`. Until a supported desktop Unity Hub can create that `.ulf`, the GameCI APK workflow cannot authenticate. Do not run the APK workflow yet.
 
 The current workflow uses Unity's default Android signing configuration for a development/test APK. It is not a Play Store release-signed artifact. Production signing requires a separately provisioned Android keystore and password/alias secrets; never put those values in source control or chat. A successful CI artifact still needs installation and device smoke testing before release.
 
