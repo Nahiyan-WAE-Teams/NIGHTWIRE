@@ -257,10 +257,27 @@ namespace Nightwire.Runtime.Saves
                 if (!_migrations.TryGetValue(MigrationKey(state.EpisodeId, state.EpisodeVersion), out var migration))
                     throw new SaveStoreException("migration_required",
                         $"Save is for episode version '{state.EpisodeVersion}', but '{targetVersion}' is installed. An explicit migration is required.");
-                migration.Migrate(state);
+                if (!string.Equals(migration.EpisodeId, state.EpisodeId, StringComparison.Ordinal) ||
+                    !string.Equals(migration.FromEpisodeVersion, state.EpisodeVersion, StringComparison.Ordinal))
+                    throw new SaveStoreException("migration_identity_changed",
+                        "Registered migration identity no longer matches the save's current episode and source version.");
+                if (string.IsNullOrWhiteSpace(migration.ToEpisodeVersion) ||
+                    string.Equals(migration.ToEpisodeVersion, state.EpisodeVersion, StringComparison.Ordinal))
+                    throw new SaveStoreException("migration_target_invalid",
+                        "Episode migration must declare a non-empty target version different from its source.");
+
+                string nextVersion = migration.ToEpisodeVersion;
+                try { migration.Migrate(state); }
+                catch (SaveStoreException) { throw; }
+                catch (Exception exception)
+                {
+                    throw new SaveStoreException("migration_failed",
+                        $"Migration from '{state.EpisodeVersion}' to '{nextVersion}' failed.", exception);
+                }
+
                 if (!string.Equals(state.EpisodeId, migration.EpisodeId, StringComparison.Ordinal))
                     throw new SaveStoreException("migration_identity_changed", "Episode migrations cannot change the save's episode identity.");
-                state.EpisodeVersion = migration.ToEpisodeVersion;
+                state.EpisodeVersion = nextVersion;
                 migrated = true;
                 if (visited.Count > 32) throw new SaveStoreException("migration_limit", "Too many sequential save migrations.");
             }
