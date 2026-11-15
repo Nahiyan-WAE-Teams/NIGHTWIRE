@@ -46,6 +46,7 @@ internal static class Program
         Run("save store rejects a different episode identity", SaveStoreRejectsEpisodeMismatch, ref failures);
         Run("save store detects episode-version metadata tampering", SaveStoreRejectsMetadataTampering, ref failures);
         Run("save store applies an explicit episode migration", SaveStoreMigratesEpisodeVersion, ref failures);
+        Run("save store normalizes migration exceptions without modifying the persisted save", SaveStoreNormalizesMigrationFailure, ref failures);
         Run("session coordinator starts an episode and persists its entry event", SessionStartsAndPersists, ref failures);
         Run("runtime session close notifies hosts once and isolates observer failures", RuntimeSessionCloseNotifiesHosts, ref failures);
         Run("session coordinator resumes conversation progress", SessionResumesConversation, ref failures);
@@ -593,6 +594,31 @@ internal static class Program
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
 
+
+    private static void SaveStoreNormalizesMigrationFailure()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-save-migration-failure-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new SaveStore(root);
+            store.Save(CreateState());
+            store.RegisterMigration(new FailingEpisodeMigration());
+
+            bool normalized = false;
+            try { store.Load("nightwire.ep001", "1.1.0"); }
+            catch (SaveStoreException exception)
+            {
+                normalized = exception.ErrorCode == "migration_failed" &&
+                    exception.InnerException is InvalidOperationException;
+            }
+
+            Assert(normalized, "Migration exception was not converted to the stable migration_failed error.");
+            var original = store.Load("nightwire.ep001", "1.0.0");
+            Assert(original.State.EpisodeVersion == "1.0.0",
+                "A failed in-memory migration modified the persisted save.");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
 
     private static void SessionStartsAndPersists()
     {
@@ -1660,6 +1686,18 @@ internal static class Program
                 "Incomplete staging directory was not cleaned.");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private sealed class FailingEpisodeMigration : IEpisodeProgressMigration
+    {
+        public string EpisodeId => "nightwire.ep001";
+        public string FromEpisodeVersion => "1.0.0";
+        public string ToEpisodeVersion => "1.1.0";
+        public void Migrate(EpisodeProgressState state)
+        {
+            state.StoryFlags["migration_partial_change"] = StoryFlagValue.FromBoolean(true);
+            throw new InvalidOperationException("Simulated migration failure.");
+        }
     }
 
     private sealed class TestEpisodeMigration : IEpisodeProgressMigration
