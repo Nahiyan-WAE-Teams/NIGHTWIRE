@@ -75,6 +75,7 @@ internal static class Program
         Run("signed release catalogue verifies signatures, rejects rollback, duplicate JSON keys, and malformed runtime versions", ReleaseCatalogueVerifiesSignatureAndSequence, ref failures);
         Run("installer startup recovery restores interrupted update backup", InstallerRecoveryRestoresPreviousInstall, ref failures);
         Run("installer recovery restores a valid backup over an invalid destination", InstallerRecoveryRestoresBackupOverInvalidDestination, ref failures);
+        Run("installer recovery cleans crash-leftover quarantine only after validating active episode", InstallerRecoveryCleansValidatedQuarantine, ref failures);
         Run("installer rejects a symlinked ancestor of its install root", InstallerRejectsSymlinkedRootAncestor, ref failures);
         Run("installer rejects signed release identity mismatch before replacing existing content", InstallerRejectsReleaseIdentityMismatch, ref failures);
         Run("release manager performs one-time install recovery before library access", ReleaseManagerRecoversBeforeLibraryAccess, ref failures);
@@ -1928,6 +1929,36 @@ internal static class Program
                 "The invalid destination remained active after recovery.");
             Assert(!Directory.Exists(backup), "Successfully restored backup was not consumed.");
             Assert(!Directory.Exists(invalidBackup), "Obsolete invalid backup was not cleaned after successful recovery.");
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    private static void InstallerRecoveryCleansValidatedQuarantine()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "nightwire-quarantine-recovery-" + Guid.NewGuid().ToString("N"));
+        string installRoot = Path.Combine(root, "installed");
+        Directory.CreateDirectory(root);
+        try
+        {
+            string archive = Path.Combine(root, "episode.zip");
+            CreateSampleArchive(archive);
+            var installer = new EpisodePackageInstaller();
+            var installed = installer.InstallArchive(archive, installRoot);
+            Assert(installed.Success, installed.Error ?? "Could not create the active episode fixture.");
+
+            string quarantine = Path.Combine(installRoot,
+                ".invalid-nightwire.ep001-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(quarantine);
+            File.WriteAllText(Path.Combine(quarantine, "invalid.marker"), "orphaned quarantine");
+
+            var recovery = installer.RecoverInterruptedInstalls(installRoot);
+            Assert(!Directory.Exists(quarantine),
+                "Recovery did not clean a quarantine after validating its active episode.");
+            Assert(new EpisodePackageLoader().Load(installed.InstallDirectory!).Descriptor.EpisodeId == "nightwire.ep001",
+                "Quarantine cleanup damaged the active installed episode.");
         }
         finally
         {
