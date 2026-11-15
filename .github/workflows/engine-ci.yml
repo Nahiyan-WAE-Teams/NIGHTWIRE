@@ -1,0 +1,75 @@
+name: NIGHTWIRE Engine CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/Nightwire.Runtime/**"
+      - "tools/Nightwire.EpisodeValidator/**"
+      - "tests/Nightwire.Runtime.Tests/**"
+      - "tests/test_validator.py"
+      - "schemas/**"
+      - "examples/**"
+      - ".github/workflows/engine-ci.yml"
+  pull_request:
+    paths:
+      - "src/Nightwire.Runtime/**"
+      - "tools/Nightwire.EpisodeValidator/**"
+      - "tests/Nightwire.Runtime.Tests/**"
+      - "tests/test_validator.py"
+      - "schemas/**"
+      - "examples/**"
+      - ".github/workflows/engine-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightwire-engine-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime:
+    name: Portable runtime tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build portable runtime
+        run: dotnet build src/Nightwire.Runtime/Nightwire.Runtime.csproj --configuration Release
+
+      - name: Run runtime regression harness
+        run: dotnet run --project tests/Nightwire.Runtime.Tests/Nightwire.Runtime.Tests.csproj --configuration Release
+
+  episode-validator:
+    name: Episode validator and package tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build episode validator
+        run: dotnet build tools/Nightwire.EpisodeValidator/Nightwire.EpisodeValidator.csproj --configuration Release
+
+      - name: Validate sample episode
+        run: dotnet tools/Nightwire.EpisodeValidator/bin/Release/net10.0/Nightwire.EpisodeValidator.dll examples/Episode_001
+
+      - name: Run validator integration tests
+        run: python -m unittest discover -s tests -p "test_validator.py" -v
