@@ -922,7 +922,7 @@ namespace Nightwire.Unity.UI
             {
                 double min = config.GetProperty("minimum_frequency").GetDouble(); double max = config.GetProperty("maximum_frequency").GetDouble();
                 var valueLabel = new Label("TUNING: " + min.ToString("0.##")); valueLabel.AddToClassList("minigame-sequence-preview"); minigameChallengeContent.Add(valueLabel);
-                var slider = new Slider { lowValue = (float)min, highValue = (float)max, value = (float)((min + max) / 2.0) };
+                var slider = new Slider(string.Empty, (float)min, (float)max) { value = (float)((min + max) / 2.0) };
                 slider.RegisterValueChangedCallback(evt => valueLabel.text = "TUNING: " + evt.newValue.ToString("0.##")); minigameChallengeContent.Add(slider);
                 var submit = new Button { text = "LOCK FREQUENCY" }; submit.AddToClassList("minigame-submit-button");
                 submit.clicked += () => SubmitMinigameFrequency(slider.value); minigameChallengeContent.Add(submit);
