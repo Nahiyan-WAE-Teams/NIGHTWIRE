@@ -99,6 +99,7 @@ namespace Nightwire.Unity.UI
 
         private void Update()
         {
+            UpdateMediaPlayback();
             if (!bound || session == null || !session.IsActive || session.Progress == null)
                 return;
 
@@ -342,6 +343,18 @@ namespace Nightwire.Unity.UI
             return row;
         }
 
+        private void UpdateMediaPlayback()
+        {
+            if (activeAudioAssetId != null && !audioPaused && mediaAudioSource != null &&
+                activeAudioClip != null && !mediaAudioSource.isPlaying &&
+                mediaAudioSource.time >= activeAudioClip.length - 0.05f)
+            {
+                if (activeAudioButton != null) activeAudioButton.text = "REPLAY AUDIO";
+                if (activeAudioStatus != null) activeAudioStatus.text = "PLAYBACK COMPLETE";
+                activeAudioAssetId = null;
+            }
+        }
+
         private void AddAudioAttachment(VisualElement bubble, string assetId)
         {
             var player = new VisualElement();
@@ -550,7 +563,7 @@ namespace Nightwire.Unity.UI
 
         private void VideoPrepared(VideoPlayer player)
         {
-            if (player != mediaVideoPlayer) return;
+            if (player != mediaVideoPlayer || string.IsNullOrEmpty(activeVideoAssetId)) return;
             player.Play();
             if (activeVideoButton != null)
             {
@@ -662,7 +675,11 @@ namespace Nightwire.Unity.UI
                 StopCoroutine(audioLoadCoroutine);
                 audioLoadCoroutine = null;
             }
-            if (mediaAudioSource != null) mediaAudioSource.Stop();
+            if (mediaAudioSource != null)
+            {
+                mediaAudioSource.Stop();
+                mediaAudioSource.clip = null;
+            }
             if (activeAudioClip != null)
             {
                 Destroy(activeAudioClip);
