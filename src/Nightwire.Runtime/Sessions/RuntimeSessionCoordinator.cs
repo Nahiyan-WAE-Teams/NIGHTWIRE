@@ -296,7 +296,11 @@ namespace Nightwire.Runtime.Sessions
                 handlers = SessionClosed;
             }
 
-            // A host may own an exclusive episode-installation lease for this session.
+            NotifySessionClosed(handlers);
+        }
+
+        private static void NotifySessionClosed(Action? handlers)
+        {
             // Notify only after the state gate is released; one faulty observer cannot block shutdown.
             if (handlers == null) return;
             foreach (Action handler in handlers.GetInvocationList())
@@ -317,6 +321,8 @@ namespace Nightwire.Runtime.Sessions
 
         private RuntimeSessionResult Persist(RuntimeSessionResult result, EpisodeProgressState state)
         {
+            RuntimeSessionResult? failure = null;
+            Action? closedHandlers = null;
             lock (_sessionGate)
             {
                 // Never save a captured state after this coordinator has closed or switched sessions.
@@ -330,15 +336,22 @@ namespace Nightwire.Runtime.Sessions
                 }
                 catch (SaveStoreException exception)
                 {
-                    CloseSession();
-                    return Fail(exception.ErrorCode, exception.Message);
+                    failure = Fail(exception.ErrorCode, exception.Message);
                 }
                 catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
                 {
-                    CloseSession();
-                    return Fail("save_write_failed", exception.Message);
+                    failure = Fail("save_write_failed", exception.Message);
                 }
+
+                // Close atomically with the failed checkpoint so another operation cannot
+                // commit stale progress in the gap before shutdown notification.
+                Package = null;
+                Progress = null;
+                closedHandlers = SessionClosed;
             }
+
+            NotifySessionClosed(closedHandlers);
+            return failure!;
         }
 
         private bool TryContext(out LoadedEpisodePackage package, out EpisodeProgressState state, out RuntimeSessionResult? failure)
