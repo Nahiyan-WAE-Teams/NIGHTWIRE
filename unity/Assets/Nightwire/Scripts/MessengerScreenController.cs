@@ -45,6 +45,10 @@ namespace Nightwire.Unity.UI
         private Label responseHeading;
         private Label conversationStatus;
         private Button backButton;
+        private Button inboxOpenButton;
+        private Button inboxCloseButton;
+        private VisualElement conversationInbox;
+        private ScrollView conversationInboxList;
         private Button profileOpenButton;
         private Button profileCloseButton;
         private VisualElement profileOverlay;
@@ -207,6 +211,10 @@ namespace Nightwire.Unity.UI
             responseHeading = root?.Q<Label>("response-heading");
             conversationStatus = root?.Q<Label>("conversation-status");
             backButton = root?.Q<Button>("back-button");
+            inboxOpenButton = root?.Q<Button>("inbox-open-button");
+            inboxCloseButton = root?.Q<Button>("inbox-close-button");
+            conversationInbox = root?.Q<VisualElement>("conversation-inbox");
+            conversationInboxList = root?.Q<ScrollView>("conversation-inbox-list");
             profileOpenButton = root?.Q<Button>("profile-open-button");
             profileCloseButton = root?.Q<Button>("profile-close-button");
             profileOverlay = root?.Q<VisualElement>("profile-overlay");
@@ -240,7 +248,8 @@ namespace Nightwire.Unity.UI
                 episodeTitle == null || typingIndicator == null || choiceList == null ||
                 responseHeading == null || conversationStatus == null || backButton == null ||
                 profileOpenButton == null || profileCloseButton == null || profileOverlay == null ||
-                profileName == null || profileStatus == null || profileBio == null ||
+                profileName == null || profileStatus == null || profileBio == null || inboxOpenButton == null || inboxCloseButton == null ||
+                conversationInbox == null || conversationInboxList == null ||
                 callScreen == null || callKicker == null || callContact == null ||
                 callVideoSurface == null || callAudioAvatar == null || callEffectOverlay == null ||
                 callSpeaker == null || callSubtitle == null || callTimer == null ||
@@ -254,6 +263,8 @@ namespace Nightwire.Unity.UI
             }
 
             backButton.clicked += BackClicked;
+            inboxOpenButton.clicked += ShowConversationInbox;
+            inboxCloseButton.clicked += HideConversationInbox;
             messagesTabButton.clicked += ShowMessagesTab;
             feedTabButton.clicked += ShowFeedTab;
             evidenceTabButton.clicked += ShowEvidenceTab;
@@ -277,6 +288,10 @@ namespace Nightwire.Unity.UI
         {
             if (bound && backButton != null)
                 backButton.clicked -= BackClicked;
+            if (bound && inboxOpenButton != null)
+                inboxOpenButton.clicked -= ShowConversationInbox;
+            if (bound && inboxCloseButton != null)
+                inboxCloseButton.clicked -= HideConversationInbox;
             if (bound && messagesTabButton != null)
                 messagesTabButton.clicked -= ShowMessagesTab;
             if (bound && feedTabButton != null)
@@ -313,6 +328,10 @@ namespace Nightwire.Unity.UI
             responseHeading = null;
             conversationStatus = null;
             backButton = null;
+            inboxOpenButton = null;
+            inboxCloseButton = null;
+            conversationInbox = null;
+            conversationInboxList = null;
             profileOpenButton = null;
             profileCloseButton = null;
             profileOverlay = null;
@@ -1482,6 +1501,114 @@ namespace Nightwire.Unity.UI
                 SetStatus(result.Error ?? "Choice could not be selected.");
                 return;
             }
+            RenderConversation();
+        }
+
+        private void ShowConversationInbox()
+        {
+            if (conversationInbox == null || session?.Package == null || session.Progress == null ||
+                !string.IsNullOrEmpty(activeCallId) || !string.IsNullOrEmpty(activeMinigameId))
+                return;
+            RenderConversationInbox();
+            conversationInbox.style.display = DisplayStyle.Flex;
+        }
+
+        private void HideConversationInbox()
+        {
+            if (conversationInbox != null)
+                conversationInbox.style.display = DisplayStyle.None;
+        }
+
+        private void RenderConversationInbox()
+        {
+            if (conversationInboxList == null || session?.Package == null || session.Progress == null)
+                return;
+
+            conversationInboxList.Clear();
+            var opened = session.Progress.ConversationProgress.Keys
+                .Where(id => session.Package.Conversations.ContainsKey(id))
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray();
+
+            if (opened.Length == 0)
+            {
+                var empty = new Label("NO CONVERSATIONS OPENED YET.");
+                empty.AddToClassList("inbox-empty");
+                conversationInboxList.Add(empty);
+                return;
+            }
+
+            foreach (string conversationId in opened)
+            {
+                if (!session.Package.Conversations.TryGetValue(conversationId, out var conversation) ||
+                    !session.Progress.ConversationProgress.TryGetValue(conversationId, out var progress))
+                    continue;
+
+                var participants = FindOtherParticipants(conversation);
+                string title = participants.Count > 1
+                    ? "GROUP CHAT · " + participants.Count.ToString() + " MEMBERS"
+                    : participants.Count == 1 ? CharacterName(participants[0]) : "NIGHTWIRE";
+                string preview = "NO MESSAGES YET";
+                if (conversation.TryGetProperty("messages", out var messages) &&
+                    messages.ValueKind == JsonValueKind.Array)
+                {
+                    var messageArray = messages.EnumerateArray().ToArray();
+                    for (int i = messageArray.Length - 1; i >= 0; i--)
+                    {
+                        string messageId = ReadString(messageArray[i], "message_id");
+                        if (!progress.DeliveredMessageIds.Contains(messageId))
+                            continue;
+                        string key = ReadString(messageArray[i], "text_key");
+                        if (key.Length == 0)
+                            key = ReadString(messageArray[i], "prompt_key");
+                        preview = key.Length > 0
+                            ? Localize(key, "MESSAGE RECEIVED")
+                            : ReadString(messageArray[i], "type").ToUpperInvariant() + " RECEIVED";
+                        break;
+                    }
+                }
+
+                string state = progress.IsComplete ? "COMPLETE"
+                    : progress.WaitingChoiceMessageId != null ? "YOUR RESPONSE"
+                    : "OPEN";
+                var item = new Button();
+                item.AddToClassList("inbox-conversation-item");
+                var textBlock = new VisualElement();
+                textBlock.AddToClassList("inbox-conversation-copy");
+                var name = new Label(title);
+                name.AddToClassList("inbox-conversation-name");
+                var last = new Label(preview);
+                last.AddToClassList("inbox-conversation-preview");
+                var status = new Label(state);
+                status.AddToClassList("inbox-conversation-state");
+                textBlock.Add(name);
+                textBlock.Add(last);
+                item.Add(textBlock);
+                item.Add(status);
+                bool isActive = string.Equals(conversationId, session.Progress.ActiveConversationId, StringComparison.Ordinal);
+                if (isActive)
+                    item.AddToClassList("inbox-conversation-active");
+                item.clicked += () => OpenConversationFromInbox(conversationId);
+                conversationInboxList.Add(item);
+            }
+        }
+
+        private void OpenConversationFromInbox(string conversationId)
+        {
+            if (session == null || session.Progress == null ||
+                !session.Progress.ConversationProgress.ContainsKey(conversationId))
+                return;
+
+            var result = session.BeginConversation(conversationId);
+            if (!result.Success)
+            {
+                SetStatus(result.Error ?? "Could not open this conversation.");
+                return;
+            }
+
+            HideConversationInbox();
+            ActivateCurrentConversation();
+            ShowMessagesTab();
             RenderConversation();
         }
 
