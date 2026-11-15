@@ -18,6 +18,14 @@ namespace Nightwire.Runtime.Installation
         public double MaximumCompressionRatio { get; set; } = 200;
     }
 
+    public sealed class EpisodeInstallRecoveryResult
+    {
+        public IReadOnlyList<string> RestoredEpisodeIds { get; internal set; } = Array.Empty<string>();
+        public int RemovedStagingDirectories { get; internal set; }
+        public int RemovedObsoleteBackups { get; internal set; }
+        public IReadOnlyList<string> Warnings { get; internal set; } = Array.Empty<string>();
+    }
+
     public sealed class EpisodeInstallResult
     {
         public bool Success { get; internal set; }
