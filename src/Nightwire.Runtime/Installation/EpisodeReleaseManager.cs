@@ -441,7 +441,7 @@ namespace Nightwire.Runtime.Installation
 
         private static string GetDownloadCacheDirectory(string installRoot, string downloadRoot)
         {
-            string canonicalRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(installRoot));
+            string canonicalRoot = RuntimeFileSystem.TrimEndingDirectorySeparator(installRoot);
             if (Path.DirectorySeparatorChar == '\\')
                 canonicalRoot = canonicalRoot.ToUpperInvariant();
             byte[] identity;
@@ -454,7 +454,7 @@ namespace Nightwire.Runtime.Installation
 
         private bool TryAcquireSharedEpisodeOperation(string episodeId)
         {
-            string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(_installRoot));
+            string root = RuntimeFileSystem.TrimEndingDirectorySeparator(_installRoot);
             string key = root + "\\n" + episodeId;
             lock (SharedEpisodeOperationsGate)
                 return SharedEpisodeOperations.Add(key);
@@ -462,7 +462,7 @@ namespace Nightwire.Runtime.Installation
 
         private void ReleaseSharedEpisodeOperation(string episodeId)
         {
-            string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(_installRoot));
+            string root = RuntimeFileSystem.TrimEndingDirectorySeparator(_installRoot);
             string key = root + "\\n" + episodeId;
             lock (SharedEpisodeOperationsGate)
                 SharedEpisodeOperations.Remove(key);
