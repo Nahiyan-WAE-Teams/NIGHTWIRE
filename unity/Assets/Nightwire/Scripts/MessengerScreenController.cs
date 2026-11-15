@@ -885,6 +885,131 @@ namespace Nightwire.Unity.UI
             if (callVideoTexture != null) { callVideoTexture.Release(); Destroy(callVideoTexture); callVideoTexture = null; }
             callMediaReady = false; callTickAccumulatorSeconds = 0; callEffectRemainingSeconds = 0;
         }
+        private void StartPendingMinigame()
+        {
+            if (session?.Progress == null || session.Package == null || string.IsNullOrEmpty(session.Progress.PendingMinigameId)) return;
+            string id = session.Progress.PendingMinigameId;
+            if (!session.Package.Minigames.TryGetValue(id, out var definition)) { SetStatus("INVESTIGATION PACKAGE IS MISSING."); return; }
+            var started = session.StartMinigame(id);
+            if (!started.Success || started.Minigame == null) { SetStatus(started.Error ?? "INVESTIGATION COULD NOT OPEN."); return; }
+            activeMinigameId = id; minigameTickAccumulator = 0; selectedSequence.Clear(); selectedEvidenceItemId = null;
+            minigameScreen.style.display = DisplayStyle.Flex; minigameEntryButton.style.display = DisplayStyle.None;
+            minigameTitle.text = Localize(ReadString(definition, "title_key"), id.ToUpperInvariant());
+            minigameInstructions.text = Localize(ReadString(definition, "instructions_key"), "Follow the evidence and complete the task.");
+            minigameFeedback.text = string.Empty; minigameContinueButton.style.display = DisplayStyle.None;
+            BuildMinigameChallenge(definition); UpdateMinigameProgress(started.Minigame);
+        }
+
+        private void BuildMinigameChallenge(JsonElement definition)
+        {
+            minigameChallengeContent.Clear();
+            string type = ReadString(definition, "type");
+            JsonElement config = definition.GetProperty("configuration");
+            if (type == "sequence_reconstruction")
+            {
+                var preview = new Label("YOUR SIGNAL SEQUENCE: —"); preview.AddToClassList("minigame-sequence-preview"); minigameChallengeContent.Add(preview);
+                var symbols = new VisualElement(); symbols.style.flexDirection = FlexDirection.Row; symbols.style.flexWrap = Wrap.Wrap; minigameChallengeContent.Add(symbols);
+                foreach (var symbol in config.GetProperty("symbols").EnumerateArray())
+                {
+                    string value = symbol.GetString() ?? string.Empty; var button = new Button { text = value }; button.AddToClassList("minigame-symbol-button");
+                    button.clicked += () => { if (selectedSequence.Count < 32) selectedSequence.Add(value); preview.text = "YOUR SIGNAL SEQUENCE: " + string.Join(" / ", selectedSequence); }; symbols.Add(button);
+                }
+                var clear = new Button { text = "CLEAR SEQUENCE" }; clear.AddToClassList("minigame-evidence-button");
+                clear.clicked += () => { selectedSequence.Clear(); preview.text = "YOUR SIGNAL SEQUENCE: —"; }; minigameChallengeContent.Add(clear);
+                var submit = new Button { text = "TRANSMIT SEQUENCE" }; submit.AddToClassList("minigame-submit-button"); submit.clicked += SubmitMinigameSequence; minigameChallengeContent.Add(submit);
+            }
+            else if (type == "frequency_tuning")
+            {
+                double min = config.GetProperty("minimum_frequency").GetDouble(); double max = config.GetProperty("maximum_frequency").GetDouble();
+                var valueLabel = new Label("TUNING: " + min.ToString("0.##")); valueLabel.AddToClassList("minigame-sequence-preview"); minigameChallengeContent.Add(valueLabel);
+                var slider = new Slider { lowValue = (float)min, highValue = (float)max, value = (float)((min + max) / 2.0) };
+                slider.RegisterValueChangedCallback(evt => valueLabel.text = "TUNING: " + evt.newValue.ToString("0.##")); minigameChallengeContent.Add(slider);
+                var submit = new Button { text = "LOCK FREQUENCY" }; submit.AddToClassList("minigame-submit-button");
+                submit.clicked += () => SubmitMinigameFrequency(slider.value); minigameChallengeContent.Add(submit);
+            }
+            else if (type == "evidence_matching")
+            {
+                var prompt = new Label("SELECT TWO ITEMS TO TEST A CONNECTION."); prompt.AddToClassList("minigame-sequence-preview"); minigameChallengeContent.Add(prompt);
+                var items = new VisualElement(); items.style.flexDirection = FlexDirection.Row; items.style.flexWrap = Wrap.Wrap; minigameChallengeContent.Add(items);
+                foreach (var item in config.GetProperty("items").EnumerateArray())
+                {
+                    string id = ReadString(item, "item_id"); string label = Localize(ReadString(item, "label_key"), id);
+                    var button = new Button { text = label }; button.AddToClassList("minigame-evidence-button");
+                    button.clicked += () => SelectEvidenceItem(id, prompt); items.Add(button);
+                }
+            }
+        }
+
+        private void SelectEvidenceItem(string itemId, Label prompt)
+        {
+            if (string.IsNullOrEmpty(selectedEvidenceItemId)) { selectedEvidenceItemId = itemId; prompt.text = "FIRST ITEM: " + itemId + " · SELECT A MATCH"; return; }
+            if (selectedEvidenceItemId == itemId) { selectedEvidenceItemId = null; prompt.text = "SELECTION CLEARED · CHOOSE TWO ITEMS"; return; }
+            string left = selectedEvidenceItemId; selectedEvidenceItemId = null;
+            var result = session.MatchEvidence(activeMinigameId, left, itemId);
+            HandleMinigameResult(result, result.Success ? "PAIR CHECKED." : result.Error);
+            if (activeMinigameId != null && prompt != null) prompt.text = "SELECT TWO ITEMS TO TEST ANOTHER CONNECTION.";
+        }
+
+        private void SubmitMinigameSequence()
+        {
+            if (selectedSequence.Count == 0) { minigameFeedback.text = "ADD THE SIGNAL SYMBOLS FIRST."; return; }
+            var result = session.SubmitSequence(activeMinigameId, selectedSequence);
+            HandleMinigameResult(result, result.Success ? "SIGNAL TRANSMITTED." : result.Error);
+        }
+
+        private void SubmitMinigameFrequency(float frequency)
+        {
+            var result = session.SubmitFrequency(activeMinigameId, frequency);
+            HandleMinigameResult(result, result.Success ? "FREQUENCY SUBMITTED." : result.Error);
+        }
+
+        private void HandleMinigameResult(RuntimeSessionResult result, string feedback)
+        {
+            if (result == null || !result.Success) { minigameFeedback.text = feedback ?? "INPUT COULD NOT BE ACCEPTED."; return; }
+            if (result.Minigame != null) UpdateMinigameProgress(result.Minigame);
+            if (result.Minigame != null && result.Minigame.Solved)
+            {
+                minigameFeedback.text = "SIGNAL VERIFIED · INVESTIGATION COMPLETE.";
+                minigameContinueButton.style.display = DisplayStyle.Flex; activeMinigameId = null; return;
+            }
+            if (result.Minigame != null && result.Minigame.AttemptsExhausted)
+            {
+                minigameFeedback.text = "NO ATTEMPTS REMAIN. THE INVESTIGATION HAS STALLED.";
+                minigameContinueButton.style.display = DisplayStyle.Flex; activeMinigameId = null; return;
+            }
+            minigameFeedback.text = feedback ?? "RESULT RECORDED.";
+        }
+
+        private void UpdateMinigameProgress(Nightwire.Runtime.Minigames.MinigameRuntimeResult result)
+        {
+            if (result == null || session?.Progress == null || string.IsNullOrEmpty(activeMinigameId)) return;
+            double elapsed = session.Progress.MinigameProgress.TryGetValue(activeMinigameId, out var progress) ? progress.ElapsedSeconds : 0;
+            string time = session.Package.Minigames.TryGetValue(activeMinigameId, out var definition) && definition.TryGetProperty("time_limit_seconds", out var limit)
+                ? " · TIME " + Math.Max(0, (int)Math.Ceiling(limit.GetDouble() - elapsed)).ToString("00") + "s" : string.Empty;
+            minigameProgress.text = "ATTEMPTS LEFT " + result.AttemptsRemaining.ToString("00") + time;
+        }
+
+        private void UpdateMinigamePlayback()
+        {
+            if (string.IsNullOrEmpty(activeMinigameId) || session?.Progress == null || session.Package == null) return;
+            if (!session.Package.Minigames.TryGetValue(activeMinigameId, out var definition) || !definition.TryGetProperty("time_limit_seconds", out var limit)) return;
+            minigameTickAccumulator += Time.unscaledDeltaTime; if (minigameTickAccumulator < 1.0) return;
+            minigameTickAccumulator -= 1.0;
+            var tick = session.AdvanceMinigameTime(activeMinigameId, 1.0);
+            if (!tick.Success) { minigameFeedback.text = tick.Error ?? "INVESTIGATION TIMER FAILED."; return; }
+            if (tick.Minigame != null) UpdateMinigameProgress(tick.Minigame);
+            if (tick.Minigame != null && tick.Minigame.AttemptsExhausted)
+            { minigameFeedback.text = "TIME EXPIRED · INVESTIGATION FAILED."; minigameContinueButton.style.display = DisplayStyle.Flex; activeMinigameId = null; }
+        }
+
+        private void CloseMinigamePresentation()
+        {
+            activeMinigameId = null; selectedSequence.Clear(); selectedEvidenceItemId = null; minigameTickAccumulator = 0;
+            if (minigameScreen != null) minigameScreen.style.display = DisplayStyle.None;
+            if (minigameContinueButton != null) minigameContinueButton.style.display = DisplayStyle.None;
+            RenderConversation();
+        }
+
         private void UpdateMediaPlayback()
         {
             if (activeAudioAssetId != null && !audioPaused && mediaAudioSource != null &&
