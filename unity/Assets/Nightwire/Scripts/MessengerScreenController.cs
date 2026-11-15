@@ -1568,7 +1568,9 @@ namespace Nightwire.Unity.UI
                     }
                 }
 
-                string state = progress.IsComplete ? "COMPLETE"
+                int unreadCount = progress.DeliveredMessageIds.Count(id => !progress.ReadMessageIds.Contains(id));
+                string state = unreadCount > 0 ? "UNREAD " + unreadCount.ToString()
+                    : progress.IsComplete ? "COMPLETE"
                     : progress.WaitingChoiceMessageId != null ? "YOUR RESPONSE"
                     : "OPEN";
                 var item = new Button();
