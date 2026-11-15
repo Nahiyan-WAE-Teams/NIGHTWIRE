@@ -1,0 +1,78 @@
+{
+  "schema_version": "0.1",
+  "conversation_id": "rafi.day01",
+  "participants": [
+    "player",
+    "rafi"
+  ],
+  "messages": [
+    {
+      "message_id": "rafi.day01.001",
+      "type": "text",
+      "sender_id": "rafi",
+      "text_key": "chat.rafi.001",
+      "delay_seconds": 1.1
+    },
+    {
+      "message_id": "rafi.day01.002",
+      "type": "text",
+      "sender_id": "rafi",
+      "text_key": "chat.rafi.002",
+      "delay_seconds": 1.4
+    },
+    {
+      "message_id": "rafi.day01.003",
+      "type": "choice",
+      "sender_id": "rafi",
+      "prompt_key": "choice.rafi.003.prompt",
+      "options": [
+        {
+          "option_id": "trust_rafi",
+          "text_key": "choice.rafi.003.trust",
+          "next_message_id": "rafi.day01.004",
+          "relationship_delta": 2,
+          "set_flags": [
+            "trust_rafi"
+          ]
+        },
+        {
+          "option_id": "challenge_rafi",
+          "text_key": "choice.rafi.003.challenge",
+          "next_message_id": "rafi.day01.005",
+          "relationship_delta": -1,
+          "set_flags": [
+            "questioned_rafi"
+          ]
+        }
+      ]
+    },
+    {
+      "message_id": "rafi.day01.004",
+      "type": "text",
+      "sender_id": "rafi",
+      "text_key": "chat.rafi.004",
+      "delay_seconds": 1
+    },
+    {
+      "message_id": "rafi.day01.005",
+      "type": "text",
+      "sender_id": "rafi",
+      "text_key": "chat.rafi.005",
+      "delay_seconds": 1
+    },
+    {
+      "message_id": "rafi.day01.006",
+      "type": "text",
+      "sender_id": "rafi",
+      "text_key": "chat.rafi.006",
+      "delay_seconds": 1.6
+    },
+    {
+      "message_id": "rafi.day01.007",
+      "type": "text",
+      "sender_id": "rafi",
+      "text_key": "chat.rafi.007",
+      "delay_seconds": 1
+    }
+  ]
+}
