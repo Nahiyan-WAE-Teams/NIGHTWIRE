@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Nightwire.Runtime.Domain;
 using Nightwire.Runtime.Loading;
+using Nightwire.Runtime.IO;
 
 namespace Nightwire.Runtime.Installation
 {
@@ -472,7 +473,7 @@ namespace Nightwire.Runtime.Installation
                 {
                     string destination = ResolveUnderRoot(staging, pair.Key);
                     Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-                    WriteEntry(entries[pair.Key], destination, pair.Value.Size, pair.Value.Sha256);
+                    WriteEntry(entries[pair.Key], destination, pair.Value.Size, pair.Value.Hash);
                 }
             }
         }
@@ -525,7 +526,7 @@ namespace Nightwire.Runtime.Installation
 
         internal static object GetInstallRootLock(string root)
         {
-            string canonicalRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+            string canonicalRoot = RuntimeFileSystem.TrimEndingDirectorySeparator(root);
             lock (InstallRootLocksGate)
             {
                 if (!InstallRootLocks.TryGetValue(canonicalRoot, out object? gate))
