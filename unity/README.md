@@ -59,7 +59,7 @@ The Episode 001 story package now includes three character profiles (Anisha, Raf
 - Episode library presentation and installed/offline episode discovery.\n- Three layered, procedurally generated fog banks drifting at different speeds behind the interface; no external fog asset or network download is required.
 - Episode session start/resume and save-backed return to archive.
 - Data-driven investigation screens for frequency tuning, sequence reconstruction, and evidence matching, using the portable minigame runtime and persisted attempt/timer state.
-- Episode-local conversation inbox for switching between already-opened threads without unlocking future story content.
+- Episode-local conversation inbox with participant/group identity, last-message previews, unread counts, completion state, and safe switching between already-opened threads without unlocking future story content.
 - Timed, localized text conversations.
 - Authored branching choices and relationship/story-flag effects.
 - Inline previews of unlocked, manifest-verified images.
