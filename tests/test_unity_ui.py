@@ -126,6 +126,17 @@ class NightwireUnityUiTests(unittest.TestCase):
                 self.assertIn(token, source)
         self.assertIn('answer.clicked += () => StartCallPresentation(callId);', source)
         self.assertIn('callTickAccumulatorSeconds < 1.0', source)
+    def test_conversation_inbox_lists_only_opened_threads_and_switches_safely(self):
+        uxml = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uxml").read_text(encoding="utf-8")
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
+        for token in ("inbox-open-button", "conversation-inbox", "inbox-close-button", "conversation-inbox-list"):
+            with self.subTest(token=token):
+                self.assertIn(token, uxml)
+        for token in ("RenderConversationInbox", "ConversationProgress.Keys", "OpenConversationFromInbox", "BeginConversation", "HideConversationInbox"):
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+        self.assertIn("!session.Progress.ConversationProgress.ContainsKey(conversationId)", source)
+
     def test_group_conversations_render_a_participant_roster(self):
         uxml = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uxml").read_text(encoding="utf-8")
         source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
