@@ -136,6 +136,8 @@ class NightwireUnityUiTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, source)
         self.assertIn("!session.Progress.ConversationProgress.ContainsKey(conversationId)", source)
+        self.assertIn("unreadCount", source)
+        self.assertIn('"UNREAD " + unreadCount.ToString()', source)
 
     def test_group_conversations_render_a_participant_roster(self):
         uxml = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uxml").read_text(encoding="utf-8")
