@@ -63,6 +63,15 @@ class NightwireUnityUiTests(unittest.TestCase):
         self.assertIn("session.OpenAsset(assetId)", source)
         self.assertIn("maximumInlineMediaBytes", source)
 
+    def test_audio_playback_only_accepts_supported_streaming_types(self):
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/MessengerScreenController.cs").read_text(encoding="utf-8")
+        self.assertIn('case ".mp3":', source)
+        self.assertIn('case ".wav":', source)
+        self.assertIn('case ".ogg":', source)
+        self.assertIn("UNSUPPORTED AUDIO FORMAT", source)
+        self.assertNotIn("AudioType.AIFF", source)
+        self.assertNotIn("AudioType.ACC", source)
+
     def test_development_provider_does_not_refresh_remote_catalogue(self):
         source = (ROOT / "unity/Assets/Nightwire/Scripts/NightwireDevelopmentPlatformServices.cs").read_text(encoding="utf-8")
         self.assertIn("ShouldRefreshCatalogue => false", source)
