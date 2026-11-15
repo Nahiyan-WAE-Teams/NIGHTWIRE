@@ -13,6 +13,7 @@ namespace Nightwire.Unity
     public interface INightwirePlatformServices
     {
         Uri CatalogueUri { get; }
+        bool ShouldRefreshCatalogue { get; }
         IReadOnlyList<TrustedReleaseKey> GetTrustedReleaseKeys();
         IReleaseCatalogueSequenceStore CreateCatalogueSequenceStore();
     }
@@ -24,6 +25,7 @@ namespace Nightwire.Unity
     public abstract class NightwirePlatformServicesBehaviour : MonoBehaviour, INightwirePlatformServices
     {
         public abstract Uri CatalogueUri { get; }
+        public abstract bool ShouldRefreshCatalogue { get; }
         public abstract IReadOnlyList<TrustedReleaseKey> GetTrustedReleaseKeys();
         public abstract IReleaseCatalogueSequenceStore CreateCatalogueSequenceStore();
     }
