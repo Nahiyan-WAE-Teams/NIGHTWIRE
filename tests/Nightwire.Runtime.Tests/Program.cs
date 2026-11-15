@@ -222,10 +222,12 @@ internal static class Program
         string root = FindRepositoryRoot();
         var package = new EpisodePackageLoader().Load(Path.Combine(root, "examples", "Episode_001"));
         Assert(package.Descriptor.EpisodeId == "nightwire.ep001", "Episode identity was not loaded.");
-        Assert(package.Conversations.ContainsKey("anisha.day01"), "Conversation was not indexed.");
-        Assert(package.CharacterProfiles.ContainsKey("anisha"), "Character profile was not indexed.");
+        Assert(package.Conversations.ContainsKey("anisha.day01"), "Anisha conversation was not indexed.");
+        Assert(package.Conversations.ContainsKey("rafi.day01"), "Rafi conversation was not indexed.");
+        Assert(package.Conversations.ContainsKey("mira.day01"), "Mira conversation was not indexed.");
+        Assert(package.CharacterProfiles.Count == 3, "Episode character profiles were not indexed.");
         Assert(package.CharacterPosts.ContainsKey("anisha.post01"), "Character post was not indexed.");
-        Assert(package.RuntimeDefinition.Events.Count == 2, "Story events were not parsed.");
+        Assert(package.RuntimeDefinition.Events.Count == 6, "Expanded story events were not parsed.");
         Assert(package.Localization["en"].ContainsKey("episode.title"), "Localization was not loaded.");
     }
 
