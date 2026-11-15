@@ -49,6 +49,10 @@ class NightwireUnityUiTests(unittest.TestCase):
         self.assertIn("NightwireMain.unity", source)
         self.assertIn("Episode_001.zip", source)
         self.assertIn("EditorBuildSettings.scenes", source)
+        self.assertIn("ScriptingImplementation.IL2CPP", source)
+        self.assertIn("AndroidArchitecture.ARM64", source)
+        self.assertIn("AndroidApiLevel28", source)
+        self.assertIn("AndroidApiLevel36", source)
 
     def test_android_ci_build_creates_development_apk_and_prepares_scene(self):
         build = (ROOT / "unity/Assets/Editor/NightwireAndroidBuild.cs").read_text(encoding="utf-8")
