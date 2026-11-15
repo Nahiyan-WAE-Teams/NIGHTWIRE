@@ -1703,6 +1703,12 @@ internal static class Program
             string backup = Path.Combine(installRoot,
                 ".backup-nightwire.ep001-" + Guid.NewGuid().ToString("N"));
             Directory.Move(installed.InstallDirectory!, backup);
+            string invalidBackup = Path.Combine(installRoot,
+                ".backup-nightwire.ep001-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(invalidBackup);
+            File.WriteAllText(Path.Combine(invalidBackup, "not-a-package.marker"), "invalid backup");
+            Directory.SetLastWriteTimeUtc(backup, DateTime.UtcNow.AddMinutes(-2));
+            Directory.SetLastWriteTimeUtc(invalidBackup, DateTime.UtcNow);
             string destination = Path.Combine(installRoot, "nightwire.ep001");
             Directory.CreateDirectory(destination);
             File.WriteAllText(Path.Combine(destination, "partial.marker"), "damaged replacement");
@@ -1717,6 +1723,7 @@ internal static class Program
             Assert(!File.Exists(Path.Combine(destination, "partial.marker")),
                 "The invalid destination remained active after recovery.");
             Assert(!Directory.Exists(backup), "Successfully restored backup was not consumed.");
+            Assert(!Directory.Exists(invalidBackup), "Obsolete invalid backup was not cleaned after successful recovery.");
         }
         finally
         {
