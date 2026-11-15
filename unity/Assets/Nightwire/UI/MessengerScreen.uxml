@@ -33,6 +33,20 @@
             <ui:VisualElement name="choice-list" class="choice-list" />
             <ui:Label name="conversation-status" text="Waiting for the next transmission…" class="conversation-status" />
         </ui:VisualElement>
+        <ui:VisualElement name="call-screen" class="call-screen" style="display: none;">
+            <ui:Label name="call-kicker" text="INCOMING TRANSMISSION" class="call-kicker" />
+            <ui:Label name="call-contact" text="UNKNOWN CALLER" class="call-contact" />
+            <ui:VisualElement name="call-visual-frame" class="call-visual-frame">
+                <ui:Image name="call-video-surface" class="call-video-surface" />
+                <ui:Label name="call-audio-avatar" text="NW" class="call-audio-avatar" />
+                <ui:Label name="call-effect-overlay" class="call-effect-overlay" />
+            </ui:VisualElement>
+            <ui:Label name="call-speaker" text="" class="call-speaker" />
+            <ui:Label name="call-subtitle" text="" class="call-subtitle" />
+            <ui:Label name="call-timer" text="00:00" class="call-timer" />
+            <ui:Label name="call-status" text="VERIFYING CALL MEDIA…" class="call-status" />
+            <ui:Button name="call-retry-button" text="RETRY MEDIA" class="call-retry-button" style="display: none;" />
+        </ui:VisualElement>
         <ui:VisualElement name="profile-overlay" class="profile-overlay" style="display: none;">
             <ui:VisualElement class="profile-card">
                 <ui:Button name="profile-close-button" text="CLOSE" class="profile-close-button" />
