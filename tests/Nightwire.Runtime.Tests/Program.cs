@@ -1874,7 +1874,7 @@ internal static class Program
             Assert(first.GetAwaiter().GetResult().ErrorCode == "episode_install_cancelled" &&
                 second.GetAwaiter().GetResult().ErrorCode == "episode_install_cancelled",
                 "Disposing managers did not cancel both isolated downloads.");
-            string[] managerDirectories = Directory.GetDirectories(sharedDownloadRoot, ".manager-*", SearchOption.TopDirectoryOnly);
+            string[] managerDirectories = Directory.GetDirectories(sharedDownloadRoot, ".library-*", SearchOption.TopDirectoryOnly);
             Assert(managerDirectories.Length == 2 && !string.Equals(managerDirectories[0], managerDirectories[1], StringComparison.Ordinal),
                 "Managers did not receive distinct download cache directories.");
         }
