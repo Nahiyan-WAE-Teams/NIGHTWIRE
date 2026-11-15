@@ -1,0 +1,12 @@
+{
+  "schema_version": "0.1",
+  "character_id": "mira",
+  "display_name_key": "character.mira.name",
+  "bio_key": "character.mira.bio",
+  "avatar_asset_id": null,
+  "status_key": "character.mira.status",
+  "conversation_ids": [
+    "mira.day01"
+  ],
+  "post_ids": []
+}
