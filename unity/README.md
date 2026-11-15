@@ -84,3 +84,18 @@ Unity In-App Purchasing 5.5.0 is pinned in `Packages/manifest.json`. `NightwireI
 Game UI CI stages the runtime assemblies, validates UI source contracts, builds the Android StrongBox secure-store AAR with JDK 17 / Gradle 9.3.1 / Android SDK 36, verifies its JNI class and backup-exclusion resources, and uploads the AAR as the `nightwire-android-secure-store-aar` workflow artifact. It is still not a Unity Editor compile or Android player build. Unity Editor compilation, Play Mode testing, final manifest merge, and Android device/StrongBox verification require an actual Unity 6000.3.28f1 installation and device/toolchain execution.
 
 See [episode library architecture](../docs/architecture/UNITY_EPISODE_LIBRARY_UI.md), [messenger architecture](../docs/architecture/MESSENGER_SCREEN.md), and [Android StrongBox notes](Android/NightwireSecureStore/README.md).
+
+
+## Manual Android APK build
+
+The repository includes a separate, manually triggered Unity Editor build workflow at `.github/workflows/android-apk.yml`. It uses GameCI Unity Builder v4 with the pinned Unity 6000.3.28f1 editor and exports an APK (not an AAB). The workflow is deliberately manual so ordinary source/engine CI runs do not consume Unity build minutes.
+
+For a Unity Personal license, configure these repository Actions secrets before running it:
+
+- `UNITY_LICENSE`: the complete contents of the Unity Personal `.ulf` license file activated through Unity Hub.
+- `UNITY_EMAIL`: the Unity account email associated with that license.
+- `UNITY_PASSWORD`: the Unity account password, stored only as a GitHub Actions secret.
+
+Then open **Actions → NIGHTWIRE Android APK → Run workflow**. A successful run uploads the `nightwire-android-apk` artifact. Do not commit license material or credentials. The first build is also an integration check: Unity must import the project, run the editor bootstrapper, compile all scripts/packages, generate the initial scene, and produce the Android player successfully.
+
+The current workflow uses Unity's default Android signing configuration for a development/test APK. It is not a Play Store release-signed artifact. Production signing requires a separately provisioned Android keystore and password/alias secrets; never put those values in source control or chat. A successful CI artifact still needs installation and device smoke testing before release.
