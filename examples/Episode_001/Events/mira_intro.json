@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1",
+  "event_id": "event.mira_intro",
+  "trigger": {
+    "type": "message_completed",
+    "message_id": "rafi.day01.006"
+  },
+  "actions": [
+    {
+      "type": "open_conversation",
+      "conversation_id": "mira.day01"
+    }
+  ]
+}
