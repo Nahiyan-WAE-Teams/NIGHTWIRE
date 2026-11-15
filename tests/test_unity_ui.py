@@ -85,6 +85,16 @@ class NightwireUnityUiTests(unittest.TestCase):
                 self.assertIn(token, source)
         self.assertEqual(bootstrap.count("AddComponent<NightwireAtmosphereController>()"), 2)
 
+    def test_iap_service_uses_iap_55_and_requires_server_fulfillment(self):
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/NightwireIapService.cs").read_text(encoding="utf-8")
+        for token in ("PurchasingController", "CatalogProvider", "OnPurchasePending", "ConfirmPurchase",
+                      "INightwirePurchaseFulfillment", "VerifyAndFulfillAsync", "CanPurchase"):
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+        self.assertIn("fulfillmentProvider is INightwirePurchaseFulfillment", source)
+        self.assertIn("if (!fulfilled)", source)
+        self.assertIn("The transaction remains pending", source)
+
     def test_development_provider_does_not_refresh_remote_catalogue(self):
         source = (ROOT / "unity/Assets/Nightwire/Scripts/NightwireDevelopmentPlatformServices.cs").read_text(encoding="utf-8")
         self.assertIn("ShouldRefreshCatalogue => false", source)
