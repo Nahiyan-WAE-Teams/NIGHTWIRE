@@ -5,6 +5,7 @@ using System.Linq;
 using Nightwire.Unity;
 using Nightwire.Unity.UI;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -186,6 +187,10 @@ namespace Nightwire.Unity.Editor
             PlayerSettings.defaultScreenWidth = 1080;
             PlayerSettings.defaultScreenHeight = 1920;
             PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, "com.nightwire.game");
+            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+            PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel28;
+            PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevel36;
         }
     }
 }
