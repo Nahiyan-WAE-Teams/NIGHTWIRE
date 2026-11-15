@@ -346,8 +346,7 @@ namespace Nightwire.Unity.UI
         private void UpdateMediaPlayback()
         {
             if (activeAudioAssetId != null && !audioPaused && mediaAudioSource != null &&
-                activeAudioClip != null && !mediaAudioSource.isPlaying &&
-                mediaAudioSource.time >= activeAudioClip.length - 0.05f)
+                activeAudioClip != null && !mediaAudioSource.isPlaying)
             {
                 if (activeAudioButton != null) activeAudioButton.text = "REPLAY AUDIO";
                 if (activeAudioStatus != null) activeAudioStatus.text = "PLAYBACK COMPLETE";
