@@ -1,0 +1,52 @@
+name: NIGHTWIRE Game UI CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "unity/**"
+      - "tools/prepare-unity-runtime.sh"
+      - "tools/Prepare-UnityRuntime.ps1"
+      - "tools/validate_unity_ui.py"
+      - "tests/test_unity_ui.py"
+      - ".github/workflows/game-ui-ci.yml"
+  pull_request:
+    paths:
+      - "unity/**"
+      - "tools/prepare-unity-runtime.sh"
+      - "tools/Prepare-UnityRuntime.ps1"
+      - "tools/validate_unity_ui.py"
+      - "tests/test_unity_ui.py"
+      - ".github/workflows/game-ui-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ui-source-validation:
+    name: Unity UI source and runtime integration checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Stage portable runtime assemblies for Unity
+        run: bash tools/prepare-unity-runtime.sh
+
+      - name: Validate Unity project and UI source contracts
+        run: python tools/validate_unity_ui.py --require-staged-runtime
+
+      - name: Run game UI source regression tests
+        run: python -m unittest discover -s tests -p "test_unity_ui.py" -v
