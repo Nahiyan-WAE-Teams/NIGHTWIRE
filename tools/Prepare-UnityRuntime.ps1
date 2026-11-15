@@ -5,7 +5,12 @@ $Publish = Join-Path $Root ".nightwire-unity-publish"
 $Destination = Join-Path $Root "unity/Assets/Plugins/Nightwire"
 
 $DotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
-if ($null -eq $DotnetCommand) {
+$HasNet10Sdk = $false
+if ($null -ne $DotnetCommand) {
+    $InstalledSdks = & $DotnetCommand.Source --list-sdks 2>$null
+    $HasNet10Sdk = @($InstalledSdks | Where-Object { $_ -match '^10\\.' }).Count -gt 0
+}
+if (-not $HasNet10Sdk) {
     # Unity Build Automation Windows images do not guarantee a preinstalled .NET SDK.
     # Bootstrap the supported .NET 10 SDK into the builder user's profile.
     $SdkInstall = Join-Path $env:USERPROFILE ".dotnet"
@@ -16,8 +21,6 @@ if ($null -eq $DotnetCommand) {
     $env:DOTNET_ROOT = $SdkInstall
     $env:PATH = "$SdkInstall;$SdkInstall\tools;$env:PATH"
     $Dotnet = Join-Path $SdkInstall "dotnet.exe"
-} else {
-    $Dotnet = $DotnetCommand.Source
 }
 
 if (Test-Path $Publish) { Remove-Item $Publish -Recurse -Force }
