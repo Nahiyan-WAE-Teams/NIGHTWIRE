@@ -21,6 +21,8 @@ if (-not $HasNet10Sdk) {
     $env:DOTNET_ROOT = $SdkInstall
     $env:PATH = "$SdkInstall;$SdkInstall\tools;$env:PATH"
     $Dotnet = Join-Path $SdkInstall "dotnet.exe"
+} else {
+    $Dotnet = $DotnetCommand.Source
 }
 
 if (Test-Path $Publish) { Remove-Item $Publish -Recurse -Force }
