@@ -193,3 +193,6 @@ The host must implement `IEpisodeInstallLeaseProvider` so lease acquisition is a
 Unity UI Toolkit integration source and setup notes are under `unity/Assets/Nightwire` and `docs/architecture/UNITY_EPISODE_LIBRARY_UI.md`. The view raises `PlayEpisodeRequested`; the host remains responsible for starting/resuming gameplay. Unity Editor import, runtime assembly dependency integration, play-mode validation, and Android IL2CPP verification have not been completed.
 
 The release manager configures its default package loader with the host-supplied runtime version and shares that loader with its default installer. If a host injects a custom installer, it must also inject the matching loader configured for the same runtime version; mismatched custom dependencies are rejected at construction.
+
+
+Filesystem compatibility: runtime file publication uses the .NET Standard 2.1 `File.Replace`/`File.Move` surface and a root-preserving path-normalization helper; newer `File.Move(..., overwrite)` and `Path.TrimEndingDirectorySeparator` APIs are not used.
