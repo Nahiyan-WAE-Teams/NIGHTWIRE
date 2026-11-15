@@ -77,6 +77,14 @@ class NightwireUnityUiTests(unittest.TestCase):
         self.assertIn("#if !UNITY_EDITOR && !DEVELOPMENT_BUILD", source)
         self.assertIn("bundled sample seeding is disabled in release players", source)
 
+    def test_procedural_fog_is_layered_animated_and_attached_to_both_screens(self):
+        source = (ROOT / "unity/Assets/Nightwire/Scripts/NightwireAtmosphereController.cs").read_text(encoding="utf-8")
+        bootstrap = (ROOT / "unity/Assets/Editor/NightwireProjectBootstrapper.cs").read_text(encoding="utf-8")
+        for token in ("CreateFogTexture", "Time.unscaledDeltaTime", "Mathf.PerlinNoise", "Speeds", "Opacities"):
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+        self.assertEqual(bootstrap.count("AddComponent<NightwireAtmosphereController>()"), 2)
+
     def test_development_provider_does_not_refresh_remote_catalogue(self):
         source = (ROOT / "unity/Assets/Nightwire/Scripts/NightwireDevelopmentPlatformServices.cs").read_text(encoding="utf-8")
         self.assertIn("ShouldRefreshCatalogue => false", source)
