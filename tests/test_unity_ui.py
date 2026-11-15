@@ -148,6 +148,8 @@ class NightwireUnityUiTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, source)
         self.assertIn("callTickAccumulatorSeconds += (mediaPositionMilliseconds - callLastMediaPositionMilliseconds) / 1000.0", source)
+        begin_media = source[source.index("private void BeginCallMedia"):source.index("private System.Collections.IEnumerator LoadCallAudio")]
+        self.assertIn('callUsesVideo = string.Equals(mode, "video", StringComparison.Ordinal)', begin_media)
 
     def test_group_conversations_render_a_participant_roster(self):
         uxml = (ROOT / "unity/Assets/Nightwire/UI/MessengerScreen.uxml").read_text(encoding="utf-8")
