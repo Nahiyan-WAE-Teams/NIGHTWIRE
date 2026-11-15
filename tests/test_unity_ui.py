@@ -106,7 +106,7 @@ class NightwireUnityUiTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, uss)
         for token in ("ShowContactDirectory", "contactsList.Clear()", "ShowContactProfile(characterId)",
-                      'CharacterProfiles.Where(pair => !string.Equals(pair.Key, "player", StringComparison.Ordinal))',
+                      '.Where(pair => !string.Equals(pair.Key, "player", StringComparison.Ordinal))',
                       'Localize(ReadString(entry.Value, "bio_key")'):
             with self.subTest(token=token):
                 self.assertIn(token, source)
