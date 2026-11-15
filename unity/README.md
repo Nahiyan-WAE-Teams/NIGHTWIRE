@@ -108,13 +108,16 @@ See [episode library architecture](../docs/architecture/UNITY_EPISODE_LIBRARY_UI
 
 The repository includes a separate, manually triggered Unity Editor build workflow at `.github/workflows/android-apk.yml`. It uses GameCI Unity Builder v4 with the pinned Unity 6000.3.28f1 editor and a project-owned build method to generate a development APK (not an AAB). The method explicitly prepares the generated scene and bundled sample archive, then enables `BuildOptions.Development` so the offline development provider and sample seeder are available in this test build. It is not a production build. The workflow is deliberately manual so ordinary source/engine CI runs do not consume Unity build minutes.
 
-For a Unity Personal license, configure these repository Actions secrets before running it:
+For a Unity Personal license, first obtain a CI-compatible `.ulf` license:
 
-- `UNITY_LICENSE`: the complete contents of the Unity Personal `.ulf` license file activated through Unity Hub.
-- `UNITY_EMAIL`: the Unity account email associated with that license.
-- `UNITY_PASSWORD`: the Unity account password, stored only as a GitHub Actions secret.
+1. Open **Actions → NIGHTWIRE Unity License Activation → Run workflow**.
+2. Download the `NIGHTWIRE-Unity-Activation-Request` artifact from that run and extract its `.alf` file.
+3. Submit the `.alf` file through Unity's manual activation portal at https://license.unity3d.com/ and download the returned `.ulf` license file.
+4. In **Settings → Secrets and variables → Actions**, add `UNITY_LICENSE` with the complete `.ulf` file contents, `UNITY_EMAIL` with the Unity account email, and `UNITY_PASSWORD` with the account password.
 
-Then open **Actions → NIGHTWIRE Android APK → Run workflow**. A successful run uploads the `nightwire-android-apk` artifact. Do not commit license material or credentials. The first build is also an integration check: Unity must import the project, run the editor bootstrapper, compile all scripts/packages, generate the initial scene, and produce the Android player successfully.
+The local `UnityEntitlementLicense.xml` named-user entitlement file is not the `.ulf` payload expected by the standard GameCI Personal-license flow. Do not upload that XML as `UNITY_LICENSE`, and never commit license material or credentials.
+
+After the three Actions secrets are configured, open **Actions → NIGHTWIRE Android APK → Run workflow**. A successful run uploads the `nightwire-android-apk` artifact. Do not commit license material or credentials. The first build is also an integration check: Unity must import the project, run the editor bootstrapper, compile all scripts/packages, generate the initial scene, and produce the Android player successfully.
 
 The current workflow uses Unity's default Android signing configuration for a development/test APK. It is not a Play Store release-signed artifact. Production signing requires a separately provisioned Android keystore and password/alias secrets; never put those values in source control or chat. A successful CI artifact still needs installation and device smoke testing before release.
 
