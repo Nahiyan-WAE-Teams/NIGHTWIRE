@@ -32,6 +32,16 @@
             <ui:Label name="response-heading" text="STORY RESPONSE" class="response-heading" />
             <ui:VisualElement name="choice-list" class="choice-list" />
             <ui:Label name="conversation-status" text="Waiting for the next transmission…" class="conversation-status" />
+            <ui:Button name="minigame-entry-button" text="OPEN INVESTIGATION" class="minigame-entry-button" style="display: none;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="minigame-screen" class="minigame-screen" style="display: none;">
+            <ui:Label text="NIGHTWIRE FIELD TERMINAL" class="minigame-kicker" />
+            <ui:Label name="minigame-title" text="INVESTIGATION" class="minigame-title" />
+            <ui:Label name="minigame-instructions" text="" class="minigame-instructions" />
+            <ui:Label name="minigame-progress" text="" class="minigame-progress" />
+            <ui:VisualElement name="minigame-challenge-content" class="minigame-challenge-content" />
+            <ui:Label name="minigame-feedback" text="" class="minigame-feedback" />
+            <ui:Button name="minigame-continue-button" text="CONTINUE" class="minigame-continue-button" style="display: none;" />
         </ui:VisualElement>
         <ui:VisualElement name="call-screen" class="call-screen" style="display: none;">
             <ui:Label name="call-kicker" text="INCOMING TRANSMISSION" class="call-kicker" />
