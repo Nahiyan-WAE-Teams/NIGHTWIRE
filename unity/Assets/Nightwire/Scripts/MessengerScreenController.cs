@@ -697,6 +697,12 @@ namespace Nightwire.Unity.UI
                 Destroy(activeAudioClip);
                 activeAudioClip = null;
             }
+            if (activeAudioButton != null)
+            {
+                activeAudioButton.text = "PLAY AUDIO";
+                activeAudioButton.SetEnabled(true);
+            }
+            if (activeAudioStatus != null) activeAudioStatus.text = "STOPPED";
             activeAudioAssetId = null;
             activeAudioButton = null;
             activeAudioStatus = null;
@@ -706,6 +712,12 @@ namespace Nightwire.Unity.UI
         private void StopVideoPlayback()
         {
             if (mediaVideoPlayer != null) mediaVideoPlayer.Stop();
+            if (activeVideoButton != null)
+            {
+                activeVideoButton.text = "PLAY VIDEO";
+                activeVideoButton.SetEnabled(true);
+            }
+            if (activeVideoStatus != null) activeVideoStatus.text = "STOPPED";
             activeVideoAssetId = null;
             activeVideoButton = null;
             activeVideoStatus = null;
@@ -715,6 +727,7 @@ namespace Nightwire.Unity.UI
         {
             StopAudioPlayback();
             StopVideoPlayback();
+            if (mediaVideoPlayer != null) mediaVideoPlayer.targetTexture = null;
             if (videoRenderTexture != null)
             {
                 videoRenderTexture.Release();
