@@ -781,6 +781,7 @@ namespace Nightwire.Unity.UI
         {
             if (!definition.TryGetProperty("media", out var media) || media.ValueKind != JsonValueKind.Object) { FailCallMedia("CALL MEDIA METADATA IS MISSING."); return; }
             string mode = ReadString(definition, "mode");
+            callUsesVideo = string.Equals(mode, "video", StringComparison.Ordinal);
             string assetId = ReadString(media, mode == "video" ? "video_asset_id" : "audio_asset_id");
             string expectedType = mode == "video" ? "video" : "audio";
             if (assetId.Length == 0) { FailCallMedia("CALL MEDIA REFERENCE IS MISSING."); return; }
