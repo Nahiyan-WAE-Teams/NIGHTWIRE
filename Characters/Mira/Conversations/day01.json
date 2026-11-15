@@ -1,0 +1,78 @@
+{
+  "schema_version": "0.1",
+  "conversation_id": "mira.day01",
+  "participants": [
+    "player",
+    "mira"
+  ],
+  "messages": [
+    {
+      "message_id": "mira.day01.001",
+      "type": "text",
+      "sender_id": "mira",
+      "text_key": "chat.mira.001",
+      "delay_seconds": 1
+    },
+    {
+      "message_id": "mira.day01.002",
+      "type": "text",
+      "sender_id": "mira",
+      "text_key": "chat.mira.002",
+      "delay_seconds": 1.3
+    },
+    {
+      "message_id": "mira.day01.003",
+      "type": "choice",
+      "sender_id": "mira",
+      "prompt_key": "choice.mira.003.prompt",
+      "options": [
+        {
+          "option_id": "send_location",
+          "text_key": "choice.mira.003.send",
+          "next_message_id": "mira.day01.004",
+          "relationship_delta": 2,
+          "set_flags": [
+            "shared_location"
+          ]
+        },
+        {
+          "option_id": "keep_safe",
+          "text_key": "choice.mira.003.keep",
+          "next_message_id": "mira.day01.005",
+          "relationship_delta": 1,
+          "set_flags": [
+            "withheld_location"
+          ]
+        }
+      ]
+    },
+    {
+      "message_id": "mira.day01.004",
+      "type": "text",
+      "sender_id": "mira",
+      "text_key": "chat.mira.004",
+      "delay_seconds": 1
+    },
+    {
+      "message_id": "mira.day01.005",
+      "type": "text",
+      "sender_id": "mira",
+      "text_key": "chat.mira.005",
+      "delay_seconds": 1
+    },
+    {
+      "message_id": "mira.day01.006",
+      "type": "text",
+      "sender_id": "mira",
+      "text_key": "chat.mira.006",
+      "delay_seconds": 1.5
+    },
+    {
+      "message_id": "mira.day01.007",
+      "type": "text",
+      "sender_id": "mira",
+      "text_key": "chat.mira.007",
+      "delay_seconds": 1
+    }
+  ]
+}
