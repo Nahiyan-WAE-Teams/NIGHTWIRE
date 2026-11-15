@@ -41,7 +41,10 @@ namespace Nightwire.Runtime.Sessions
 
         public LoadedEpisodePackage? Package { get; private set; }
         public EpisodeProgressState? Progress { get; private set; }
-        public bool IsActive => Package != null && Progress != null;
+        public bool IsActive
+        {
+            get { lock (_sessionGate) return Package != null && Progress != null; }
+        }
 
         public RuntimeSessionCoordinator(SaveStore saveStore,
             EpisodePackageLoader? loader = null,
@@ -356,12 +359,15 @@ namespace Nightwire.Runtime.Sessions
 
         private bool TryContext(out LoadedEpisodePackage package, out EpisodeProgressState state, out RuntimeSessionResult? failure)
         {
-            package = Package!;
-            state = Progress!;
-            failure = null;
-            if (package != null && state != null) return true;
-            failure = Fail("session_not_active", "Load or start an episode before using runtime session operations.");
-            return false;
+            lock (_sessionGate)
+            {
+                package = Package!;
+                state = Progress!;
+                failure = null;
+                if (package != null && state != null) return true;
+                failure = Fail("session_not_active", "Load or start an episode before using runtime session operations.");
+                return false;
+            }
         }
 
         private static EpisodeProgressState NewProgress(LoadedEpisodePackage package) =>
