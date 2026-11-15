@@ -1,7 +1,12 @@
 {
   "name": "Nightwire.Unity",
   "rootNamespace": "Nightwire.Unity",
-  "references": ["Nightwire.Runtime"],
+  "references": [
+    "UnityEngine.UIElementsModule",
+    "UnityEngine.VideoModule",
+    "UnityEngine.AudioModule",
+    "Unity.Purchasing"
+  ],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
