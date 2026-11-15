@@ -20,6 +20,11 @@ namespace Nightwire.Unity
 
         public IEnumerator EnsureInstalled(Action<bool> completed)
         {
+#if !UNITY_EDITOR && !DEVELOPMENT_BUILD
+            Debug.LogWarning("NIGHTWIRE bundled sample seeding is disabled in release players.", this);
+            completed?.Invoke(false);
+            yield break;
+#endif
             string dataRoot = Path.Combine(Application.persistentDataPath, "Nightwire");
             string installRoot = Path.Combine(dataRoot, "Episodes");
             string downloadRoot = Path.Combine(dataRoot, "Downloads");
